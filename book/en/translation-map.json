@@ -1,0 +1,261 @@
+{
+  "source_revision": "39287373bee7ecf55c7c8c9c80bc126124831e62",
+  "translation_date": "2026-10-15",
+  "sections": [
+    {
+      "source": "第一篇-角色与服务的基本模型/README.md",
+      "english": "part-01-roles-and-services/README.md",
+      "source_sha256": "2a0cbe95755ac79f8705d4056a7820838fac90bfdc2721c0c5ded0c4505861d1"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/01-business-activities.md",
+      "english": "part-01-roles-and-services/01-business-activities.md",
+      "source_sha256": "9201d8b8e43bbb169080c3031b91c811465de1740363c8c7d9d31e7c424c7c76"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/02-service-model.md",
+      "english": "part-01-roles-and-services/02-service-model.md",
+      "source_sha256": "3a54920f60e5dac0e513b0bdb06886d941059bf6823ba832e14c647ecffb80dc"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/03-roles.md",
+      "english": "part-01-roles-and-services/03-roles.md",
+      "source_sha256": "66859ce14abb7d034e0dc57920012a994eefdfaad9785b72271a4e8fdf36b863"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/04-decomposition.md",
+      "english": "part-01-roles-and-services/04-decomposition.md",
+      "source_sha256": "53fd4e5c9dcb27023726b89012d7a72dca870fc4236aaadf3aad533e65f385fd"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/05-quantum-services.md",
+      "english": "part-01-roles-and-services/05-quantum-services.md",
+      "source_sha256": "af0ad0513e7ca87c3717c7ec8c1b19a21af7796bf4204501d8263914a055e94d"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/06-composition-and-conservation.md",
+      "english": "part-01-roles-and-services/06-composition-and-conservation.md",
+      "source_sha256": "51f51bff5316efcadd06c67c078c50679a87a6ff44ac50ddc19ad04045266fc1"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/07-business-service-characteristics.md",
+      "english": "part-01-roles-and-services/07-business-service-characteristics.md",
+      "source_sha256": "08337aff19c9b950315c7f3a22fe630d44b0314420862d97b1262f66d1bd2072"
+    },
+    {
+      "source": "第一篇-角色与服务的基本模型/08-polymorphism-and-separation.md",
+      "english": "part-01-roles-and-services/08-polymorphism-and-separation.md",
+      "source_sha256": "febe7dcba227c926807ed979e94ab6f353bc7006c7a362c32235845b47baf849"
+    },
+    {
+      "source": "第二篇-服务协作与执行/README.md",
+      "english": "part-02-service-cooperation/README.md",
+      "source_sha256": "45c1c8bd810a65dc6b5dfb25c787233e0151c8d51ca1577f379f15f33377a527"
+    },
+    {
+      "source": "第二篇-服务协作与执行/09-service-coordination.md",
+      "english": "part-02-service-cooperation/09-service-coordination.md",
+      "source_sha256": "34f6cb0ed5fc3a2570777b0c6d0f187bcac53ed1b8b060b9edbd73d370113197"
+    },
+    {
+      "source": "第二篇-服务协作与执行/10-parallelism-and-costs.md",
+      "english": "part-02-service-cooperation/10-parallelism-and-costs.md",
+      "source_sha256": "f69438e93219071b92c66de3b64da99a21d187db434bc48ee8740505a0ea0a63"
+    },
+    {
+      "source": "第二篇-服务协作与执行/11-deployment-granularity.md",
+      "english": "part-02-service-cooperation/11-deployment-granularity.md",
+      "source_sha256": "6ddbc56ccf06b681cccb52b0bbfec3b92dc3a1545983089d6a9887af3d60699b"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/README.md",
+      "english": "part-03-the-spp-language/README.md",
+      "source_sha256": "3ac7eee81a2e667285737b65972581c804da9c7d755fe88584c1d06ec8b38dd4"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/12-layers.md",
+      "english": "part-03-the-spp-language/12-layers.md",
+      "source_sha256": "e1f7fee13871f6d274e0732548187d0a0b019e6db2d096e6b364eb1d51a01c37"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/13-business-models.md",
+      "english": "part-03-the-spp-language/13-business-models.md",
+      "source_sha256": "de192c333e812c3baab5eda38916ab33fd76d409e71aabc961fad88c926764f2"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/14-take.md",
+      "english": "part-03-the-spp-language/14-take.md",
+      "source_sha256": "660d5ce7dca69213f69bd72a8a42e457eb4ed0ca08825c66f067cfaf9b3047ce"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/15-atomic-services.md",
+      "english": "part-03-the-spp-language/15-atomic-services.md",
+      "source_sha256": "ab4fc4f66213b55252a5a4eb328f613c937624cce5348b922581a78402c0a2e5"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/16-calculation-and-rules.md",
+      "english": "part-03-the-spp-language/16-calculation-and-rules.md",
+      "source_sha256": "9c9698fc7a519703487f0706f812fb9086a419f5cf277a5da3a379645acf40e1"
+    },
+    {
+      "source": "第三篇-用S++表达角色与服务/17-scenarios.md",
+      "english": "part-03-the-spp-language/17-scenarios.md",
+      "source_sha256": "9ec34c8c766d6afca9d638ee31bfc8619ac702065a6817e11986ab2b5999f98b"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/README.md",
+      "english": "part-04-consistency-and-execution/README.md",
+      "source_sha256": "815faf84e5b46804e24650f2fabcc33d9a2ece8549dc3f73498a34c225ea9999"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/18-facts-and-storage.md",
+      "english": "part-04-consistency-and-execution/18-facts-and-storage.md",
+      "source_sha256": "94b0676e898ada3cf3ae0707c2b4cc6cb280db1941d91862ebf5f3971ee5c614"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/19-transactions.md",
+      "english": "part-04-consistency-and-execution/19-transactions.md",
+      "source_sha256": "0122486ce72525299e19968a6748a94eb57965e417f3f1c3104f0519c963f5f4"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/20-quantum-execution.md",
+      "english": "part-04-consistency-and-execution/20-quantum-execution.md",
+      "source_sha256": "821173830915f49777777adc256c48a2cd5abebb90de45e6572f05242e375cb1"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/21-recovery.md",
+      "english": "part-04-consistency-and-execution/21-recovery.md",
+      "source_sha256": "0d6b950f02be07f1c0e27c1e3dfdd2f6f4a11952ff7eb4a716aa13aa2faf8510"
+    },
+    {
+      "source": "第四篇-一致性与执行保障/22-generation-and-runtime.md",
+      "english": "part-04-consistency-and-execution/22-generation-and-runtime.md",
+      "source_sha256": "c887df9c1c1b74baac4506ef628bfe56b17e3fa8ef76b622da3c79401a3da54e"
+    },
+    {
+      "source": "第五篇-业务与技术分离/README.md",
+      "english": "part-05-business-and-technology/README.md",
+      "source_sha256": "6d854f6419acfe9336d93777db70e32e2ef371a5ca2362d0b45646331b19586c"
+    },
+    {
+      "source": "第五篇-业务与技术分离/23-separation-benefits.md",
+      "english": "part-05-business-and-technology/23-separation-benefits.md",
+      "source_sha256": "564462bfe5b231adfaf7362615bdf9fdeecee22eec71807d9597cdb530d66b97"
+    },
+    {
+      "source": "第五篇-业务与技术分离/24-performance-services.md",
+      "english": "part-05-business-and-technology/24-performance-services.md",
+      "source_sha256": "2325f5e564575fe5303fdf3a6645c17dcaea7acbaec7e516a8e1b444f9a09219"
+    },
+    {
+      "source": "第五篇-业务与技术分离/25-security-services.md",
+      "english": "part-05-business-and-technology/25-security-services.md",
+      "source_sha256": "310f834e221d039654b66ce71f0e31a4f195969c6731dadc13ac5c64714f6847"
+    },
+    {
+      "source": "第五篇-业务与技术分离/26-reliability-services.md",
+      "english": "part-05-business-and-technology/26-reliability-services.md",
+      "source_sha256": "00fcf03079ced522de000d15a124fae4faf100395992479fc098016e1a1b03f0"
+    },
+    {
+      "source": "第五篇-业务与技术分离/27-operations-and-evolution.md",
+      "english": "part-05-business-and-technology/27-operations-and-evolution.md",
+      "source_sha256": "bff65798809d11b4b08fa2fef06c0d548c3291540769fbbdd88df2d84f38e00e"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/README.md",
+      "english": "part-06-petstore/README.md",
+      "source_sha256": "e70d192fdf88c63df3f1913f89d224f626ed6c640f058d317248b65fb2307c1f"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/28-petstore-modeling.md",
+      "english": "part-06-petstore/28-petstore-modeling.md",
+      "source_sha256": "e5dff7312bc4e0692f7d4909c74c4b32c20c7dd3fbbbaeaa6f9163447e38e648"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/29-opening-and-transfers.md",
+      "english": "part-06-petstore/29-opening-and-transfers.md",
+      "source_sha256": "a57ac2461eab0a84cc72ccb3e6049188b27b8f62cf6628ace1508a0f07347381"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/30-order-lifecycle.md",
+      "english": "part-06-petstore/30-order-lifecycle.md",
+      "source_sha256": "207f6acf5d95d24acaab0939bdc58df996514fafeafe731c24d659257e4b122e"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/31-returns-and-reservations.md",
+      "english": "part-06-petstore/31-returns-and-reservations.md",
+      "source_sha256": "19353533efebd445d174da42dcd8374e1529f2c168b96e221ef4bb6600851427"
+    },
+    {
+      "source": "第六篇-完整实践Petstore/32-validation-and-performance.md",
+      "english": "part-06-petstore/32-validation-and-performance.md",
+      "source_sha256": "f2c5e9346ff939fac97af3345029c6ae8faadbd57fde0d5326a84e1eeda16cca"
+    },
+    {
+      "source": "第七篇-进阶案例与架构方法/README.md",
+      "english": "part-07-advanced-cases/README.md",
+      "source_sha256": "b88da0aa2b02aaea1440dc596deffa770af867cefbe112866f210a0078e04dbe"
+    },
+    {
+      "source": "第七篇-进阶案例与架构方法/33-banking.md",
+      "english": "part-07-advanced-cases/33-banking.md",
+      "source_sha256": "733e32b322f7cb9be6f3845962e6c87e7862bca449600340494850bea30998b4"
+    },
+    {
+      "source": "第七篇-进阶案例与架构方法/34-migration.md",
+      "english": "part-07-advanced-cases/34-migration.md",
+      "source_sha256": "83bf78a1e1e831961a5b2e8ce4c2eeacddc46b386666912d648d2908dcdf1947"
+    },
+    {
+      "source": "第七篇-进阶案例与架构方法/35-design-review.md",
+      "english": "part-07-advanced-cases/35-design-review.md",
+      "source_sha256": "5994a5c4329b0db020e5fae1949aaa2422a3053faa99e05449f203d9ebc7b821"
+    },
+    {
+      "source": "附录/README.md",
+      "english": "appendices/README.md",
+      "source_sha256": "07bc53431f0a841de8d6fe92f3fe60d94c2cbfd3cdd4ec7fb85d37bd5a76788d"
+    },
+    {
+      "source": "附录/a-service-model.md",
+      "english": "appendices/a-service-model.md",
+      "source_sha256": "0a93cf09b9c5552a2f025fb8e2c3284c9a23fd750726bc3a668f21ff2c459cb0"
+    },
+    {
+      "source": "附录/b-parallel-conditions.md",
+      "english": "appendices/b-parallel-conditions.md",
+      "source_sha256": "16b5d111395aa12c9461161ab11d2e6c8f7e2e8272e25517d0c88c0990d9e937"
+    },
+    {
+      "source": "附录/c-performance.md",
+      "english": "appendices/c-performance.md",
+      "source_sha256": "a880a3129c3a1efa1f06d5d75996e8bbbbe479d2c68c5b8efd441af83c9e0f8d"
+    },
+    {
+      "source": "附录/d-quantum-contracts.md",
+      "english": "appendices/d-quantum-contracts.md",
+      "source_sha256": "42443c07a6c188d71a86e0e6fda5d10133604e081a582d0e1a0c8663b6dda2b1"
+    },
+    {
+      "source": "附录/e-language-and-build.md",
+      "english": "appendices/e-language-and-build.md",
+      "source_sha256": "885566944eaf91d1795ac9b4469ef282d7e5d9a96e7c0b6e4f93d2d616f8c804"
+    },
+    {
+      "source": "附录/f-sources-and-evidence.md",
+      "english": "appendices/f-sources-and-evidence.md",
+      "source_sha256": "e5cc9fd9c49c680bab686ee367bc9713f14125ed753eb2023159ae825d6d288f"
+    }
+  ],
+  "english_presentation": {
+    "date": "2026-10-15",
+    "default_locale": "en-US",
+    "example_currency": "USD",
+    "example_names": [
+      "Alex",
+      "Jordan"
+    ],
+    "notes": "Illustrative amounts retain their numeric values. Original bank currency-specific rules and bibliographic source paths are preserved."
+  }
+}

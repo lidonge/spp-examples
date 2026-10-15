@@ -1,0 +1,95 @@
+{
+  "anchored": {
+    "programs": {
+      "files": 9,
+      "physical_lines": 14156,
+      "code_lines": 11410
+    },
+    "direct_copybooks": {
+      "files": 135,
+      "physical_lines": 21798,
+      "code_lines": 10372
+    },
+    "recursive_copybooks": {
+      "files": 161,
+      "physical_lines": 23488,
+      "code_lines": 11179
+    },
+    "unresolved": [],
+    "program_list": [
+      "ccbmain.cbl/GCCBAAR.cbl",
+      "kbcf.cbl/CCMDAT1.cbl",
+      "kbcf.cbl/CSAFEE0.cbl",
+      "kbcf.cbl/CSAPRD2.cbl",
+      "kbcf.cbl/CSAPRD4.cbl",
+      "kbcf.cbl/CSAQRY1.cbl",
+      "kbcf.cbl/KSADEP0.cbl",
+      "kbcf.cbl/KSAFEE0.cbl",
+      "onbb.cbl/GSA01102.cbl"
+    ]
+  },
+  "mentioned": {
+    "programs": {
+      "files": 22,
+      "physical_lines": 20626,
+      "code_lines": 16384
+    },
+    "direct_copybooks": {
+      "files": 166,
+      "physical_lines": 23170,
+      "code_lines": 11110
+    },
+    "recursive_copybooks": {
+      "files": 192,
+      "physical_lines": 24961,
+      "code_lines": 11974
+    },
+    "unresolved": [],
+    "program_list": [
+      "ccbmain.cbl/GCCBAAMT.cbl",
+      "ccbmain.cbl/GCCBAAR.cbl",
+      "ccbmain.cbl/GCCBACND.cbl",
+      "ccbmain.cbl/GCCBAMH.cbl",
+      "ccbmain.cbl/GSYSSART.cbl",
+      "ccbmain.cbl/GSYSSSMP.cbl",
+      "ccbmain.cbl/GSYSSSMT.cbl",
+      "ccbmain.cbl/GSYSTRIG.cbl",
+      "kbcf.cbl/CCMCUR2.cbl",
+      "kbcf.cbl/CCMDAT1.cbl",
+      "kbcf.cbl/CCMFRT2.cbl",
+      "kbcf.cbl/CCMRELO.cbl",
+      "kbcf.cbl/CSAFEE0.cbl",
+      "kbcf.cbl/CSAINF0.cbl",
+      "kbcf.cbl/CSAPRD2.cbl",
+      "kbcf.cbl/CSAPRD4.cbl",
+      "kbcf.cbl/CSAQRY1.cbl",
+      "kbcf.cbl/CSATXL0.cbl",
+      "kbcf.cbl/KCMFEE0.cbl",
+      "kbcf.cbl/KSADEP0.cbl",
+      "kbcf.cbl/KSAFEE0.cbl",
+      "onbb.cbl/GSA01102.cbl"
+    ]
+  },
+  "spp": {
+    ".spp": {
+      "files": 34,
+      "physical_lines": 1037,
+      "code_lines": 973
+    },
+    ".enum": {
+      "files": 1,
+      "physical_lines": 6,
+      "code_lines": 6
+    },
+    ".app": {
+      "files": 2,
+      "physical_lines": 48,
+      "code_lines": 48
+    },
+    ".phy": {
+      "files": 2,
+      "physical_lines": 38,
+      "code_lines": 38
+    }
+  }
+}

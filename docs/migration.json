@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-15",
+  "source_revision": "9bf54c1ecfbcf892e32e856f980f75f7e5a8b684",
+  "layout": {
+    "book": "book",
+    "petstore-demo": "demos/petstore",
+    "xbod-deposit-demo": "demos/bank-deposit"
+  },
+  "scope": "Current source snapshot plus working-tree changes; compiler/runtime implementation and unrelated legacy demos are excluded.",
+  "book_license": "All rights reserved; publicly available for reading",
+  "code_license": "MIT",
+  "companion_reference_documents": 30
+}
