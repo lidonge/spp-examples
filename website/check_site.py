@@ -27,6 +27,8 @@ checked = 0
 for page, parsed in pages.items():
     for href in parsed.targets:
         link = urlsplit(href)
+        if link.hostname and link.hostname.lower() in {'github.com', 'www.github.com', 'raw.githubusercontent.com'}:
+            errors.append(f'{page.relative_to(root)}: GitHub link must not be published: {href}')
         if link.scheme or link.netloc:
             continue
         if not link.path:

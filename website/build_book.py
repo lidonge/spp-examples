@@ -15,7 +15,7 @@ from markdown.treeprocessors import Treeprocessor
 
 
 BASE = Path(__file__).resolve().parent
-PUBLIC_REPOSITORY = 'https://github.com/lidonge/spp-examples'
+BOOK_COPYRIGHT_URL = 'https://github.com/lidonge/spp-examples/blob/main/book/COPYRIGHT.md'
 
 
 def page_url(relative):
@@ -30,6 +30,9 @@ class PublicLinks(Treeprocessor):
     def run(self, root):
         for node in root.iter('a'):
             href = node.get('href', '')
+            if href == BOOK_COPYRIGHT_URL:
+                node.set('href', '/book/copyright/')
+                continue
             parsed = urlsplit(href)
             if parsed.scheme or parsed.netloc or not parsed.path:
                 continue
@@ -56,7 +59,7 @@ def title_of(path):
 
 
 def header(section='book'):
-    markup = '''<header class="topbar"><a href="/" class="wordmark" aria-label="S++ home"><span class="mark">S<span>++</span></span><span class="wordmark-divider"></span><span class="wordmark-sub">Business systems language</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/examples/">Examples</a><a href="/guide/">Guide</a><a href="/book/">Book</a><a href="/sources/">Source</a><a href="https://github.com/lidonge/spp-examples">GitHub</a><a class="nav-contact" href="/#contact">Get in touch ↗</a></nav><button class="menu-toggle" aria-label="Open menu" aria-expanded="false">Menu ☰</button></header>'''
+    markup = '''<header class="topbar"><a href="/" class="wordmark" aria-label="S++ home"><span class="mark">S<span>++</span></span><span class="wordmark-divider"></span><span class="wordmark-sub">Business systems language</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/examples/">Examples</a><a href="/guide/">Guide</a><a href="/book/">Book</a><a href="/sources/">Source</a><a class="nav-contact" href="/#contact">Get in touch ↗</a></nav><button class="menu-toggle" aria-label="Open menu" aria-expanded="false">Menu ☰</button></header>'''
     return markup.replace(f'href="/{section}/"', f'href="/{section}/" aria-current="page"')
 
 
@@ -125,6 +128,9 @@ def build(source, output):
     shutil.copytree(BASE / 'static', output, dirs_exist_ok=True)
     files = sorted(source.rglob('*.md'))
     pages = {path: page_url(path.relative_to(source)) for path in files}
+    copyright_page = BASE.parent / 'book/COPYRIGHT.md'
+    files.append(copyright_page.resolve())
+    pages[copyright_page.resolve()] = '/book/copyright/'
     pages.update(build_sources(BASE.parent, source.parent.parent.parent, output))
     # The translation map is the author's deliberate reading order, rather than filename order.
     import json
@@ -153,7 +159,7 @@ def build(source, output):
         quicklinks = '<a href="/book/">Contents</a><a href="/book/complete-manuscript/">Complete book</a>'
         document = f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="{html.escape(title, quote=True)} — S++ modeling, language mechanisms and engineering practice."><title>{html.escape(title)} — S++</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/book.css"><script src="/site.js" defer></script><script src="/book.js" defer></script></head>
-<body class="book-page">{header()}<div class="book-layout"><aside class="book-sidebar"><details class="book-toc" open><summary>Book contents</summary><nav aria-label="Book contents"><label class="toc-search">Find a chapter<input type="search" id="chapter-search" placeholder="Search chapter titles" autocomplete="off"></label>{nav}<p id="chapter-search-empty" hidden>No matching chapters.</p></nav></details></aside><main id="main-content"><div class="book-meta"><span>ENGLISH EDITION · OCTOBER 15, 2026</span><div>{quicklinks}</div></div><article class="book-article">{body}</article>{note}<footer class="book-footer"><a href="/book/">← Book contents</a><a href="/">S++ home</a><a href="mailto:hello@servpp.top">Get in touch</a><a href="https://github.com/lidonge/spp-examples/blob/main/book/COPYRIGHT.md">Book: all rights reserved</a></footer></main></div></body></html>'''
+<body class="book-page">{header()}<div class="book-layout"><aside class="book-sidebar"><details class="book-toc" open><summary>Book contents</summary><nav aria-label="Book contents"><label class="toc-search">Find a chapter<input type="search" id="chapter-search" placeholder="Search chapter titles" autocomplete="off"></label>{nav}<p id="chapter-search-empty" hidden>No matching chapters.</p></nav></details></aside><main id="main-content"><div class="book-meta"><span>ENGLISH EDITION · OCTOBER 15, 2026</span><div>{quicklinks}</div></div><article class="book-article">{body}</article>{note}<footer class="book-footer"><a href="/book/">← Book contents</a><a href="/">S++ home</a><a href="mailto:hello@servpp.top">Get in touch</a><a href="/book/copyright/">Book: all rights reserved</a></footer></main></div></body></html>'''
         target = output / pages[path].lstrip('/') / 'index.html'
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(document)
