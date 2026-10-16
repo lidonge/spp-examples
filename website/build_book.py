@@ -3,6 +3,7 @@
 from pathlib import Path
 import argparse
 import html
+import json
 import re
 from urllib.parse import unquote, urlsplit
 import shutil
@@ -60,7 +61,38 @@ def title_of(path):
 
 def header(section='book'):
     markup = '''<header class="topbar"><a href="/" class="wordmark" aria-label="S++ home"><span class="mark">S<span>++</span></span><span class="wordmark-divider"></span><span class="wordmark-sub">Business systems language</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/examples/">Examples</a><a href="/guide/">Guide</a><a href="/book/">Book</a><a href="/sources/">Source</a><a class="nav-contact" href="/#contact">Get in touch ↗</a></nav><button class="menu-toggle" aria-label="Open menu" aria-expanded="false">Menu ☰</button></header>'''
+    markup = markup.replace('<a href="/sources/">Source</a>', '<a href="/sources/">Source</a><a href="/articles/">Articles</a>')
     return markup.replace(f'href="/{section}/"', f'href="/{section}/" aria-current="page"')
+
+
+def article_entries():
+    return json.loads((BASE / 'articles.json').read_text())
+
+
+def build_articles(output):
+    """Render original introductory articles from their maintained Markdown sources."""
+    entries = article_entries()
+    sidebar = '<a class="book-index" href="/articles/">All articles</a>' + ''.join(
+        f'<a class="toc-link" href="/articles/{entry["slug"]}/">{html.escape(entry["title"])}</a>'
+        for entry in entries
+    )
+    cards = []
+    for entry in entries:
+        url = f'/articles/{entry["slug"]}/'
+        text = (BASE / 'articles' / entry['file']).read_text()
+        body = markdown.markdown(text, extensions=['tables', 'fenced_code', 'toc'])
+        cards.append(f'<h2><a href="{url}">{html.escape(entry["title"])}</a></h2><p>{html.escape(entry["description"])}</p>')
+        article_page(output, url, entry['title'], body, sidebar, entry['date'])
+    body = '<h1>Articles on business modeling and role-oriented programming</h1><p>Practical introductions to S++ (ServPP), grounded in the Petstore and bank-deposit demonstrations. Explore participants, business facts and transaction boundaries, then follow links to the actual source.</p>' + ''.join(cards)
+    article_page(output, '/articles/', 'Business Modeling and Role-Oriented Programming Articles', body, sidebar)
+
+
+def article_page(output, url, title, body, sidebar, published=None):
+    date = f'<time datetime="{published}">Published {published}</time>' if published else 'PRACTICAL INTRODUCTIONS'
+    document = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)} | S++ (ServPP)</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/book.css"><script src="/site.js" defer></script></head><body class="book-page">{header('articles')}<div class="book-layout"><aside class="book-sidebar"><nav aria-label="Articles">{sidebar}</nav></aside><main id="main-content"><div class="book-meta"><span>S++ (SERVPP) · {date}</span><a href="/guide/">Language guide</a></div><article class="book-article">{body}</article><footer class="book-footer"><a href="/articles/">All articles</a><a href="/examples/">Working examples</a><a href="mailto:hello@servpp.top">Discuss an evaluation</a></footer></main></div></body></html>'''
+    target = output / url.lstrip('/') / 'index.html'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(document)
 
 
 def build_sources(repo, docs_repo, output):
@@ -109,7 +141,7 @@ def build_sources(repo, docs_repo, output):
             lines = ''.join(f'<span class="source-line" id="L{i}"><a class="line-number" href="#L{i}" aria-label="Line {i}">{i}</a><code>{html.escape(line)}</code></span>' for i, line in enumerate(path.read_text().splitlines(), 1))
             body = f'<h1 class="source-title">{html.escape(path.name)}</h1><p class="source-path">{html.escape(str(relative))}</p><p><a href="{raw_url}" download>Download original file</a> · <a href="/sources/{demo}/">{label} source contents</a></p><pre class="source-code">{lines}</pre>'
             nav = ''.join(sidebar).replace(f'href="{urls[path]}"', f'href="{urls[path]}" aria-current="page"')
-            source_page(output, urls[path], path.name, body, nav)
+            source_page(output, urls[path], f'{path.name} · {relative.parent} · {label}', body, nav)
         summaries.append(f'<h2><a href="/sources/{demo}/">{label}</a></h2><p>{len(files)} files · <a href="/sources/{demo}/">Browse online</a> · <a href="/sources/downloads/{demo}.zip" download>Download ZIP</a></p>')
         print(f'Built {len(files)} {label} source pages')
     source_page(output, '/sources/', 'Demo source', '<h1>Read the demo source</h1><p>Explore the business models and scenarios alongside their application and physical configuration. These are the current source-language files from the two demonstrations.</p>' + ''.join(summaries), '<a class="book-index" href="/book/">Read the English book</a><a class="book-index" href="/sources/petstore-demo/">Petstore</a><a class="book-index" href="/sources/xbod-deposit-demo/">Bank deposit</a>')
@@ -133,7 +165,6 @@ def build(source, output):
     pages[copyright_page.resolve()] = '/book/copyright/'
     pages.update(build_sources(BASE.parent, source.parent.parent.parent, output))
     # The translation map is the author's deliberate reading order, rather than filename order.
-    import json
     entries = json.loads((source / 'translation-map.json').read_text())['sections']
     order = [source / entry['english'] for entry in entries]
     sidebar = ['<a class="book-index" href="/book/">Full book contents</a>']
@@ -152,6 +183,8 @@ def build(source, output):
         md.repository_references = 0
         body = md.convert(text)
         title = title_of(path)
+        if path == source / 'complete-manuscript.md':
+            title += ' — Complete English Book'
         note = ''
         if md.repository_references:
             note = '<aside class="book-reference-note">Underlined repository references identify supporting engineering records outside this published English edition. Hover over a reference to see its original path. Demo source files are available in the <a href="/sources/">source browser</a>.</aside>'
@@ -164,6 +197,7 @@ def build(source, output):
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(document)
     print(f'Built {len(files)} English book pages from {source}')
+    build_articles(output)
     build_search_assets(output)
 
 
@@ -173,13 +207,41 @@ def build_search_assets(output):
     namespace = 'http://www.sitemaps.org/schemas/sitemap/0.9'
     ET.register_namespace('', namespace)
     sitemap = ET.Element(f'{{{namespace}}}urlset')
+    articles = {f'/articles/{entry["slug"]}/': entry for entry in article_entries()}
+    descriptions = {
+        '/': 'S++ (ServPP) is an experimental role-oriented language for business systems. Explore explicit participants, services and transactions through working demos.',
+        '/guide/': 'Learn how S++ (ServPP) separates business models, roles, checks and scenarios from deployment and physical implementation using SPP, APP and PHY.',
+        '/examples/': 'Explore S++ (ServPP) business modeling through Petstore ordering, payment and returns, and selected banking deposit and reversal transactions.',
+        '/articles/': 'Practical articles on business modeling, role-oriented programming and business transaction boundaries with S++ (ServPP) examples and source.',
+        '/sources/': 'Browse S++ (ServPP) Petstore and bank-deposit business models, scenarios and APP/PHY configurations online, organized by domain and function.',
+    }
     for path in sorted(output.rglob('*.html')):
         relative = '/' + path.relative_to(output).as_posix()
         if relative.endswith('index.html'):
             relative = relative[:-len('index.html')]
         canonical = origin + relative
         text = re.sub(r'<link\s+rel="canonical"[^>]*>', '', path.read_text())
-        text = text.replace('</head>', f'<link rel="canonical" href="{html.escape(canonical, quote=True)}"></head>')
+        title = html.unescape(re.search(r'<title>(.*?)</title>', text, re.S).group(1))
+        existing = re.search(r'<meta name="description" content="([^"]*)"', text)
+        entry = articles.get(relative)
+        description = descriptions.get(relative) or (entry['description'] if entry else None)
+        description = description or (html.unescape(existing.group(1)) if existing else f'{title}. Read the S++ (ServPP) business-language source and related examples.')
+        text = re.sub(r'<meta name="description"[^>]*>', '', text)
+        text = re.sub(r'<meta (?:property="og:[^"]+"|name="twitter:[^"]+")[^>]*>', '', text)
+        text = re.sub(r'<script type="application/ld\+json">.*?</script>', '', text, flags=re.S)
+        metadata = f'<link rel="canonical" href="{html.escape(canonical, quote=True)}"><meta name="description" content="{html.escape(description, quote=True)}">'
+        for key, value in {'og:site_name': 'S++ (ServPP)', 'og:type': 'article' if entry else 'website', 'og:title': title, 'og:description': description, 'og:url': canonical, 'og:locale': 'en_US'}.items():
+            metadata += f'<meta property="{key}" content="{html.escape(value, quote=True)}">'
+        metadata += '<meta name="twitter:card" content="summary">'
+        metadata += f'<meta name="twitter:title" content="{html.escape(title, quote=True)}"><meta name="twitter:description" content="{html.escape(description, quote=True)}">'
+        structured = None
+        if relative == '/':
+            structured = {'@context': 'https://schema.org', '@type': 'WebSite', 'name': 'S++', 'alternateName': ['ServPP', 'S++ (ServPP)'], 'url': origin + '/', 'inLanguage': 'en'}
+        elif entry:
+            structured = {'@context': 'https://schema.org', '@type': 'Article', 'headline': entry['title'], 'description': description, 'datePublished': entry['date'], 'inLanguage': 'en', 'mainEntityOfPage': canonical, 'author': {'@type': 'Organization', 'name': 'S++ project', 'url': origin + '/'}}
+        if structured:
+            metadata += '<script type="application/ld+json">' + json.dumps(structured, ensure_ascii=False).replace('<', '\\u003c') + '</script>'
+        text = text.replace('</head>', metadata + '</head>')
         path.write_text(text)
         node = ET.SubElement(sitemap, f'{{{namespace}}}url')
         ET.SubElement(node, f'{{{namespace}}}loc').text = canonical

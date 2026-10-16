@@ -3,6 +3,8 @@
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit, unquote
+import json
+import re
 
 
 class Links(HTMLParser):
@@ -25,6 +27,26 @@ pages = {p: Links(p.read_text()) for p in root.rglob('*.html')}
 errors = []
 checked = 0
 for page, parsed in pages.items():
+    text = page.read_text()
+    relative = '/' + page.relative_to(root).as_posix()
+    if relative.endswith('index.html'):
+        relative = relative[:-len('index.html')]
+    canonical = re.findall(r'<link rel="canonical" href="([^"]+)"', text)
+    if canonical != ['https://us.servpp.top' + relative]:
+        errors.append(f'{page.relative_to(root)}: missing, duplicate or incorrect canonical URL')
+    for pattern, label in [(r'<title>[^<]+</title>', 'title'),
+                           (r'<meta name="description" content="[^"]+"', 'description'),
+                           (r'<meta property="og:title" content="[^"]+"', 'sharing title'),
+                           (r'<meta property="og:description" content="[^"]+"', 'sharing description')]:
+        if len(re.findall(pattern, text)) != 1:
+            errors.append(f'{page.relative_to(root)}: expected one nonempty {label}')
+    for payload in re.findall(r'<script type="application/ld\+json">(.*?)</script>', text, re.S):
+        try:
+            data = json.loads(payload)
+            if data.get('@type') == 'WebSite' and 'ServPP' not in data.get('alternateName', []):
+                errors.append('Homepage structured data must include the ServPP alternate name')
+        except ValueError:
+            errors.append(f'{page.relative_to(root)}: invalid structured JSON')
     for href in parsed.targets:
         link = urlsplit(href)
         if link.hostname and link.hostname.lower() in {'github.com', 'www.github.com', 'raw.githubusercontent.com'}:

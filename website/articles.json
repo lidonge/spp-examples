@@ -1,0 +1,23 @@
+[
+  {
+    "slug": "business-logic-and-database-design",
+    "title": "Why Business Logic Should Not Depend on Database Design",
+    "description": "How S++ separates business participants from storage: role mappings, order-time snapshots and physical numeric representation in the Petstore demo.",
+    "date": "2026-10-16",
+    "file": "business-logic-and-database-design.md"
+  },
+  {
+    "slug": "role-oriented-order-lifecycle",
+    "title": "Modeling an Order Lifecycle with Roles and Services",
+    "description": "A practical introduction to role-oriented programming in S++: buyers, goods, order lines, explicit scenarios and the Petstore order lifecycle.",
+    "date": "2026-10-16",
+    "file": "role-oriented-order-lifecycle.md"
+  },
+  {
+    "slug": "business-transactions-and-infrastructure",
+    "title": "Business Transactions Without Infrastructure Details",
+    "description": "Model business transaction boundaries, bounded funds transfers and reservation failure handling in S++, with implementation policy in APP and PHY.",
+    "date": "2026-10-16",
+    "file": "business-transactions-and-infrastructure.md"
+  }
+]

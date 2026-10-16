@@ -25,6 +25,8 @@ for p in files:
    parsed=urlsplit(href)
    if parsed.scheme or parsed.netloc or not parsed.path:continue
    path=unquote(parsed.path.split(' "',1)[0])
+   # Article links use public site routes, checked after rendering by check_site.py.
+   if path.startswith('/') and p.is_relative_to(ROOT/'website/articles'):continue
    if not (p.parent/path).resolve().exists():
     errors.append(f'{rel}: missing local link {href}')
 for private in ['generator','lang','appframe','appframe-seata']:
