@@ -49,7 +49,7 @@ The owner confirmed successful Search Console ownership verification on October 
 
 The search changes and three articles were published from revision `55190ce`. The corresponding GitHub Actions run `38843452296` passed. The 176 public content pages have distinct titles and descriptions, canonical URLs, sharing metadata and valid local links. The site sitemap has 176 unique page entries, including all three articles. All 299 publication files at that stage matched their local generated SHA-256 values; no HTML page linked to GitHub or returned a `noindex` response header.
 
-Desktop and mobile browser checks covered the homepage, article index and all three articles. The live mobile route from homepage to article index to transaction article passed without browser errors or document overflow. These are website checks, not evidence of a real Googlebot visit or inclusion in Google's index. Ownership verification has been confirmed by the owner. Sitemap submission and indexing requests remain pending owner confirmation.
+Desktop and mobile browser checks covered the homepage, article index and all three articles. The live mobile route from homepage to article index to transaction article passed without browser errors or document overflow. These are website checks, not evidence of a real Googlebot visit or inclusion in Google's index. Ownership verification has been confirmed by the owner. The owner also confirmed submitting the correct `https://us.servpp.top/sitemap.xml` URL on October 16, 2026. Google's processing result and individual indexing-request results have not been independently observed.
 
 ## Measure and improve
 
@@ -68,3 +68,7 @@ The public source browser remains available without linking to the GitHub reposi
 - [Ownership verification](https://support.google.com/webmasters/answer/9008080)
 - [Sitemap submission](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)
 - [Requesting a recrawl](https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl)
+
+### Distinguish the two Search Console inputs
+
+Submit only `sitemap.xml` (or its complete URL when the field has no fixed prefix) under **Sitemaps**. The owner encountered “Sitemap is HTML” after submitting `/book/` there; that URL is a normal page, not a sitemap. Remove erroneous page submissions from the Sitemaps report. Normal page URLs belong in the top **URL inspection** field, where the owner can request indexing. The corrected sitemap submission has been confirmed; it does not by itself establish that Google has indexed any page.
