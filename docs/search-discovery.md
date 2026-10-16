@@ -39,6 +39,18 @@ Use an owner-controlled Google account. Do not commit account credentials, brows
 
 Account verification and Search Console submission must be reported separately from successful website deployment. Without an authenticated owner session, their status is **pending**, even if all website checks pass.
 
+### HTML file verification
+
+The owner selected Google's HTML-file method for this rollout. The supplied public file `google7f75a76777f31f44.html` is maintained under `website/static/` and served verbatim at the website root. It has been fetched over HTTPS with status 200 and checked against the original bytes. The builder must not add a title, canonical link or other page metadata to this file, and the file is not an article or sitemap entry. Keep it when publishing future site versions.
+
+The owner still needs to click **Verify** in the authenticated Search Console browser; serving the file alone does not prove account verification. The HTML-tag procedure above remains an alternative for future owners.
+
+## Rollout evidence — October 16, 2026
+
+The search changes and three articles were published from revision `55190ce`. The corresponding GitHub Actions run `38843452296` passed. The 176 public content pages have distinct titles and descriptions, canonical URLs, sharing metadata and valid local links. The site sitemap has 176 unique page entries, including all three articles. All 299 publication files at that stage matched their local generated SHA-256 values; no HTML page linked to GitHub or returned a `noindex` response header.
+
+Desktop and mobile browser checks covered the homepage, article index and all three articles. The live mobile route from homepage to article index to transaction article passed without browser errors or document overflow. These are website checks, not evidence of a real Googlebot visit or inclusion in Google's index. Account verification, sitemap submission and indexing requests remain pending owner confirmation.
+
 ## Measure and improve
 
 After verification, use Search Console's Page indexing and Performance reports. Keep a first 28-day baseline of impressions, clicks and actual search queries; low or absent initial data is not a reason to invent demand estimates. Segment brand searches (ServPP and S++) from topic searches.

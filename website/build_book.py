@@ -216,6 +216,9 @@ def build_search_assets(output):
         '/sources/': 'Browse S++ (ServPP) Petstore and bank-deposit business models, scenarios and APP/PHY configurations online, organized by domain and function.',
     }
     for path in sorted(output.rglob('*.html')):
+        # Google ownership files must be served verbatim, without page metadata or sitemap entries.
+        if path.parent == output and re.fullmatch(r'google[0-9a-f]+\.html', path.name) and path.read_text().strip() == f'google-site-verification: {path.name}':
+            continue
         relative = '/' + path.relative_to(output).as_posix()
         if relative.endswith('index.html'):
             relative = relative[:-len('index.html')]

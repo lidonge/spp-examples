@@ -23,7 +23,10 @@ class Links(HTMLParser):
 
 
 root = Path(__file__).resolve().parent / 'dist'
-pages = {p: Links(p.read_text()) for p in root.rglob('*.html')}
+verification_files = {p for p in root.glob('google*.html')
+                      if re.fullmatch(r'google[0-9a-f]+\.html', p.name)
+                      and p.read_text().strip() == f'google-site-verification: {p.name}'}
+pages = {p: Links(p.read_text()) for p in root.rglob('*.html') if p not in verification_files}
 errors = []
 checked = 0
 for page, parsed in pages.items():

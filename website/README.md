@@ -47,7 +47,7 @@ The script uploads static publication files to the selected destination. It does
 
 ## Search discovery
 
-Use Google Search Console to add and verify the URL-prefix property `https://us.servpp.top/`, submit `sitemap.xml`, and request indexing for the home page and book contents. The generator supplies crawl and canonical settings, page descriptions, sharing metadata, homepage site-name structured data and article structured data. See [the rollout guide](../docs/search-discovery.md) for positioning, verification steps and measurement, and [post drafts](../docs/promotion-copy.md) for owner-approved sharing. These steps do not guarantee indexing or ranking. Ownership verification belongs to the owner's Google account; verification tokens and credentials are not preconfigured here.
+Use Google Search Console to add and verify the URL-prefix property `https://us.servpp.top/`, submit `sitemap.xml`, and request indexing for the home page and book contents. The generator supplies crawl and canonical settings, page descriptions, sharing metadata, homepage site-name structured data and article structured data. See [the rollout guide](../docs/search-discovery.md) for positioning, verification steps and measurement, and [post drafts](../docs/promotion-copy.md) for owner-approved sharing. These steps do not guarantee indexing or ranking. Ownership verification belongs to the owner's Google account. Owner-supplied public verification files are kept verbatim under `static/`; account credentials remain outside this repository.
 
 ## Reserved-rights PDF publications
 
