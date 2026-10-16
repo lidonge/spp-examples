@@ -30,6 +30,10 @@ Opening creates account facts and zero quantum records. A deposit is a separate 
 
 Production business Java, HTTP controllers and transaction wrappers are generated. Java tests only compose generated services, prepare inputs, assert outcomes and inject technical faults. Existing failure/recovery limits are documented instead of hidden in handwritten demo implementations.
 
+## Role composition and storage
+
+The role-composition update preserves the bank model: the account roles still need their explicit BankAccount take mappings because their structures borrow scalar account facts rather than repeat participant members. Existing account-number primary keys are explicit business identities and remain supported. The new APP independent-key and same-table/separate-table player-storage policies are demonstrated by Petstore and covered by compiler/runtime tests.
+
 ## Acceptance
 
 ```bash

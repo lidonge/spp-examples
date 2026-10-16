@@ -97,23 +97,15 @@ Reference ReturnRefundAgreement from petshop.ReturnRefundAgreement {
 }
 
 Role StockSupply {
-    Goods goods;
+    Goods;
     quantum int balance;
 }
 
-take Goods as StockSupply {
-    Goods goods = Goods;
-}
-
 Role StockLine {
-    Goods goods;
+    Goods;
     quantum int available;
     quantum int reserved;
     quantum int sold;
-}
-
-take Goods as StockLine {
-    Goods goods = Goods;
 }
 
 Contract InventoryOpeningAgreement {

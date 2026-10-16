@@ -34,6 +34,12 @@ Conversely, different entity types can play the same role. A person purchases ho
 
 There is no one-to-one relationship between entity types and roles. One entity can play many roles; one role can admit different entities. Role-oriented modeling identifies required participating identities from behavior before assigning entities to them.
 
+## Composition and stable role identity
+
+A participant member in a Role declares intrinsic composition. `Role CartLine { Buyer; Goods; int quantity; }` already includes Buyer and Goods. Each take joins its explicit players with those intrinsic members; separate take clauses are alternatives. Neither operation replaces these roles or flattens every source property. Services depend on the declared structure, including intermediate role identities. See [Chapter 14](../part-03-the-spp-language/14-take.md).
+
+APP gives extensible roles an independent storage identity. Player keys are associations, stored inline or in a separate table. Extending composition does not replace the role primary key, and storage layout does not change business uniqueness or required participation.
+
 ---
 
 [Part Contents](README.md) · [Full Book Contents](../README.md) · [Previous Chapter](02-service-model.md) · [Next Chapter](04-decomposition.md)

@@ -40,6 +40,33 @@ public class PetstoreScenarioTest {
         }
     }
 
+    @Test public void cartRoleUsesPrivateIndependentIdentityAndCleansRelationshipRows() throws Exception {
+        Session session = shop.openStore("ROLE-IDENTITY",false);
+        shop.setQuantity(session,"FOOD","2","CREATE-LINE");
+        String identity;
+        try (var connection = DriverManager.getConnection(shop.jdbcUrl);var statement = connection.createStatement();
+             var rows = statement.executeQuery("select cartLineId from SHOP_CART_LINES")) {
+            assertTrue(rows.next()); identity = rows.getString(1); assertFalse(identity.isBlank()); assertFalse(rows.next());
+        }
+        JsonNode cart = shop.cart(session);
+        assertFalse(cart.toString(),cart.toString().contains("cartLineId"));
+        assertEquals(1,cart.path("lines").size());
+        try (var connection = DriverManager.getConnection(shop.jdbcUrl);var statement = connection.createStatement();
+             var rows = statement.executeQuery("select count(*) from SHOP_CART_LINE_PLAYERS where role_id='" + identity + "'")) {
+            rows.next(); assertEquals(2,rows.getInt(1));
+        }
+        shop.setQuantity(session,"FOOD","3","REPLACE-LINE");
+        try (var connection = DriverManager.getConnection(shop.jdbcUrl);var statement = connection.createStatement();
+             var rows = statement.executeQuery("select count(*) from SHOP_CART_LINE_PLAYERS")) {
+            rows.next(); assertEquals(2,rows.getInt(1));
+        }
+        shop.command("clearShopCart",session.command("Clear cart","CLEAR-ROLE"));
+        try (var connection = DriverManager.getConnection(shop.jdbcUrl);var statement = connection.createStatement();
+             var rows = statement.executeQuery("select count(*) from SHOP_CART_LINE_PLAYERS")) {
+            rows.next(); assertEquals(0,rows.getInt(1));
+        }
+    }
+
     private Session order(String store, String quantity, boolean vip) {
         Session session = shop.openStore(store, vip);
         shop.setQuantity(session, "FOOD", quantity, "CART");

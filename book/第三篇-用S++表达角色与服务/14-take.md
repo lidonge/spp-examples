@@ -1,115 +1,107 @@
-# 第14章 用 take ... as 声明扮演关系
+# 第14章 角色组合与 take 扮演关系
 
 > © 2026 S++ project contributors. All rights reserved. [Book copyright](https://github.com/lidonge/spp-examples/blob/main/book/COPYRIGHT.md).
 
-定义 Goods 只说明销售角色需要哪些事实，模型还要说明由谁扮演它。S++ 用 `take ... as` 声明这一关系，并表达属性映射、借用和角色自己的事实。
+角色既是服务依赖的结构，也是业务参与身份。角色不关心具体由谁来扮演，但必须明确服务可以使用什么成员。参与者成员同时表达内在角色组合，普通属性表达这个组合自己的事实。
 
-`take` 后面写扮演者，`as` 后面写所扮演的角色。例如 `take Product as Goods` 表示 Product 扮演 Goods。
-
-## 单方扮演与映射
-
-Petstore 将产品映射为商品：
+## 角色声明已经表达内在组合
 
 ```spp
-take Product as Goods {
-    mapsame;
-    String sku = productCode;
-}
-```
-
-`mapsame` 显式启用同名属性映射。例如 Product 与 Goods 都有 name，类型等条件满足时，商品名称可以从产品名称取得。名称不同的属性则显式映射：上例把 Product.productCode 映射为 Goods.sku。
-
-`mapsame` 不是默认规则。若只写下面的映射，就只明确了商品编号的来源，同名的 name 不会因此自动加入映射：
-
-```spp
-take Product as Goods {
-    String sku = productCode;
-}
-```
-
-无映射块的 `take ... as` 简写也只声明扮演关系，不自动启用同名映射。`takeall` 是另一种明确的写法，用于让角色继承扮演者的属性，并为相应属性生成映射；它与仅声明扮演关系的简写不同。
-
-映射还决定事实归属。直接借用的事实由原扮演者拥有，角色新增或明确重定义的事实由角色拥有。查询需要补全两类事实，保存则不能任意跨越所有权边界。
-
-## 查询扮演链与属性回填
-
-角色查询会沿扮演关系查询来源事实。例如查询 Goods，系统取得商品自己的事实，并查询相应 Product。取得产品之后，再按照已声明的映射把相应属性补入 Goods。
-
-因此，“查询到了 Product.name”和“把 Product.name 用作 Goods.name”是两个步骤。前者取得来源数据，后者由映射决定。上例显式使用 mapsame 时可以补全同名名称；仅映射 sku 时，查询产品不会自动增加 name 的映射。这也解释了为什么递归查询扮演链，并不使 mapsame 成为可省略的默认行为。
-
-## 联合扮演
-
-购物车明细由商品与买家共同扮演：
-
-```spp
-take Goods, Buyer as CartLine {
-    Goods goods = Goods;
-    Buyer buyer = Buyer;
+Role CartLine {
+    Buyer;
+    Goods;
     int quantity;
 }
 ```
 
-第一行声明两个扮演者：Goods 和 Buyer 共同扮演 CartLine。映射块中的两行分别把这两个参与者作为整体放到购物车明细中。以 `Goods goods = Goods;` 为例：
+Buyer、Goods 的类型和业务身份已经确定，不需要重复写 `take Buyer, Goods as CartLine`，更不必重复写 `Buyer buyer = Buyer`。服务可以使用 `CartLine.Buyer`、`CartLine.Goods` 和 `CartLine.quantity`。生成的 Java/JSON 仍采用正常的 bean 属性名，既有界面不必随 SPP 的省名写法改动。
 
-- 左边的 `Goods` 是属性类型，说明这个属性表示一个商品角色。
-- 左边的 `goods` 是 CartLine 中的属性名。
-- 右边的 `Goods` 指向第一行声明的商品扮演者，表示把这个参与者整体映射给 `goods`。
+角色不能只留下 quantity，再由一个空的 take 块隐式增加 Buyer、Goods。那会让服务依赖的结构失去明确声明。显式名字仍然可用，例如 `Buyer purchaser;`；同类型多个成员必须按名字区分，不能仅按类型猜测该用哪一个。
 
-`Buyer buyer = Buyer;` 同理。右边写的是扮演者名称，不是在创建一个新买家，也不是读取买家的某个同名属性。生成的映射把参与者对象交给相应属性；若角色尚未声明该属性，编译器会补上类型相符的属性。
-
-因此，购物车明细的业务结构可以这样理解：
-
-```text
-CartLine（购物车明细）
-├─ goods：Goods（本条明细的商品）
-├─ buyer：Buyer（选购该商品的买家）
-└─ quantity（本条明细的选购数量）
-```
-
-这里的 quantity 是 CartLine 自己的事实，需要在角色定义中声明。使用商品名称时访问 `cartLine.goods.name`，使用买家名称时访问 `cartLine.buyer.name`。即使商品和买家都有 name，也能明确区分。上述结构表达业务上的参与关系，具体怎样存储仍由 APP 配置决定。
-
-小林和小王都把同一商品加入购物车，分别选了 2 件和 3 件。两条明细的商品相同，买家不同，数量也不同。CartLine 因而要保留“哪位买家选了哪个商品”的关系；数量属于这段关系，APP 按双方身份定位各自明细。
-
-## 整体参与者映射与 takeall 的区别
-
-当前语言中，批量引入扮演者属性的关键字是 `takeall`，并没有 `mapall`。它与上面的整体参与者映射有不同的结构。
-
-例如，Goods 有 sku、name 两个属性：
+## take 补充而不替换内在组合
 
 ```spp
-take Goods as DisplayGoods {
-    takeall;
+take ReservationSource as CartLine;
+```
+
+假设 ReservationSource 已在模型中声明，这个方案由 Buyer、Goods、ReservationSource 联合扮演 CartLine，quantity 仍是角色自己的事实。单条 take 内的逗号表示联合，多条 take 之间表示备选；角色声明中的内在参与者会加入每一个备选方案。
+
+```spp
+Role R;
+take A as R;
+take B as R;
+take C, D as R;
+```
+
+假设 A、B、C、D 已定义，允许的组合是 `{A}`、`{B}` 或 `{C, D}`。一行 R 选择其中一个完整组合：A 与 B 不会因两条 take 自动联合；C 与 D 则必须同时存在。
+
+```spp
+Role R { R1; R2; }
+take A as R;
+take B as R;
+take A, B as R;
+```
+
+假设相关类型已定义，允许的组合是 `{R1, R2, A}`、`{R1, R2, B}` 或 `{R1, R2, A, B}`。R1、R2 在每行中都必需。显式声明 take 后，内在组合本身不额外构成一个独立备选；没有 take 时，内在组合就是缺省方案。选中的方案必须完整，不能保存不属于任何方案的零散组合。同表布局中，未选中来源的身份列为空；分表布局中不保存它们的关系行。
+
+内在 Buyer 可能由 Person 扮演，Goods 可能由 Product 扮演。查询和身份关联会沿实际扮演链处理，仍保留 Buyer、Goods 的业务身份，不把中间角色抹平为根实体。
+
+仅需先声明角色身份时，可以写：
+
+```spp
+Role Goods;
+take Product, Package as Goods;
+```
+
+这里假设 Product、Package 已定义。它表达两者共同扮演 Goods，但不会自动把所有产品和包装属性平铺到 Goods。服务需要的商品属性仍应明确声明；映射选择它们的来源。没有属性的角色也可以表达一种身份。
+
+## 参与者绑定与普通属性映射
+
+已有成员与扮演者类型唯一对应时，编译器生成整体参与者映射。保留显式写法用于定制，但目标成员必须已经声明，映射不能悄悄创造成员。
+
+```spp
+Role OrderLine {
+    Goods;
+    String name;
+    BigDecimal(19, 2) unitPrice;
+    int quantity;
+}
+
+take Goods as OrderLine {
+    String name = name;
+    BigDecimal unitPrice = price;
 }
 ```
 
-`takeall` 把 Goods 的属性引入 DisplayGoods；尚未声明的属性会被补入，并生成相应映射。因此可以直接访问 `displayGoods.sku`、`displayGoods.name`，无需先经过一个 goods 属性。
+Goods 的整体关系已由角色成员表达。name 和 unitPrice 的来源则明确映射到商品名称与售价。若多个来源都能提供同一属性，需要明确选择，不能靠遍历先后决定含义。
 
-| 写法 | 角色中的结构 | 商品名称的访问方式 |
-| --- | --- | --- |
-| `Goods goods = Goods;` | 有一个 Goods 类型的 goods 属性，保留完整商品参与者 | `cartLine.goods.name` |
-| `takeall;` | 把扮演者的属性引入角色本身 | `displayGoods.name` |
+`mapsame;` 显式启用兼容同名属性映射，并不是空 take 的缺省行为。查询到了 Product.name，不等于已经约定将其用作 Goods.name。既有 `takeall;` 是显式引入来源属性的兼容写法；新模型应优先在 Role 中完整声明结构，避免把服务依赖藏在导入过程中。
 
-购物车明细需要同时表达“商品”和“买家”，整体参与者映射使两者各有明确的位置。如果对 Goods、Buyer 一起使用 `takeall`，它也不会自动产生 goods、buyer 两个分组；双方的同名属性还需要明确区分来源，不能仅靠批量引入表达“商品名称”和“买家名称”。
+参与者数组保留集合语义，各成员独立携带身份；不能把整个集合压成一个同类型的标量扮演者。服务直接按已声明成员访问，类型名不能区分多个同类型成员时必须使用显式名字。
 
-`mapsame` 又有所不同：它为角色已有的兼容同名属性生成映射；`takeall` 还会把扮演者中角色尚未声明的属性引入角色。选择写法时，先确定业务需要的是完整参与者，还是参与者的某些属性，再声明对应的映射。
+## 独立角色身份与 APP 存储
 
-## 角色自己的事实
+增加扮演者不应该改变已经存在的角色身份。因此，角色表没有显式主键时，APP 缺省增加一个 SPP 不可见的 String roleId；也可以自行命名独立主键：
 
-角色可以借用扮演者的资料，也可以拥有这个业务身份需要的事实。例如，小林扮演商家时，商家借用小林的个人资料，同时拥有店铺名称“林家宠物店”与经营资金。小林修改个人资料，商家查询按映射取得相应资料；修改店铺名称，则是在维护商家自己的事实，不是在修改小林的个人姓名。
+```app
+tables roles {
+    table SHOP_CART_LINES(CartLine) {
+        primarykey notnull String cartLineId;
+        identity independent;
+        performers in SHOP_CART_LINE_PLAYERS;
+    }
+}
+```
 
-因此，声明扮演关系时需要分清：哪些属性来自扮演者，哪些属性属于角色自己的业务身份。合约保留成交时的信息是另一项要求，见第四篇第18章的说明。
+插入服务生成技术身份，查询、更新和删除继续使用该身份。SPP 不声明或操作 cartLineId。扮演者的主键是关联信息，不再组成缺省的角色主键；明确配置的历史业务主键和联合主键仍受支持。独立身份与业务唯一约束是不同问题。
 
-## 扮演关系的合法性与持久化
+`performers inline;` 将扮演者身份记录与角色事实放在同表；`performers in 表名;` 将身份关联放在另一张表，以角色主键关联。当前 JDBC 实现的同表方式使用每个扮演者对应的技术身份列，分表方式使用 role_type、role_id、performer_type 与 performer_key。它们保存身份，不复制或更新来源域的全部事实。
 
-`take ... as` 是需要编译器检查的业务声明。编译器检查扮演者是否为已定义的合法参与者类型、`as` 后面的目标是否为角色，以及属性类型是否符合扮演关系的要求。当前实现的严格业务模型检查允许 Entity、Reference 或 Role 扮演角色，拒绝把 Contract 当作扮演者；这一检查由 `strictRoleOnlyBusinessModel` 配置启用。
+角色与关联写入使用同一个已声明事务的本地资源，失败一并回滚。角色内嵌在合约或其他参与者中时，技术身份由内部持久化元数据携带，不混入 SPP 属性。普通事实的 current/snapshot 选择独立于关系表布局；成交价格副本仍在角色表中保存。
 
-合约仍可以作为服务或场景的上下文传入，供计算、校验和后续处理使用，不必为了读取合约就声明扮演关系。例如，退款场景可以读取原订单合约，同时由买家、商家等角色参与退款。合约包含订单明细，也不等于合约扮演明细：包含关系与扮演关系需要分别表达。
+添加扮演关系不意味着历史数据已经补齐。是否必需由业务约定和校验决定；新增同表身份列需要正常的数据库迁移，分表可以追加新关系行，但不会自动建立真实业务联系。APP 选择布局，PHY 选择数据源与数据库实现；布局不能改变业务基数、资格和义务。
 
-例如，扮演者的 name 是字符串，角色中的同名属性也必须保持相同类型，不能改成数值类型；整体参与者映射也必须指向声明中的扮演者，并与目标属性的类型一致。这样的错误应在编译时发现，不应等到查询或保存时才暴露。
-
-声明合法之后，编译器才能据此生成类型、映射与查询元数据。但声明一个扮演关系，并不等于创建一个实际参与者。例如，声明 Person 可以扮演 Merchant，不会自动为小林建立商家记录；何时开店、何时保存商家自己的资料，仍由场景安排。
-
-持久化也需要遵守事实归属。普通角色更新自己的事实，客户或产品的资料则通过相应的内置服务维护。编译时确认谁可以扮演谁，运行时根据具体参与者完成查询与保存，两者共同支撑扮演关系。
+规范与实施说明见[角色组合与存储](../references/role-composition-and-storage.md)。
 
 ---
 

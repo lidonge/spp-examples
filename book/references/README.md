@@ -32,3 +32,5 @@ These reserved-rights companion documents accompany the book and migrated demos.
 - [spp-transaction-mode](spp-transaction-mode.md)
 - [spp-transaction-reads](spp-transaction-reads.md)
 - [transaction-storage-v1](transaction-storage-v1.md)
+
+- [Role composition and independent storage identity](role-composition-and-storage.md)

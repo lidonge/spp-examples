@@ -18,6 +18,7 @@ tables roles {
     }
     table SHOP_STOCK(StockLine) {
         primarykey(StockLine.goods.sku);
+        performers inline;
     }
 }
 

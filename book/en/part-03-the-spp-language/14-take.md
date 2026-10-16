@@ -1,108 +1,108 @@
-# Chapter 14 — Declaring Role Relationships with take ... as
+# Chapter 14 — Role Composition and take Relationships
 
 > © 2026 S++ project contributors. All rights reserved. [Book copyright](https://github.com/lidonge/spp-examples/blob/main/book/COPYRIGHT.md).
 
-Goods defines facts required by a sales role, but not who plays it. `take ... as` declares players, mappings, borrowed facts and role-owned facts. Players follow `take`; the role follows `as`. `take Product as Goods` means Product plays Goods.
+A role is both a business identity and the structure consumed by services. It does not depend on a particular player, but its members must be explicit. Participant members declare intrinsic composition; ordinary properties describe facts belonging to that composition.
 
-## One-Party Role Playing and Mapping
-
-Petstore maps products to goods:
+## Intrinsic composition needs no repeated take
 
 ```spp
-take Product as Goods {
-    mapsame;
-    String sku = productCode;
-}
-```
-
-`mapsame` explicitly enables compatible same-name mappings. If Product and Goods both have name, goods can obtain it from the product. Differently named fields need explicit mapping, here Product.productCode to Goods.sku.
-
-This is not the default. The following declares only sku's source, without automatically mapping name:
-
-```spp
-take Product as Goods {
-    String sku = productCode;
-}
-```
-
-A `take ... as` shorthand without a block also only declares the relationship. `takeall` explicitly imports player properties and creates mappings; it differs from the shorthand.
-
-Mapping also determines ownership. Borrowed facts remain owned by their player; added or explicitly redefined facts belong to the role. Queries complete both, but saves must respect ownership boundaries.
-
-## Querying the Chain and Filling Properties
-
-Goods queries retrieve role facts and the corresponding Product. Declared mappings then fill Goods from source facts.
-
-“Product.name was queried” and “Product.name supplies Goods.name” are different steps. Retrieval obtains data; mapping chooses its use. With mapsame the name can be completed. With only sku mapping, querying Product creates no name mapping. Recursive chain querying therefore does not make mapsame optional by default.
-
-## Joint Role Playing
-
-Goods and buyer jointly play a cart line:
-
-```spp
-take Goods, Buyer as CartLine {
-    Goods goods = Goods;
-    Buyer buyer = Buyer;
+Role CartLine {
+    Buyer;
+    Goods;
     int quantity;
 }
 ```
 
-The declaration identifies two players. `Goods goods = Goods;` maps the entire goods participant into the cart line: the left Goods is the property type, goods its name in CartLine, and the right Goods the declared player.
+Buyer and Goods are already intrinsic participants. Repeating `take Buyer, Goods as CartLine` and assigning the same players to the same members adds no information. Services use `CartLine.Buyer`, `CartLine.Goods` and `CartLine.quantity`. Generated Java/JSON keeps ordinary bean property names.
 
-`Buyer buyer = Buyer;` is analogous. The right side does not create a new buyer or read a same-name property. The generated mapper supplies the player object; compatible undeclared target properties are added by the compiler.
+Declaring only quantity and silently adding members through an empty take would leave the service contract incomplete. Explicit member names remain valid. Two Buyer members must be distinguished by name; a type alone cannot select between them.
 
-```text
-CartLine
-├─ goods: Goods, the item selected
-├─ buyer: Buyer, who selected it
-└─ quantity, selected for this line
-```
-
-Quantity is CartLine's own fact and must be declared in the role definition. Access names as `cartLine.goods.name` and `cartLine.buyer.name`, even if both participants have name. This is business structure; APP determines storage.
-
-Alex and Jordan select the same goods, two and three units respectively. The lines share goods but differ in buyer and quantity. CartLine preserves which buyer selected which goods, while APP locates each line by both identities.
-
-## Whole-Participant Mapping Versus takeall
-
-The current keyword for bulk importing player properties is `takeall`; there is no `mapall`. It creates a different structure from whole-participant mapping.
-
-For Goods with sku and name:
+## take adds players rather than replacing intrinsic roles
 
 ```spp
-take Goods as DisplayGoods {
-    takeall;
+take ReservationSource as CartLine;
+```
+
+Assuming ReservationSource is declared, this branch jointly combines Buyer, Goods and ReservationSource. Quantity remains a role fact. Commas within one take mean joint participation; separate take clauses are alternatives. Intrinsic participants join every alternative.
+
+```spp
+Role R;
+take A as R;
+take B as R;
+take C, D as R;
+```
+
+With A, B, C and D declared, the valid combinations are `{A}`, `{B}` or `{C, D}`. Each R row selects one complete combination. Separate A and B clauses do not make them joint; C and D must both be present.
+
+```spp
+Role R { R1; R2; }
+take A as R;
+take B as R;
+take A, B as R;
+```
+
+With the referenced types declared, the valid combinations are `{R1, R2, A}`, `{R1, R2, B}` or `{R1, R2, A, B}`. R1 and R2 are mandatory in every row. When explicit take clauses exist, intrinsic composition alone is not an additional alternative; without a take clause it is the default branch. Persistence requires one complete declared combination. In an inline layout, inactive player identity columns are null; in a separate layout, their relationship rows are absent.
+
+If Person plays Buyer and Product plays Goods, the composition can be traced to those sources. Buyer and Goods remain distinct intermediate business identities.
+
+An identity-only role is also valid:
+
+```spp
+Role Goods;
+take Product, Package as Goods;
+```
+
+The players are explicitly composed, but their entire property sets are not automatically flattened into Goods. Declare the facts needed by services and map their sources. A role with no properties can still express an identity.
+
+## Participant binding and scalar mapping
+
+A unique match between an existing member and its player produces an automatic whole-participant mapping. Explicit mappings remain available, but must target declared members and must not silently add fields.
+
+```spp
+Role OrderLine {
+    Goods;
+    String name;
+    BigDecimal(19, 2) unitPrice;
+    int quantity;
+}
+
+take Goods as OrderLine {
+    String name = name;
+    BigDecimal unitPrice = price;
 }
 ```
 
-`takeall` imports them into DisplayGoods, adding missing properties and mappings. Access becomes `displayGoods.sku` and `displayGoods.name`, without a goods grouping property.
+The Goods relationship is intrinsic. The scalar mappings select goods name and price as the sources of order-line facts. Explicitly resolve competing sources.
 
-|Declaration|Role Structure|Name Access|
-|---|---|---|
-|`Goods goods = Goods;`|Goods-typed property preserving the entire participant|`cartLine.goods.name`|
-|`takeall;`|Player properties imported into the role itself|`displayGoods.name`|
+`mapsame;` enables compatible same-name mappings; it is not implied by an empty take block. Retrieving Product.name does not by itself select it as Goods.name. The existing `takeall;` keyword is a compatible explicit property-import form; new models should prefer complete Role declarations so service dependencies remain visible.
 
-A cart line needs both goods and buyer, and whole mapping gives each a distinct place. Applying takeall to both does not automatically create goods and buyer groups. Same-name properties need explicit source distinction.
+Participant collections retain their element identities. They are not converted into one scalar player. Explicit member names remain necessary when several members share a type.
 
-`mapsame` maps existing compatible same-name role properties; `takeall` also imports properties the role has not declared. Choose whether business needs whole participants or selected properties before declaring mappings.
+## Stable independent identity and APP storage
 
-## Role-Owned Facts
+Extending composition must not change an existing role identity. A role table without an explicit key receives an APP-only String roleId. A named independent key can be declared as follows:
 
-A merchant played by Alex may borrow personal facts and own store name “Alex's Pet Store” and operating funds. Personal-data changes are obtained through mappings; changing store name changes merchant facts, not Alex's personal name.
+```app
+tables roles {
+    table SHOP_CART_LINES(CartLine) {
+        primarykey notnull String cartLineId;
+        identity independent;
+        performers in SHOP_CART_LINE_PLAYERS;
+    }
+}
+```
 
-Distinguish borrowed and identity-specific facts. Contracts retaining historical settlement information are a separate requirement, discussed in Part IV, Chapter 18.
+Insertion generates the technical identity; later CRUD uses it. SPP neither declares nor modifies cartLineId. Player keys are relationship facts, not the default role primary key. Explicit historical business/composite keys remain supported. Business uniqueness and physical identity are separate concerns.
 
-## Legality and Persistence
+`performers inline;` stores player identity records in the role table. `performers in TABLE;` uses a separate association table joined through the stable role identity. The current JDBC realization uses technical per-player identity columns for the inline layout, and role_type, role_id, performer_type and performer_key for the separate layout. These contain identities, not copies of all source-domain facts.
 
-The compiler checks that players are defined legal participant types, targets are roles, and property types satisfy the relationship. The current strict check allows Entity, Reference and Role but rejects Contract as player, when `strictRoleOnlyBusinessModel` is enabled.
+Role and association writes use the same local transaction resource and roll back together. Nested participants carry technical identity through private persistence metadata rather than business properties. The current/snapshot policy for ordinary facts is independent of this layout; agreed order prices still belong to the role's snapshot storage.
 
-Contracts can still be passed as service or scenario context for calculation, validation and later processing. Refunds can read the original order while buyer and merchant participate. Containing lines does not mean playing lines; composition differs from role playing.
+New relationships do not backfill historical business facts. Business rules determine whether they are required. Adding inline columns requires a schema migration; separate tables can receive new association rows, but cannot invent real relationships. APP selects layout; PHY selects the database and deployment. Neither changes business cardinality or obligations.
 
-A string name cannot become a number in a same-name mapping. Whole-participant mapping must reference a declared player and match the target type. These errors belong at compilation, not at query or save time.
-
-Legal declarations enable generated types, mappings and metadata, but do not create participants. Person may play Merchant without automatically establishing a merchant record for Alex; opening and saving remain scenario activities.
-
-Persistence respects ownership. Ordinary role updates maintain role facts; customer or product data uses its appropriate built-in services. Compile-time legality and runtime participant-specific querying and saving jointly support the relationship.
+See the [composition and storage specification](../../references/role-composition-and-storage.md).
 
 ---
 
-[Part Contents](README.md) · [Full Book Contents](../README.md) · [Previous Chapter](13-business-models.md) · [Next Chapter](15-atomic-services.md)
+[Part contents](README.md) · [Book contents](../README.md) · [Previous](13-business-models.md) · [Next](15-atomic-services.md)

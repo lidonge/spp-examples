@@ -8,16 +8,16 @@
 
 Petstore 用 Product 表示产品（含成本），Goods 表示可售商品（含售价和上架事实）；Person 扮演 Buyer；Person 扮演 Merchant，shopName 等经营属性在 take 中声明为角色特有事实。take 表达属性映射及组合扮演；实体继承仍可表达简单扮演的特殊情况，当前语言未新增实体继承语法。生成器生成实体、角色及双向 mapper；原子执行中的通用框架根据 take 绑定并回填扮演实体。
 
-StockLine、CartLine、OrderLine和Cart是角色。Goods扮演库存/选购/成交明细，Buyer扮演Cart，整体映射保留原参与者关系：
+StockLine、CartLine、OrderLine和Cart是角色。Goods扮演库存/选购/成交明细，Buyer扮演Cart，参与者成员本身已经表达内在组合，不再重复声明整体映射：
 
 ```spp
-take Goods as StockLine { Goods goods = Goods; }
-take Buyer as Cart { Buyer buyer = Buyer; }
+Role StockLine { Goods; quantum int available; quantum int reserved; quantum int sold; }
+Role Cart { Buyer; CartLine[] lines; }
 ```
 
 Receipt是实际办理凭证实体。没有StockBook汇总状态；available/reserved/sold逐商品定义为quantum int，数量为int，汇总按需计算。角色并非持久化记录换个关键字，必须有实际业务角色关系。
 
-本例展示简单实体/角色扮演、角色特有事实及整体参与者映射；复杂多实体组合为语言能力，但不在本例演示。简单角色可以与实体继承概念兼容，当前没有新增继承语法。take映射不自动替代实体仓储生命周期，也不承诺跨进程多个角色长期同步。
+本例展示简单实体/角色扮演、角色特有事实及整体参与者映射；CartLine 的 Buyer/Goods 组合、take 单条联合、多条备选的扩展及独立角色身份见[角色组合与存储](role-composition-and-storage.md)。简单角色可以与实体继承概念兼容，当前没有新增继承语法。take映射不自动替代实体仓储生命周期，也不承诺跨进程多个角色长期同步。
 
 ## 合约必须有明确场景
 
@@ -50,9 +50,9 @@ tables contracts {
 }
 ```
 
-SPP 的 Buyer 是完整参与者关系；APP 将其会员号展开为外键列。平台 version 不进入生成业务模型或请求 JSON。StockLine按Goods业务凭证定位，Merchant的平台主键由APP定义，单商家定位用singleton，不向 SPP 塞入门店分区号。
+SPP 的 Buyer 是完整参与者关系；APP 将其会员号展开为外键列。平台 version 不进入生成业务模型或请求 JSON。StockLine按Goods业务凭证定位，Merchant的平台主键由APP定义，保留既有单扮演者身份定位的兼容方式，不向 SPP 塞入门店分区号。
 
-APP 的 platform(index, Type.column) 定位模型外元数据；compareVersion(platform(...)) advanceVersion 采用查询基线进行原子版本保护。成功查询或插入记录平台身份，量子账簿据此定位，缺少身份不能悄悄选择默认对象。撤销同时恢复内部基线。APP 的 number(argument(...), "ORDER") 为实际业务凭证分配编号，不是技术请求防重键。
+APP 的 platform(index, Type.column) 定位模型外元数据；compareVersion(platform(...)) advanceVersion 采用查询基线进行原子版本保护。成功查询或插入记录平台身份，量子账簿据此定位，缺少身份不能悄悄选择默认对象。撤销同时恢复内部基线。APP 表中的 auto 凭证字段 prefix "ORDER" 为实际业务凭证分配编号，不是技术请求防重键。
 
 ## 参与者稳定性与集合
 

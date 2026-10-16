@@ -31,6 +31,10 @@ A role owns its added or overridden facts, while player facts stay with their or
 
 Develop uses LOCAL realization: all participating domains share a JVM and the same database/schema/connection resource, allowing ordinary and quantum changes to commit together. Testing exercises separate domain and quantum resources. See [transaction design](docs/scenario-design.md), [transaction evolution](docs/transaction-evolution-plan.md), and [the deployment specification](../../book/references/deployment-environments-and-physical-defaults.md) for supported combinations and limits.
 
+## Role composition and storage
+
+CartLine now declares its intrinsic Buyer/Goods members directly, without repeated whole-player mappings. APP gives cart lines an independent technical key and stores their player links in SHOP_CART_LINE_PLAYERS. Inventory demonstrates inline player identity storage. See [composition and storage](../../book/references/role-composition-and-storage.md). Existing persistent demo databases require an explicit schema/data migration or an isolated new demo database; the compiler does not rewrite historical identities.
+
 ## Acceptance
 
 ```bash

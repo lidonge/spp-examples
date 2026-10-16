@@ -2,7 +2,7 @@ domain petshop;
 
 Role OrderLine {
     business("Order-line reference used to verify individual items during delivery and returns") String lineNumber;
-    Goods goods;
+    Goods;
     String name;
     int quantity;
     BigDecimal(19, 2) unitPrice;
@@ -10,7 +10,6 @@ Role OrderLine {
 }
 
 take Goods as OrderLine {
-    Goods goods = Goods;
     String name = name;
     BigDecimal unitPrice = price;
 }

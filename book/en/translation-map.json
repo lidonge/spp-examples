@@ -20,7 +20,8 @@
     {
       "source": "第一篇-角色与服务的基本模型/03-roles.md",
       "english": "part-01-roles-and-services/03-roles.md",
-      "source_sha256": "66859ce14abb7d034e0dc57920012a994eefdfaad9785b72271a4e8fdf36b863"
+      "source_sha256": "15466585087d685e2c662782a8af25eb184c63789fde5224ef08acaca2e09054",
+      "revision_note": "Intrinsic composition, joint/alternative take and independent APP identity updated 2026-10-16."
     },
     {
       "source": "第一篇-角色与服务的基本模型/04-decomposition.md",
@@ -85,7 +86,8 @@
     {
       "source": "第三篇-用S++表达角色与服务/14-take.md",
       "english": "part-03-the-spp-language/14-take.md",
-      "source_sha256": "660d5ce7dca69213f69bd72a8a42e457eb4ed0ca08825c66f067cfaf9b3047ce"
+      "source_sha256": "39898ac66648a8e59970eeb407cd2226c3a3d84b1b2ecd881b9f19f6583e1a07",
+      "revision_note": "Intrinsic composition, joint/alternative take and independent APP identity updated 2026-10-16."
     },
     {
       "source": "第三篇-用S++表达角色与服务/15-atomic-services.md",

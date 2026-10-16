@@ -58,9 +58,9 @@ tables entities {
 
 tables roles {
     table SHOP_CART_LINES(CartLine) {
-        primarykey(CartLine.buyer, CartLine.goods);
-        foreignkey(CartLine.buyer) references Buyer;
-        foreignkey(CartLine.goods) references Goods;
+        primarykey notnull String cartLineId;
+        identity independent;
+        performers in SHOP_CART_LINE_PLAYERS;
     }
     table SHOP_ORDER_LINES(OrderLine) {
         primarykey(OrderLine.lineNumber);

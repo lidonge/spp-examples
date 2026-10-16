@@ -1,23 +1,14 @@
 domain petshop;
 
 Role CartLine {
-    Buyer buyer;
-    Goods goods;
+    Buyer;
+    Goods;
     int quantity;
 }
 
-take Goods, Buyer as CartLine {
-    Goods goods = Goods;
-    Buyer buyer = Buyer;
-}
-
 Role Cart {
-    Buyer buyer;
+    Buyer;
     CartLine[] lines;
-}
-
-take Buyer as Cart {
-    Buyer buyer = Buyer;
 }
 
 Contract CartAdditionAgreement {

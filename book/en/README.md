@@ -12,7 +12,7 @@ Monetary examples in this English edition use US dollars (USD), with English par
 
 The complete manuscript has seven parts, 35 chapters and six appendices. Each part has its own introduction and contents; each chapter links to its part, the whole book and adjacent chapters.
 
-This English edition follows the Chinese manuscript at revision `39287373`, including the discussions of modeling expressiveness, the bank case and COBOL/S++ code counts. S++ keywords, identifiers and executable examples retain their source forms; referenced engineering documents and editorial issue records retain their original language. The bank is described generically; real repository paths remain in source links.
+The initial English translation follows the Chinese manuscript at revision `39287373`, including the discussions of modeling expressiveness, the bank case and COBOL/S++ code counts. S++ keywords, identifiers and executable examples retain their source forms; referenced engineering documents and editorial issue records retain their original language. The bank is described generically; real repository paths remain in source links. Chapters 3 and 14 were updated in both languages on October 16, 2026 for intrinsic role composition, joint and alternative take relationships and independent APP storage identity; translation-map.json records those section updates.
 
 [Chinese Edition](../README.md)
 

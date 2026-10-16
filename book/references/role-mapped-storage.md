@@ -5,15 +5,15 @@
 SPP 用 take 描述业务角色与扮演者的属性映射；APP 决定映射属性是否在角色表保留副本。模型、业务表达式和 PHY 的数值表示彼此独立。角色自己的新增属性继续正常保存，扮演者仍由原域维护。
 
 ```spp
-Role OrderLine { String lineNumber; Goods goods; String name; BigDecimal(19, 2) unitPrice; }
-take Goods as OrderLine { Goods goods = Goods; String name = name; BigDecimal unitPrice = price; }
+Role OrderLine { String lineNumber; Goods; String name; BigDecimal(19, 2) unitPrice; }
+take Goods as OrderLine { String name = name; BigDecimal unitPrice = price; }
 ```
 
 ```app
 tables roles {
     table ORDER_LINES(OrderLine) {
         primarykey(OrderLine.lineNumber);
-        foreignkey(OrderLine.goods) references Goods;
+        foreignkey(OrderLine.Goods) references Goods;
         snapshot(OrderLine.name, OrderLine.unitPrice);
     }
     table GOODS(Goods) {
