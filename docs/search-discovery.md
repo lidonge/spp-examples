@@ -43,13 +43,13 @@ Account verification and Search Console submission must be reported separately f
 
 The owner selected Google's HTML-file method for this rollout. The supplied public file `google7f75a76777f31f44.html` is maintained under `website/static/` and served verbatim at the website root. It has been fetched over HTTPS with status 200 and checked against the original bytes. The builder must not add a title, canonical link or other page metadata to this file, and the file is not an article or sitemap entry. Keep it when publishing future site versions.
 
-The owner still needs to click **Verify** in the authenticated Search Console browser; serving the file alone does not prove account verification. The HTML-tag procedure above remains an alternative for future owners.
+The owner confirmed successful Search Console ownership verification on October 16, 2026. This confirmation is separate from the HTTPS check of the file. The HTML-tag procedure above remains an alternative for future owners.
 
 ## Rollout evidence — October 16, 2026
 
 The search changes and three articles were published from revision `55190ce`. The corresponding GitHub Actions run `38843452296` passed. The 176 public content pages have distinct titles and descriptions, canonical URLs, sharing metadata and valid local links. The site sitemap has 176 unique page entries, including all three articles. All 299 publication files at that stage matched their local generated SHA-256 values; no HTML page linked to GitHub or returned a `noindex` response header.
 
-Desktop and mobile browser checks covered the homepage, article index and all three articles. The live mobile route from homepage to article index to transaction article passed without browser errors or document overflow. These are website checks, not evidence of a real Googlebot visit or inclusion in Google's index. Account verification, sitemap submission and indexing requests remain pending owner confirmation.
+Desktop and mobile browser checks covered the homepage, article index and all three articles. The live mobile route from homepage to article index to transaction article passed without browser errors or document overflow. These are website checks, not evidence of a real Googlebot visit or inclusion in Google's index. Ownership verification has been confirmed by the owner. Sitemap submission and indexing requests remain pending owner confirmation.
 
 ## Measure and improve
 
