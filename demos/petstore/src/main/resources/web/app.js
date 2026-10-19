@@ -1,4 +1,14 @@
 'use strict';
+function newRequestId() {
+  const provider = globalThis.crypto;
+  if (typeof provider?.randomUUID === 'function') return provider.randomUUID();
+  if (typeof provider?.getRandomValues !== 'function') throw new Error('This browser does not provide secure random numbers');
+  const bytes = provider.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 const transportReplays = new WeakMap();
 const requestKeys = new WeakMap();
 const $ = id => document.getElementById(id);
@@ -45,6 +55,7 @@ const serviceActors = {
 };
 let view = {}, lastCommand, lastService, catalog = [];
 const errors = {
+  PARTICIPANT_NOT_IDENTIFIED:'A required record was not found. Register or load an existing customer first, and check the selected goods or order',
   CUSTOMER_NOT_FOUND:'Register or load the correct customer account first', CUSTOMER_EXISTS:'This membership number is already registered; use Load customer',
   EMPTY_CART:'Add goods to the cart first', INVALID_QUANTITY:'Quantity must be a positive integer', INSUFFICIENT_STOCK:'Insufficient available stock; adjust the cart quantity',
   INSUFFICIENT_FUNDS:'Insufficient demo wallet balance', PRODUCT_UNAVAILABLE:'These goods are not currently available for sale',
@@ -61,7 +72,7 @@ const participantNames = {"addCartItem":{"customer":"Buyer","cart":"Cart","goods
 async function invoke(service, participants) {
   const names=participantNames[service] || {};
   const payload=Object.fromEntries(Object.entries(participants).map(([name,value])=>[names[name] || name,value]));
-  const response = await fetch('/api/petshop.'+service, {method:'POST', headers:{'Content-Type':'application/json', 'Accept-Language':$('catalog-locale').value, 'X-SPP-Request-Serial':participants.AppHeader?.requestSerialNumber || crypto.randomUUID()}, body:JSON.stringify(payload)});
+  const response = await fetch('/api/petshop.'+service, {method:'POST', headers:{'Content-Type':'application/json', 'Accept-Language':$('catalog-locale').value, 'X-SPP-Request-Serial':participants.AppHeader?.requestSerialNumber || newRequestId()}, body:JSON.stringify(payload)});
   const data = await response.json();
   if (!response.ok) {
     const failure = new Error(errors[data.error] || data.error || 'Request failed');
@@ -75,7 +86,7 @@ async function invoke(service, participants) {
 }
 async function api(service, cmd) {
   const participants={};
-  if (!requestKeys.has(cmd)) requestKeys.set(cmd, crypto.randomUUID());
+  if (!requestKeys.has(cmd)) requestKeys.set(cmd, newRequestId());
   participants.AppHeader={globalSerialNumber:requestKeys.get(cmd),requestSerialNumber:requestKeys.get(cmd)};
   for (const actor of serviceActors[service]) participants[actor]=['products','stock','previousLines'].includes(actor)?[]:{};
   if (['placeShopOrder','previewShopOrder'].includes(service)) participants.customer={membershipNumber:cmd.membershipNumber};
@@ -177,7 +188,7 @@ function showReservation(agreement) {
 $('reserve-pet').onclick = () => guarded(async () => {
   try {
     const result = await invoke('reserveShopPet', {
-      AppHeader: {globalSerialNumber: crypto.randomUUID()},
+      AppHeader: {globalSerialNumber: newRequestId()},
       customer: {membershipNumber: membershipNumber()}, goods: {sku: $('reservation-product').value},
       stock: [], agreement: {quantity: Number($('reservation-quantity').value)}
     });

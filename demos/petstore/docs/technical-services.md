@@ -1,5 +1,7 @@
 # 技术服务样例：调用日志与耗时
 
+局域网 HTTP 页面也需要生成请求流水号，用于传输重试和界面防重。网页优先使用 `crypto.randomUUID()`；非安全上下文未提供该方法时，以 `crypto.getRandomValues()` 生成符合 UUID v4 格式的流水号。仍复用同一命令的原流水号，不改变业务参与者、幂等或防重语义。
+
 需求：不在 SPP 中添加日志调用，不增加业务参与者，统一观察商店域场景及原子服务的技术调用情况，包括标准 CRUD 与量子服务。
 
 [APP](../src/main/spp/petshop/technical-services.app) 声明 invocationTrace，使用 `intercept services` 匹配商店域全部服务，在 before、after、failure 三个阶段执行。[PHY](../src/main/spp/petshop/technical-services.phy) 指定通用 InvocationTraceService 和日志名称 spp.petstore.invocations。实现位于框架，不依赖任何 Petstore 属性或业务状态。

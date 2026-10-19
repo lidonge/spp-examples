@@ -17,6 +17,10 @@ SPP_WEB_PORT可改端口。已完成构建时可设置SPP_DEMO_SKIP_BUILD=1跳�
 
 脚本运行公共GeneratedWebServer，加载APP web目录、PHY资源和生成服务。默认持久化数据库在demos/petstore/target/petstore；重启保留数据，mvn clean会删除该目录。SPP_PETSTORE_JDBC_URL可指定其他H2地址。
 
+APP 的 `web start` 自动执行客户域、产品域和商店初始化，首次提供商户、四件商品及对应库存、供应和结算记录；已有记录不会在重启时重复灌入。页面上预填的客户资料不是已注册账号，购物客户仍须点击 Register 注册。账户余额和可售库存初始为零，充值、入库步骤见下文。
+
+局域网 HTTP 下浏览器可能不提供 `crypto.randomUUID()`，网页以 `crypto.getRandomValues()` 生成请求流水号。修改页面脚本后可用 Ctrl+F5 刷新缓存。
+
 ## Java验收
 
 以下命令会实际执行测试，仅在需要回归时使用：
@@ -30,6 +34,8 @@ mvn -pl :petstore-demo -am test -Dtest=PetstoreScenarioTest -Dsurefire.failIfNoS
 examples保留为脚本命令名称，内部已改为JUnit，不执行APP examples或GeneratedExampleRunner。28个测试方法位于src/test/java；默认独立内存数据库，不操作网页数据库。持久化重启测试启动两个独立子JVM并使用专用临时文件数据库。
 
 生产生成Java、SQL/OpenAPI与目录仍在target；测试编译结果在target/test-classes，JUnit执行报告在target/surefire-reports。旧target/spp-examples/evidence是历史APP验收证据，不代表当前测试结果。覆盖与测试边界见[Java验收](java-tests.md)。
+
+浏览器请求流水号回归可运行 `node --test demos/petstore/src/test/browser/RequestIdTest.cjs`。安装 Playwright 并准备独立测试数据库后，`SPP_DEMO_URL=http://<局域网IP>:8089 node demos/petstore/src/test/browser/PetstoreLanCartRegression.cjs` 验证 HTTP 兼容、注册、充值、入库、添加两个不同商品及下单；该流程会写入测试客户和订单，不应指向正在手工使用的数据库。
 
 ## 当前需求与设计核对方式
 
