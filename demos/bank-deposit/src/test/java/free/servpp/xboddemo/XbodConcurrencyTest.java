@@ -70,7 +70,8 @@ public class XbodConcurrencyTest {
         }
     }
     @Test(timeout=60000) public void concurrentIndependentAccountsKeepFundsAndRecordsSeparate() throws Exception {
-        try (var demo = new XbodTestSupport()) {
+        // Customer accounts differ, but both postings legitimately lock shared bank income accounts.
+        try (var demo = new XbodTestSupport(10000)) {
             XbodTransactionTest.open(demo); XbodTransactionTest.openSecondAccount(demo);
             var second = XbodTransactionTest.deposit(200);
             second.put("DepositAccount",Map.of("accountNumber","ACCOUNT-002"));

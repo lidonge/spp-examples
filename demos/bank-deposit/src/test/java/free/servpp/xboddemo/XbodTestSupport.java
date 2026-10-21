@@ -17,8 +17,11 @@ final class XbodTestSupport implements AutoCloseable {
     final String previousUrl;
     final String previousLedgerUrl;
     XbodTestSupport() {
-        this("jdbc:h2:mem:xbod_acceptance_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1",
-                "jdbc:h2:mem:xbod_ledger_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1");
+        this(2000);
+    }
+    XbodTestSupport(int lockTimeoutMillis) {
+        this("jdbc:h2:mem:xbod_acceptance_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=" + lockTimeoutMillis,
+                "jdbc:h2:mem:xbod_ledger_" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=" + lockTimeoutMillis);
     }
     XbodTestSupport(String url, String ledgerUrl) {
         previousUrl = System.getProperty("spp.xbod.datasource-url");

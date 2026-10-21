@@ -4,6 +4,13 @@ S++ describes business systems through participants, roles, atomic services, sce
 
 **[Read the English book](https://us.servpp.top/book/)** · **[Browse demo source](https://us.servpp.top/sources/)** · **[Project website](https://us.servpp.top/)** · **[Report an issue](https://github.com/lidonge/spp-examples/issues)**
 
+The current full Petstore and bank demos explicitly select the official enhanced
+generator and runtime (`generator-enhanced` and `appframe-enhanced`). Install those
+SDK artifacts as well as the public compiler/runtime before building the demos.
+Their source code remains under this repository's scoped license. A basic-runtime
+custom-service example is supplied separately with the compiler; no commercial
+implementation source is copied here.
+
 ## Start here
 
 | Material | What it contains |

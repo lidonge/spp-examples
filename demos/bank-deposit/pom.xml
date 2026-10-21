@@ -5,6 +5,8 @@
   <artifactId>xbod-deposit-demo</artifactId>
   <name>XBOD Deposit SPP Demo</name>
   <dependencies>
+    <dependency><groupId>free.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
+    <dependency><groupId>free.servpp</groupId><artifactId>appframe-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
     <dependency><groupId>org.mybatis</groupId><artifactId>mybatis</artifactId><version>3.5.15</version></dependency>
     <dependency><groupId>free.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version></dependency>
     <dependency><groupId>free.servpp</groupId><artifactId>appframe</artifactId><version>${spp.sdk.version}</version></dependency>
@@ -24,6 +26,7 @@
     <plugins>
       <plugin>
         <groupId>free.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version>
+        <dependencies><dependency><groupId>free.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency></dependencies>
         <configuration>
           <sppSourceDirectory>${project.basedir}/src/main/spp</sppSourceDirectory>
           <yamlOutputDirectory>${project.build.directory}/spp/src/main/resources</yamlOutputDirectory>

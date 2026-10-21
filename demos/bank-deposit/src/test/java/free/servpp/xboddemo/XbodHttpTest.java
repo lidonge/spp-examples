@@ -14,6 +14,12 @@ public class XbodHttpTest {
             XbodTransactionTest.open(demo);
             Properties catalog = new Properties();
             try (var input = getClass().getResourceAsStream("/META-INF/spp/domains/cboddeposit/web.properties")) { catalog.load(input); }
+            var previousStore = free.servpp.service.idempotency.BusinessIdempotencyManager.requestStore();
+            // This HTTP test verifies APP's five-second business-key window, independently
+            // of host speed; business facts still use the generated JDBC deployment.
+            demo.runtime.getPhysicalRuntime().setRequestStore(
+                    new free.servpp.service.idempotency.InMemoryBusinessIdempotencyStore(
+                            java.time.Clock.fixed(java.time.Instant.parse("2026-10-01T00:00:00Z"),java.time.ZoneOffset.UTC)));
             try (var server = new free.servpp.service.runtime.GeneratedWebServer(catalog,demo.mapper,new InetSocketAddress("127.0.0.1",0))) {
                 server.start(); free.servpp.service.runtime.DomainServiceRouter.markReady();
                 var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
@@ -34,13 +40,14 @@ public class XbodHttpTest {
                 var replay = client.send(request,HttpResponse.BodyHandlers.ofString());
                 assertEquals(first.body(),200,first.statusCode()); assertEquals(replay.body(),200,replay.statusCode());
                 var a = demo.mapper.readTree(first.body()); var b = demo.mapper.readTree(replay.body());
-                assertFalse(a.path("replayed").asBoolean()); assertTrue(b.path("replayed").asBoolean());
+                assertFalse(first.body(),a.path("replayed").asBoolean()); assertTrue(replay.body(),b.path("replayed").asBoolean());
                 assertEquals("REMOTE",a.path("participants").path("AppHeader").path("callMode").asText());
                 assertEquals("HTTP-DEPOSIT",a.path("participants").path("AppHeader").path("requestSerialNumber").asText());
                 assertTrue(a.path("participants").path("AppHeader").path("callerId").asText().startsWith("browser:"));
                 assertEquals(a.path("participants").path("CashDepositAgreement").path("depositNumber"),b.path("participants").path("CashDepositAgreement").path("depositNumber"));
                 var changed = XbodTransactionTest.deposit(100);
                 changed.put("DepositFeeParty",Map.of("accountKind","NormalSavings","customerNumber","CHANGED","branchNumber","001","regionCode","R001"));
+                // APP identifies this operation by the account pair, even with another HTTP serial.
                 var conflict = client.send(HttpRequest.newBuilder(depositUrl).timeout(Duration.ofSeconds(30)).header("Cookie",cookie)
                         .header("X-SPP-Request-Serial","HTTP-CHANGED").POST(HttpRequest.BodyPublishers.ofString(demo.mapper.writeValueAsString(demo.request("depositCash",changed)))).build(),HttpResponse.BodyHandlers.ofString());
                 assertEquals(conflict.body(),400,conflict.statusCode());
@@ -67,6 +74,9 @@ public class XbodHttpTest {
                 var hidden = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+server.port()+"/api/cboddeposit.findDepositAccount"))
                         .timeout(Duration.ofSeconds(5)).POST(HttpRequest.BodyPublishers.ofString("{}")).build(),HttpResponse.BodyHandlers.ofString());
                 assertEquals(404,hidden.statusCode());
+            } finally {
+                demo.runtime.getPhysicalRuntime().setRequestStore(null);
+                free.servpp.service.idempotency.BusinessIdempotencyManager.setRequestStore(previousStore);
             }
         }
     }
