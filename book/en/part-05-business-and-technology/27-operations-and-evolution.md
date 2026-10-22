@@ -14,15 +14,15 @@ Contracts answer what was bought, paid and processed; traces answer paths, failu
 
 ## Add a Slow-Call Observer in Java
 
-Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: `../../../appframe/src/main/java/free/servpp/service/technical/TechnicalService.java`) and TechnicalInvocation (maintainer reference: `../../../appframe/src/main/java/free/servpp/service/technical/TechnicalInvocation.java`):
+Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: `../../../appframe/src/main/java/com/servpp/service/technical/TechnicalService.java`) and TechnicalInvocation (maintainer reference: `../../../appframe/src/main/java/com/servpp/service/technical/TechnicalInvocation.java`):
 
 ```java
 package example.technical;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import free.servpp.service.technical.TechnicalInvocation;
-import free.servpp.service.technical.TechnicalService;
+import com.servpp.service.technical.TechnicalInvocation;
+import com.servpp.service.technical.TechnicalService;
 
 public final class SlowCallObserver implements TechnicalService {
     private long thresholdNanos;

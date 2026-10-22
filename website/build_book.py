@@ -60,7 +60,7 @@ def title_of(path):
 
 
 def header(section='book'):
-    markup = '''<header class="topbar"><a href="/" class="wordmark" aria-label="S++ home"><span class="mark">S<span>++</span></span><span class="wordmark-divider"></span><span class="wordmark-sub">Business systems language</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/examples/">Examples</a><a href="/guide/">Guide</a><a href="/book/">Book</a><a href="/sources/">Source</a><a class="nav-contact" href="/#contact">Get in touch ↗</a></nav><button class="menu-toggle" aria-label="Open menu" aria-expanded="false">Menu ☰</button></header>'''
+    markup = '''<header class="topbar"><a href="/" class="wordmark" aria-label="S++ home"><span class="mark">S<span>++</span></span><span class="wordmark-divider"></span><span class="wordmark-sub">Business systems language</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/examples/">Examples</a><a href="/guide/">Guide</a><a href="/book/">Book</a><a href="/sources/">Source</a><a href="https://github.com/lidonge/spp-basic">GitHub</a><a class="nav-contact" href="https://platform.servpp.top/login">Platform <span aria-hidden="true">↗</span></a></nav><button class="menu-toggle" aria-label="Open menu" aria-expanded="false">Menu ☰</button></header>'''
     markup = markup.replace('<a href="/sources/">Source</a>', '<a href="/sources/">Source</a><a href="/articles/">Articles</a>')
     return markup.replace(f'href="/{section}/"', f'href="/{section}/" aria-current="page"')
 

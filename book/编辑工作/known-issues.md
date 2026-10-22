@@ -164,7 +164,7 @@
 
 **已明确的规则。** 作者明确：同一事务边界内，SPP 编译器自动将量子交易提前到所有普通更新交易之前。普通更新不会影响量子交易的结果，量子交易自身可乱序执行；量子阶段之后再并发保存普通事实。
 
-**实现核对。** SppDomain (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppDomain.java`)的 `transactionPlanWarnings` 给混合边界生成量子优先阶段说明；SourceTransactionPlan (maintainer reference: `../../appframe/src/main/java/free/servpp/service/transaction/SourceTransactionPlan.java`)的 `stages` 将 QUANTUM 组放在普通组之前。`executePlan` 对同质、非 SAGA 边界则直接传递原调用列表，[事务与存储设计](../references/transaction-storage-v1.md)也说明同质源边界保持声明顺序。当前证据支持混合阶段的自动量子优先，但尚不能据此认定全部部署模式均已实现同样重排、量子乱序和普通更新自动并发。
+**实现核对。** SppDomain (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppDomain.java`)的 `transactionPlanWarnings` 给混合边界生成量子优先阶段说明；SourceTransactionPlan (maintainer reference: `../../appframe/src/main/java/com/servpp/service/transaction/SourceTransactionPlan.java`)的 `stages` 将 QUANTUM 组放在普通组之前。`executePlan` 对同质、非 SAGA 边界则直接传递原调用列表，[事务与存储设计](../references/transaction-storage-v1.md)也说明同质源边界保持声明顺序。当前证据支持混合阶段的自动量子优先，但尚不能据此认定全部部署模式均已实现同样重排、量子乱序和普通更新自动并发。
 
 **书稿影响。** 第一篇第7章和第四篇第19章按作者规则解释自动计划；附录 B 的 B13 节分别论证量子内部交换、普通更新内部交换和跨类别的单向依赖。
 
@@ -194,7 +194,7 @@
 
 **书稿处理。** 第三篇第13章区分内部主键、习惯性 ID 与业务凭证，解释 `business` 的针对性用途；第12章、第四篇第18章及附录 E 同步采用这一定义。
 
-**实现差异。** SppDomain (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppDomain.java`)的 `validateBusinessFieldMeanings` 目前将没有 business 说明的 id、*Id、*ID 等字段加入 errors，`validateAppDeclarations` 将其合并为编译错误，并非仅给警告。[内置 CRUD 规范](../references/implicit-participant-crud.md)支持 APP-only 主键及内部存储身份，但也明确新记录主键仍依赖 APP 编号或扮演者映射；这不能作为每个实体都已自动创建与分配隐藏主键的完整证据。
+**实现差异。** SppDomain (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppDomain.java`)的 `validateBusinessFieldMeanings` 目前将没有 business 说明的 id、*Id、*ID 等字段加入 errors，`validateAppDeclarations` 将其合并为编译错误，并非仅给警告。[内置 CRUD 规范](../references/implicit-participant-crud.md)支持 APP-only 主键及内部存储身份，但也明确新记录主键仍依赖 APP 编号或扮演者映射；这不能作为每个实体都已自动创建与分配隐藏主键的完整证据。
 
 **待统一。** 将疑似习惯性 ID 的诊断级别与作者的警告规则统一；明确内部主键自动创建、分配、查询和跨域传递的机制，以及它与实际业务编号、APP 显式主键和已有数据的关系。普通业务主键和技术版本等其他诊断是否采用同样级别，需分别确认，不能一并降级。
 
@@ -202,8 +202,8 @@
 
 **作者已决定。** 书稿按照现有实现解释：mapsame 需要显式声明，省略与显式声明不等价；沿扮演链查询与属性映射回填分别说明，不采用默认 mapsame 的设想。
 
-**当前实现核对。** 书稿分支与主线源码中，SppRoleMapper (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppRoleMapper.java`)的 isMapSame 默认 false，解析处理器 (maintainer reference: `../../lang/src/main/java/free/servpp/lang/general/IActasHandler.java`)仅在读取 mapsame 时将其设为 true。映射生成器 (maintainer reference: `../../generator/src/main/java/free/servpp/generator/openapi/MustacheClassWriter.java`)仅在 takeall 或 mapsame 生效时收集同名自动映射。查询运行时 (maintainer reference: `../../appframe/src/main/java/free/servpp/service/runtime/ParticipantRoleQueries.java`)确实沿扮演关系读取来源事实，但最终通过生成的 entityToRole 映射回填，因此递归查询不等于默认同名映射。
+**当前实现核对。** 书稿分支与主线源码中，SppRoleMapper (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppRoleMapper.java`)的 isMapSame 默认 false，解析处理器 (maintainer reference: `../../lang/src/main/java/com/servpp/lang/general/IActasHandler.java`)仅在读取 mapsame 时将其设为 true。映射生成器 (maintainer reference: `../../generator/src/main/java/com/servpp/generator/openapi/MustacheClassWriter.java`)仅在 takeall 或 mapsame 生效时收集同名自动映射。查询运行时 (maintainer reference: `../../appframe/src/main/java/com/servpp/service/runtime/ParticipantRoleQueries.java`)确实沿扮演关系读取来源事实，但最终通过生成的 entityToRole 映射回填，因此递归查询不等于默认同名映射。
 
-**关联影响。** 存储归属检查 (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/DomainDeploymentValidator.java`)也按 mapsame 标记同名借用属性。将其改为默认，必须同步映射生成、存储归属、身份推导与查询回填，不能只去掉示例中的关键字。联合扮演的同名来源歧义、类型或量子属性不匹配，以及订单成交事实需要独立保存的配置，也要保持明确语义。
+**关联影响。** 存储归属检查 (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/DomainDeploymentValidator.java`)也按 mapsame 标记同名借用属性。将其改为默认，必须同步映射生成、存储归属、身份推导与查询回填，不能只去掉示例中的关键字。联合扮演的同名来源歧义、类型或量子属性不匹配，以及订单成交事实需要独立保存的配置，也要保持明确语义。
 
 **书稿处理。** 第三篇第14章保留显式 mapsame 示例，增加省略 mapsame 的对照，区分扮演链查询与回填，并说明 takeall 是另一种明确的属性继承与映射规则；附录 E 同步更新。该项无需继续讨论是否在正文采用默认 mapsame。

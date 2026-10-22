@@ -6,9 +6,9 @@
 
 ## 文件职责
 
-- [PetstoreScenarioTest](../src/test/java/free/servpp/petdemo/PetstoreScenarioTest.java)：28个JUnit测试方法，组合独立场景并断言业务与物理事实。
-- [PetstoreTestSupport](../src/test/java/free/servpp/petdemo/PetstoreTestSupport.java)：生成请求/响应的调用支持，以及仅存在于Java测试中的Session输入。生产场景不会接收该夹具。
-- [PetstoreRestartProbe](../src/test/java/free/servpp/petdemo/PetstoreRestartProbe.java)：测试专用子JVM入口；先创建并付款，再在另一进程读取原数据库，检查持久化事实。
+- [PetstoreScenarioTest](../src/test/java/com/servpp/petdemo/PetstoreScenarioTest.java)：28个JUnit测试方法，组合独立场景并断言业务与物理事实。
+- [PetstoreTestSupport](../src/test/java/com/servpp/petdemo/PetstoreTestSupport.java)：生成请求/响应的调用支持，以及仅存在于Java测试中的Session输入。生产场景不会接收该夹具。
+- [PetstoreRestartProbe](../src/test/java/com/servpp/petdemo/PetstoreRestartProbe.java)：测试专用子JVM入口；先创建并付款，再在另一进程读取原数据库，检查持久化事实。
 
 例如完整交易测试依次调用下单、付款、发货和收货场景；调用顺序在Java测试中，业务状态更新仍在对应SPP场景的原子服务中。价格边界测试可直接调用生成的quoteOrder原子服务，提供固定输入与独立预期值，不在Java中重写计算公式。
 

@@ -2,6 +2,23 @@
 
 The production website is <https://us.servpp.top/>. Its public English pages include the project introduction, guide, examples, English book and source browser. Book publication is reserved-rights under `../book/COPYRIGHT.md`; the website code is MIT-licensed.
 
+## Platform and public source entry points
+
+The main navigation links to <https://platform.servpp.top/login> and the independent
+Apache-2.0 basic SDK source at <https://github.com/lidonge/spp-basic>. The homepage
+also links to the existing <https://github.com/lidonge/spp-examples> repository.
+Neither source repository requires a platform account. The examples repository's
+MIT code license does not relicense its reserved-rights book.
+
+The platform keeps its own origin, cookies, OAuth callback and backend policy;
+this integration adds links, not an iframe or a replacement for the static site.
+The homepage currently states that public registration is not open. Update that
+statement and its site-check assertion only after the platform's real registration
+acceptance and enablement, not merely after adding a navigation link.
+
+The site checker allows only these two approved GitHub repository destinations;
+private compiler history and commercial repositories remain unpublished.
+
 ## Inputs and generated output
 
 - `static/`: maintained HTML, CSS, JavaScript and icons for the public website.

@@ -31,7 +31,7 @@ mvn -pl :petstore-demo -am test -Dtest=PetstoreScenarioTest -Dsurefire.failIfNoS
 - [需求与功能](docs/requirements-and-functions.md)、[实施路径](docs/implementation-path.md)、[能力矩阵](docs/capability-matrix.md)。
 - [十分钟演示](docs/demo-walkthrough.md)、[按SPP文件导读](docs/source-guide.md)、[传统Java比较](docs/spp-vs-java.md)、[通用语法缺口](docs/language-gaps.md)。
 - [商店域按功能阅读](docs/source-guide.md)：`membership`、`catalogue`、`cart`、`order`、`payment`、`fulfillment`、`returns`、`reservation`；共享定义放在 `shared`。
-- [APP绑定与网页暴露](src/main/spp/petshop/petshop.app)、[PHY数字与资源](src/main/spp/petshop/petshop.phy)、[Java场景测试](src/test/java/free/servpp/petdemo/PetstoreScenarioTest.java)。
+- [APP绑定与网页暴露](src/main/spp/petshop/petshop.app)、[PHY数字与资源](src/main/spp/petshop/petshop.phy)、[Java场景测试](src/test/java/com/servpp/petdemo/PetstoreScenarioTest.java)。
 
 这是完整本地业务演示：支付使用演示钱包，集中量子库先提交金额/库存，再提交普通记录；跨模式以Saga恢复。网页只展示事实与发起操作，不复制报价、资格和状态规则。逐商品锁竞争的吞吐成本及外部支付/多资源事务边界在对比文档明确说明。
 

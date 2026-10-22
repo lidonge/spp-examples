@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent><groupId>free.servpp.examples</groupId><artifactId>spp-examples</artifactId><version>1.0-SNAPSHOT</version><relativePath>../../pom.xml</relativePath></parent>
+  <parent><groupId>com.servpp.examples</groupId><artifactId>spp-examples</artifactId><version>1.0-SNAPSHOT</version><relativePath>../../pom.xml</relativePath></parent>
   <artifactId>xbod-deposit-demo</artifactId>
   <name>XBOD Deposit SPP Demo</name>
   <dependencies>
-    <dependency><groupId>free.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
-    <dependency><groupId>free.servpp</groupId><artifactId>appframe-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
+    <dependency><groupId>com.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
+    <dependency><groupId>com.servpp</groupId><artifactId>appframe-enhanced</artifactId><version>${spp.sdk.version}</version></dependency>
     <dependency><groupId>org.mybatis</groupId><artifactId>mybatis</artifactId><version>3.5.15</version></dependency>
-    <dependency><groupId>free.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version></dependency>
-    <dependency><groupId>free.servpp</groupId><artifactId>appframe</artifactId><version>${spp.sdk.version}</version></dependency>
+    <dependency><groupId>com.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version></dependency>
+    <dependency><groupId>com.servpp</groupId><artifactId>appframe</artifactId><version>${spp.sdk.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId><version>3.1.5</version></dependency>
     <dependency><groupId>org.openapitools</groupId><artifactId>jackson-databind-nullable</artifactId><version>0.2.6</version></dependency>
     <dependency><groupId>io.swagger.core.v3</groupId><artifactId>swagger-annotations</artifactId><version>2.2.17</version></dependency>
@@ -25,13 +25,13 @@
     </resources>
     <plugins>
       <plugin>
-        <groupId>free.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version>
-        <dependencies><dependency><groupId>free.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency></dependencies>
+        <groupId>com.servpp</groupId><artifactId>generator</artifactId><version>${spp.sdk.version}</version>
+        <dependencies><dependency><groupId>com.servpp</groupId><artifactId>generator-enhanced</artifactId><version>${spp.sdk.version}</version></dependency></dependencies>
         <configuration>
           <sppSourceDirectory>${project.basedir}/src/main/spp</sppSourceDirectory>
           <yamlOutputDirectory>${project.build.directory}/spp/src/main/resources</yamlOutputDirectory>
           <javaOutputDirectory>${project.build.directory}/generated-sources/openapi/src/main/java</javaOutputDirectory>
-          <basePackage>free.servpp.xbod.generated</basePackage>
+          <basePackage>com.servpp.xbod.generated</basePackage>
         </configuration>
         <executions><execution><goals><goal>sppcompile</goal></goals></execution></executions>
       </plugin>
@@ -41,9 +41,9 @@
           <inputSpec>${project.build.directory}/spp/src/main/resources/cboddeposit.spp.yaml</inputSpec>
           <configurationFile>${project.build.directory}/spp/src/main/resources/cboddeposit.numeric-codegen.json</configurationFile>
           <generatorName>spring</generatorName><skipValidateSpec>true</skipValidateSpec>
-          <apiPackage>free.servpp.xbod.generated.cboddeposit.handler</apiPackage>
-          <modelPackage>free.servpp.xbod.generated.cboddeposit.model</modelPackage>
-          <invokerPackage>free.servpp.xbod.generated.cboddeposit.handler</invokerPackage>
+          <apiPackage>com.servpp.xbod.generated.cboddeposit.handler</apiPackage>
+          <modelPackage>com.servpp.xbod.generated.cboddeposit.model</modelPackage>
+          <invokerPackage>com.servpp.xbod.generated.cboddeposit.handler</invokerPackage>
           <templateDirectory>${project.build.directory}/spp/src/main/resources/JavaSpring</templateDirectory>
           <configOptions><useSpringBoot3>true</useSpringBoot3></configOptions>
           <addTestCompileSourceRoot>false</addTestCompileSourceRoot>

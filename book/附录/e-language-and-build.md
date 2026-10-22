@@ -56,12 +56,12 @@
 | 独立查询并发，完成后再使用事实 | [下单场景](../../demos/petstore/src/main/spp/petshop/order/petshop-scene-placeShopOrder.spp)、[付款场景](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) |
 | 查询原地补全与身份确认 | [参与者查询绑定](../references/participant-query-binding.md)、[参与者执行](../references/spp-participant-execution.md) |
 | 普通查询与普通更新均为内置服务，开发者不修改实现；场景组织调用、计算与校验 | [内置 CRUD 规范](../references/implicit-participant-crud.md) |
-| 普通原子服务不允许调用其他服务，计算调用图禁止循环 | SppDomain 校验 (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppDomain.java`)中的 `validateBusinessCalculations`、`validateCalculationCycles` |
-| 计算只调用计算，校验不修改参与者，计算不能使用 require | 业务计算校验器 (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/app/expr/BusinessCalculationValidator.java`) |
+| 普通原子服务不允许调用其他服务，计算调用图禁止循环 | SppDomain 校验 (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppDomain.java`)中的 `validateBusinessCalculations`、`validateCalculationCycles` |
+| 计算只调用计算，校验不修改参与者，计算不能使用 require | 业务计算校验器 (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/app/expr/BusinessCalculationValidator.java`) |
 | 订单报价复用明细计算 | [Petstore 定价服务](../../demos/petstore/src/main/spp/petshop/order/petshop-20-calculations.spp)中的 `quoteOrder` 与 `priceLine` |
 | 校验控制词法范围、局部 guard 与显式撤销 | [参与者执行规范](../references/spp-participant-execution.md)、[原子服务规范](../references/spp-atomic-services.md) |
 | 事务恢复后记录业务拒绝 | [预约场景](../../demos/petstore/src/main/spp/petshop/reservation/petshop-scene-reserveShopPet.spp)、[失败处理与系统结果](../references/spp-transaction-failure-handling.md) |
-| 计算与校验可以生成本地实现 | SppService (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppService.java`)中的 `isLocalService`、生成器 (maintainer reference: `../../generator/src/main/java/free/servpp/generator/openapi/MustacheClassWriter.java`)、[Petstore APP](../../demos/petstore/src/main/spp/petshop/petshop.app) |
+| 计算与校验可以生成本地实现 | SppService (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppService.java`)中的 `isLocalService`、生成器 (maintainer reference: `../../generator/src/main/java/com/servpp/generator/openapi/MustacheClassWriter.java`)、[Petstore APP](../../demos/petstore/src/main/spp/petshop/petshop.app) |
 
 查询并发与本地顺序执行是根据职责和依赖选择的安排，不是由服务类别自动获得的调度效果。本地执行也不等于不能处理并发请求。第一篇说明常见业务的安排，第二篇进一步讨论实际成本与依赖。
 

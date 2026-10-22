@@ -27,7 +27,7 @@ phy {
             adapter jdbcQuantum;
             config datasourceUrl = "${spp.xbod.datasource-url:jdbc:h2:mem:xbod-deposit;DB_CLOSE_DELAY=-1;WRITE_DELAY=0}";
             config driverClassName = "org.h2.Driver";
-            config journalStore = "free.servpp.service.transaction.JdbcQuantumJournalStore";
+            config journalStore = "com.servpp.service.transaction.JdbcQuantumJournalStore";
             config journalTable = "xbod_quantum_journal";
             config valueTable = "xbod_quantum_value";
             config decimalStorage = "text";
@@ -60,7 +60,7 @@ phy {
             adapter jdbcQuantum;
             config datasourceUrl = "${spp.xbod.testing.ledger-url:jdbc:h2:mem:xbod-ledger;DB_CLOSE_DELAY=-1;WRITE_DELAY=0}";
             config driverClassName = "org.h2.Driver";
-            config journalStore = "free.servpp.service.transaction.JdbcQuantumJournalStore";
+            config journalStore = "com.servpp.service.transaction.JdbcQuantumJournalStore";
             config journalTable = "xbod_quantum_journal";
             config valueTable = "xbod_quantum_value";
             config decimalStorage = "text";

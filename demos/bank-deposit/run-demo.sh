@@ -19,4 +19,4 @@ exec java "-Dspp.environment=$spp_environment" -Dspp.application=xbodDeposit \
   -Dspp.xbod.datasource-url="${SPP_XBOD_JDBC_URL:-jdbc:h2:file:$demo_dir/target/xbod-deposit;DB_CLOSE_DELAY=-1;WRITE_DELAY=0}" \
   -Dspp.xbod.testing.ledger-url="${SPP_XBOD_LEDGER_URL:-jdbc:h2:file:$demo_dir/target/xbod-ledger;DB_CLOSE_DELAY=-1;WRITE_DELAY=0}" \
   -cp "$demo_dir/target/classes:$demo_classpath" \
-  free.servpp.service.runtime.GeneratedWebServer
+  com.servpp.service.runtime.GeneratedWebServer

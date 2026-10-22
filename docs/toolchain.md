@@ -10,8 +10,8 @@ Python 3.10+ and the pinned Markdown package in `website/requirements.txt` are e
 
 JDK 17+, Maven and these Maven artifacts are required:
 
-- `free.servpp:generator:${spp.sdk.version}` — source-language Maven plugin and generator.
-- `free.servpp:appframe:${spp.sdk.version}` — generic service/runtime support.
+- `com.servpp:generator:${spp.sdk.version}` — source-language Maven plugin and generator.
+- `com.servpp:appframe:${spp.sdk.version}` — generic service/runtime support.
 - Their transitive toolchain dependencies, including the language artifact and its parent POM.
 
 The default SDK version is `1.0-SNAPSHOT`. Override it with `-Dspp.sdk.version=...` when a compatible distribution is supplied. These coordinates are prerequisites, not a claim that the artifacts are publicly downloadable from Maven Central.

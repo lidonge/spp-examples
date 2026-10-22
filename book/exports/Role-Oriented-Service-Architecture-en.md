@@ -1618,7 +1618,7 @@ Its [PHY](../../demos/petstore/src/main/spp/petshop/technical-services.phy) spec
 ```phy
 phy {
     technical service invocationTrace {
-        implementation: "free.servpp.service.technical.InvocationTraceService";
+        implementation: "com.servpp.service.technical.InvocationTraceService";
         config logger = "spp.petstore.invocations";
     }
 }
@@ -1818,15 +1818,15 @@ Contracts answer what was bought, paid and processed; traces answer paths, failu
 
 ## Add a Slow-Call Observer in Java
 
-Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: `../../appframe/src/main/java/free/servpp/service/technical/TechnicalService.java`) and TechnicalInvocation (maintainer reference: `../../appframe/src/main/java/free/servpp/service/technical/TechnicalInvocation.java`):
+Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: `../../appframe/src/main/java/com/servpp/service/technical/TechnicalService.java`) and TechnicalInvocation (maintainer reference: `../../appframe/src/main/java/com/servpp/service/technical/TechnicalInvocation.java`):
 
 ```java
 package example.technical;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import free.servpp.service.technical.TechnicalInvocation;
-import free.servpp.service.technical.TechnicalService;
+import com.servpp.service.technical.TechnicalInvocation;
+import com.servpp.service.technical.TechnicalService;
 
 public final class SlowCallObserver implements TechnicalService {
     private long thresholdNanos;
@@ -3485,12 +3485,12 @@ Execution, storage and environment specifications define exact checks. Principle
 |Independent concurrent queries followed by fact use|[Ordering](../../demos/petstore/src/main/spp/petshop/order/petshop-scene-placeShopOrder.spp), [payment](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp)|
 |In-place completion and identity|[Query binding](../references/participant-query-binding.md), [execution](../references/spp-participant-execution.md)|
 |Built-in query/update; visible scenario rules|[Implicit CRUD](../references/implicit-participant-crud.md)|
-|Atomic call restrictions and calculation cycles|SppDomain (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppDomain.java`): validateBusinessCalculations, validateCalculationCycles|
-|Calculation-only calls, no check mutation/require|BusinessCalculationValidator (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/app/expr/BusinessCalculationValidator.java`)|
+|Atomic call restrictions and calculation cycles|SppDomain (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppDomain.java`): validateBusinessCalculations, validateCalculationCycles|
+|Calculation-only calls, no check mutation/require|BusinessCalculationValidator (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/app/expr/BusinessCalculationValidator.java`)|
 |Quotation reuses line calculation|[Pricing](../../demos/petstore/src/main/spp/petshop/order/petshop-20-calculations.spp): quoteOrder and priceLine|
 |Lexical checks, guards and reversal|[Execution](../references/spp-participant-execution.md), [atomics](../references/spp-atomic-services.md)|
 |Record rejection after recovery|[Reservation](../../demos/petstore/src/main/spp/petshop/reservation/petshop-scene-reserveShopPet.spp), [system results](../references/spp-transaction-failure-handling.md)|
-|Local calculation/validation generation|SppService (maintainer reference: `../../lang/src/main/java/free/servpp/lang/models/SppService.java`): isLocalService; generator (maintainer reference: `../../generator/src/main/java/free/servpp/generator/openapi/MustacheClassWriter.java`); [APP](../../demos/petstore/src/main/spp/petshop/petshop.app)|
+|Local calculation/validation generation|SppService (maintainer reference: `../../lang/src/main/java/com/servpp/lang/models/SppService.java`): isLocalService; generator (maintainer reference: `../../generator/src/main/java/com/servpp/generator/openapi/MustacheClassWriter.java`); [APP](../../demos/petstore/src/main/spp/petshop/petshop.app)|
 
 Concurrency and local sequencing follow duties/dependencies, not automatically service categories. Local execution still accepts concurrent requests. Part I explains common arrangements, Part II costs and dependencies.
 

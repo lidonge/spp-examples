@@ -50,10 +50,22 @@ for page, parsed in pages.items():
                 errors.append('Homepage structured data must include the ServPP alternate name')
         except ValueError:
             errors.append(f'{page.relative_to(root)}: invalid structured JSON')
+    navigation = re.search(r'<nav aria-label="Main navigation">(.*?)</nav>', text, re.S)
+    if navigation:
+        for destination in ('https://platform.servpp.top/login', 'https://github.com/lidonge/spp-basic'):
+            if f'href="{destination}"' not in navigation.group(1):
+                errors.append(f'{page.relative_to(root)}: missing platform or basic source navigation')
+    if page == root / 'index.html':
+        if 'https://github.com/lidonge/spp-examples' not in parsed.targets:
+            errors.append('Homepage must link to the public examples repository')
+        if 'Public platform registration is not open yet.' not in text:
+            errors.append('Homepage must disclose the current registration availability')
     for href in parsed.targets:
         link = urlsplit(href)
         if link.hostname and link.hostname.lower() in {'github.com', 'www.github.com', 'raw.githubusercontent.com'}:
-            errors.append(f'{page.relative_to(root)}: GitHub link must not be published: {href}')
+            allowed_repositories = {'/lidonge/spp-basic', '/lidonge/spp-examples'}
+            if link.hostname.lower() != 'github.com' or link.path.rstrip('/') not in allowed_repositories:
+                errors.append(f'{page.relative_to(root)}: unapproved GitHub repository link: {href}')
         if link.scheme or link.netloc:
             continue
         if not link.path:

@@ -1061,7 +1061,7 @@ intercept services {
 <p>Its <a href="https://us.servpp.top/sources/petstore-demo/petshop/technical-services.phy/">PHY</a> specifies:</p>
 <pre><code class="language-phy">phy {
     technical service invocationTrace {
-        implementation: &quot;free.servpp.service.technical.InvocationTraceService&quot;;
+        implementation: &quot;com.servpp.service.technical.InvocationTraceService&quot;;
         config logger = &quot;spp.petstore.invocations&quot;;
     }
 }
@@ -1184,13 +1184,13 @@ intercept services {
 <p>Trace scenarios, domain calls, phases and recovery. Measure duration, errors, cache hits, version conflicts and pending requests. Distinguish settled quantum work, failed ordinary work and unconfirmed inverses.</p>
 <p>Contracts answer what was bought, paid and processed; traces answer paths, failures and recovery progress. Correlation avoids exposing connections or threads as page business state.</p>
 <h2 id="add-a-slow-call-observer-in-java">Add a Slow-Call Observer in Java<a class="headerlink" href="#add-a-slow-call-observer-in-java" title="Permanent link">¶</a></h2>
-<p>Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: <code>../../appframe/src/main/java/free/servpp/service/technical/TechnicalService.java</code>) and TechnicalInvocation (maintainer reference: <code>../../appframe/src/main/java/free/servpp/service/technical/TechnicalInvocation.java</code>):</p>
+<p>Suppose calls over 200 ms need a separate record. Add a technical service without changing scenarios. This example uses current TechnicalService (maintainer reference: <code>../../appframe/src/main/java/com/servpp/service/technical/TechnicalService.java</code>) and TechnicalInvocation (maintainer reference: <code>../../appframe/src/main/java/com/servpp/service/technical/TechnicalInvocation.java</code>):</p>
 <pre><code class="language-java">package example.technical;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import free.servpp.service.technical.TechnicalInvocation;
-import free.servpp.service.technical.TechnicalService;
+import com.servpp.service.technical.TechnicalInvocation;
+import com.servpp.service.technical.TechnicalService;
 
 public final class SlowCallObserver implements TechnicalService {
     private long thresholdNanos;
@@ -2731,11 +2731,11 @@ Other request effective: C = {e}, observed 700
 </tr>
 <tr>
 <td>Atomic call restrictions and calculation cycles</td>
-<td>SppDomain (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/SppDomain.java</code>): validateBusinessCalculations, validateCalculationCycles</td>
+<td>SppDomain (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/SppDomain.java</code>): validateBusinessCalculations, validateCalculationCycles</td>
 </tr>
 <tr>
 <td>Calculation-only calls, no check mutation/require</td>
-<td>BusinessCalculationValidator (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/app/expr/BusinessCalculationValidator.java</code>)</td>
+<td>BusinessCalculationValidator (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/app/expr/BusinessCalculationValidator.java</code>)</td>
 </tr>
 <tr>
 <td>Quotation reuses line calculation</td>
@@ -2751,7 +2751,7 @@ Other request effective: C = {e}, observed 700
 </tr>
 <tr>
 <td>Local calculation/validation generation</td>
-<td>SppService (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/SppService.java</code>): isLocalService; generator (maintainer reference: <code>../../generator/src/main/java/free/servpp/generator/openapi/MustacheClassWriter.java</code>); <a href="https://us.servpp.top/sources/petstore-demo/petshop/petshop.app/">APP</a></td>
+<td>SppService (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/SppService.java</code>): isLocalService; generator (maintainer reference: <code>../../generator/src/main/java/com/servpp/generator/openapi/MustacheClassWriter.java</code>); <a href="https://us.servpp.top/sources/petstore-demo/petshop/petshop.app/">APP</a></td>
 </tr>
 </tbody>
 </table>

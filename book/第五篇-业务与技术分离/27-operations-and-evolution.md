@@ -14,15 +14,15 @@
 
 ## 用 Java 增加一个慢调用观察服务
 
-假设已有日志之外，还希望单独记录超过 200 毫秒的调用。可以新增 Java 技术服务，而不修改任何业务场景。以下示例使用当前 TechnicalService (maintainer reference: `../../appframe/src/main/java/free/servpp/service/technical/TechnicalService.java`) 与 TechnicalInvocation (maintainer reference: `../../appframe/src/main/java/free/servpp/service/technical/TechnicalInvocation.java`) 接口：
+假设已有日志之外，还希望单独记录超过 200 毫秒的调用。可以新增 Java 技术服务，而不修改任何业务场景。以下示例使用当前 TechnicalService (maintainer reference: `../../appframe/src/main/java/com/servpp/service/technical/TechnicalService.java`) 与 TechnicalInvocation (maintainer reference: `../../appframe/src/main/java/com/servpp/service/technical/TechnicalInvocation.java`) 接口：
 
 ```java
 package example.technical;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import free.servpp.service.technical.TechnicalInvocation;
-import free.servpp.service.technical.TechnicalService;
+import com.servpp.service.technical.TechnicalInvocation;
+import com.servpp.service.technical.TechnicalService;
 
 public final class SlowCallObserver implements TechnicalService {
     private long thresholdNanos;

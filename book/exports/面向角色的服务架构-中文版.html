@@ -1239,7 +1239,7 @@ intercept services {
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/technical-services.phy">技术服务 PHY</a> 为这个名称指定实现：</p>
 <pre><code class="language-phy">phy {
     technical service invocationTrace {
-        implementation: &quot;free.servpp.service.technical.InvocationTraceService&quot;;
+        implementation: &quot;com.servpp.service.technical.InvocationTraceService&quot;;
         config logger = &quot;spp.petstore.invocations&quot;;
     }
 }
@@ -1357,13 +1357,13 @@ intercept services {
 <p>技术追踪可以关联场景、跨域调用、事务阶段和恢复动作；指标可以统计耗时、错误率、缓存命中率、普通更新冲突与待恢复请求数量。量子阶段已成交、普通阶段失败和反交易尚未确认，也应能在轨迹中区分。</p>
 <p>业务合约用于回答买了什么、付了多少、目前如何办理；技术轨迹用于回答调用经过哪里、哪个阶段失败以及恢复进行到哪一步。两类信息通过标识关联，页面业务状态不需要混入数据库连接或线程细节。</p>
 <h2 id="java">用 Java 增加一个慢调用观察服务</h2>
-<p>假设已有日志之外，还希望单独记录超过 200 毫秒的调用。可以新增 Java 技术服务，而不修改任何业务场景。以下示例使用当前 TechnicalService (maintainer reference: <code>../../appframe/src/main/java/free/servpp/service/technical/TechnicalService.java</code>) 与 TechnicalInvocation (maintainer reference: <code>../../appframe/src/main/java/free/servpp/service/technical/TechnicalInvocation.java</code>) 接口：</p>
+<p>假设已有日志之外，还希望单独记录超过 200 毫秒的调用。可以新增 Java 技术服务，而不修改任何业务场景。以下示例使用当前 TechnicalService (maintainer reference: <code>../../appframe/src/main/java/com/servpp/service/technical/TechnicalService.java</code>) 与 TechnicalInvocation (maintainer reference: <code>../../appframe/src/main/java/com/servpp/service/technical/TechnicalInvocation.java</code>) 接口：</p>
 <pre><code class="language-java">package example.technical;
 
 import java.util.Map;
 import java.util.logging.Logger;
-import free.servpp.service.technical.TechnicalInvocation;
-import free.servpp.service.technical.TechnicalService;
+import com.servpp.service.technical.TechnicalInvocation;
+import com.servpp.service.technical.TechnicalService;
 
 public final class SlowCallObserver implements TechnicalService {
     private long thresholdNanos;
@@ -2766,11 +2766,11 @@ Q(x + δ) = Σ(xᵢ + δᵢ) = Σ xᵢ + Σ δᵢ
 </tr>
 <tr>
 <td>普通原子服务不允许调用其他服务，计算调用图禁止循环</td>
-<td>SppDomain 校验 (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/SppDomain.java</code>)中的 <code>validateBusinessCalculations</code>、<code>validateCalculationCycles</code></td>
+<td>SppDomain 校验 (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/SppDomain.java</code>)中的 <code>validateBusinessCalculations</code>、<code>validateCalculationCycles</code></td>
 </tr>
 <tr>
 <td>计算只调用计算，校验不修改参与者，计算不能使用 require</td>
-<td>业务计算校验器 (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/app/expr/BusinessCalculationValidator.java</code>)</td>
+<td>业务计算校验器 (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/app/expr/BusinessCalculationValidator.java</code>)</td>
 </tr>
 <tr>
 <td>订单报价复用明细计算</td>
@@ -2786,7 +2786,7 @@ Q(x + δ) = Σ(xᵢ + δᵢ) = Σ xᵢ + Σ δᵢ
 </tr>
 <tr>
 <td>计算与校验可以生成本地实现</td>
-<td>SppService (maintainer reference: <code>../../lang/src/main/java/free/servpp/lang/models/SppService.java</code>)中的 <code>isLocalService</code>、生成器 (maintainer reference: <code>../../generator/src/main/java/free/servpp/generator/openapi/MustacheClassWriter.java</code>)、<a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/petshop.app">Petstore APP</a></td>
+<td>SppService (maintainer reference: <code>../../lang/src/main/java/com/servpp/lang/models/SppService.java</code>)中的 <code>isLocalService</code>、生成器 (maintainer reference: <code>../../generator/src/main/java/com/servpp/generator/openapi/MustacheClassWriter.java</code>)、<a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/petshop.app">Petstore APP</a></td>
 </tr>
 </tbody>
 </table>

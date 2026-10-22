@@ -38,4 +38,4 @@ exec java "-Dspp.environment=$spp_environment" "-Dspp.application=$spp_applicati
     -Dspp.petstore.testing.customer-url="${SPP_TESTING_CUSTOMER_JDBC_URL:-jdbc:h2:file:$demo_dir/target/testing-customer;DB_CLOSE_DELAY=-1}" \
     -Dspp.petstore.testing.product-url="${SPP_TESTING_PRODUCT_JDBC_URL:-jdbc:h2:file:$demo_dir/target/testing-product;DB_CLOSE_DELAY=-1}" \
     -Dspp.petstore.testing.ledger-url="${SPP_TESTING_LEDGER_JDBC_URL:-jdbc:h2:file:$demo_dir/target/testing-ledger;DB_CLOSE_DELAY=-1}" \
-    -cp "$demo_dir/target/classes:$demo_classpath" free.servpp.service.runtime.GeneratedWebServer
+    -cp "$demo_dir/target/classes:$demo_classpath" com.servpp.service.runtime.GeneratedWebServer

@@ -31,7 +31,7 @@ The book is publicly published for reading, with no open-source or Creative Comm
 
 ## Run a demonstration
 
-Requirements: JDK 17+, Maven, and the separately supplied S++ SDK artifacts `free.servpp:generator` and `free.servpp:appframe` (default version `1.0-SNAPSHOT`). The compiler/runtime implementation is not included in this repository. See [toolchain setup](docs/toolchain.md).
+Requirements: JDK 17+, Maven, and the separately supplied S++ SDK artifacts `com.servpp:generator` and `com.servpp:appframe` (default version `1.0-SNAPSHOT`). The compiler/runtime implementation is not included in this repository. See [toolchain setup](docs/toolchain.md).
 
 With those artifacts installed in your Maven repository:
 

@@ -48,7 +48,7 @@ Its [PHY](../../../demos/petstore/src/main/spp/petshop/technical-services.phy) s
 ```phy
 phy {
     technical service invocationTrace {
-        implementation: "free.servpp.service.technical.InvocationTraceService";
+        implementation: "com.servpp.service.technical.InvocationTraceService";
         config logger = "spp.petstore.invocations";
     }
 }
