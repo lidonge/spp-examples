@@ -69,3 +69,21 @@ Use Google Search Console to add and verify the URL-prefix property `https://us.
 ## Reserved-rights PDF publications
 
 After building the site, `python tools/prepare-chinese-print.py` prepares a temporary Chinese print view. Serve `website/dist` at port 18977 and run `NODE_PATH=/path/to/node_modules node tools/export-book-pdf.cjs` with Playwright and Chrome available. This updates the two publications in `book/exports/`, including copyright notices. Remove `website/dist/pdf-zh/` afterward; it is a print helper, not a Chinese website entry.
+
+## Tutorial and SDK manuals
+
+The guide links to `/tutorial/`, `/sdk/user-guide/` and
+`/sdk/technical-services/`. `build_manuals.py` renders the pinned Markdown and
+sample sources under `manuals/inputs/`; `manuals/upstream.json` records the exact
+upstream revision and SHA-256 of each imported file. These inputs are selected
+from the upstream basic-distribution allowlist, with their Apache-2.0 license and
+notice preserved. They do not change the reserved-rights book license or expose
+commercial implementations.
+
+To update, import only the corresponding allowlisted documents and sample files
+from the chosen upstream revision, update the provenance manifest, then run the
+normal website build and both publication checks. Do not edit generated pages.
+The build rejects changed inputs or unpublished relative documentation links.
+The sample ZIP contains original sources and license notices; use it with the
+matching SDK source tree. The upstream validation page records upstream runs;
+website publication does not claim to rerun those compiler/runtime tests.

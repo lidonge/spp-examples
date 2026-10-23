@@ -1,0 +1,79 @@
+{
+  "revision": "462b63b1f6ee075fa54d566dabf80fda125bcd65",
+  "branch": "master",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "path": "docs/tutorial/spp-tutorial.md",
+      "sha256": "ec2f6cffd6928730a21b43632be8cfa78d6d21a3d175ab55a05d60a191e1d6eb"
+    },
+    {
+      "path": "sdk-tools/docs/user-guide.md",
+      "sha256": "7ab0933be62ac450e1a55c84e183a595613610d626e2ee1b3307c86862d3977d"
+    },
+    {
+      "path": "sdk-tools/docs/builtin-technical-services.md",
+      "sha256": "c13bdf738a26a46284c07f59036dfe84ba6d2389fd5ceea93c45282146291dbe"
+    },
+    {
+      "path": "sdk-tools/docs/tutorial-validation.md",
+      "sha256": "353af981c3c256c19850424cf77723bb25e2ecd8ef059d8c6aa79ad3508bb607"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/README.md",
+      "sha256": "8ed09028d47b62c4679313196bc09a076b660543751c9031ce2f9b11bfd8a37b"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/pom.xml",
+      "sha256": "1891b395a955c5a3be21ea6182ff1ccad3700152891d951534e0e9f0e049a7d5"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/main/java/example/technical/CallCounter.java",
+      "sha256": "340058852386712e4787274a89741967f1a691f26bb107cd9816c31b3f09ca19"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/main/spp/ledger.app",
+      "sha256": "02fbe2399af4c2fb190c00721c70c0459635e1f3caea9925cae6376e3d796570"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/main/spp/ledger.phy",
+      "sha256": "fa9650af47db9e6c73b15231257c9c3d1ae22a86268661c47be2a25afdf557d8"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/main/spp/ledger.spp",
+      "sha256": "400189ce677e1cd863bae84a7af3b5285727c8d8d8b0869c287506a441bf8ef8"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/test/java/example/technical/BasicPersistenceTest.java",
+      "sha256": "6619f4a784a871568e72092e7cbbefdb5db079d756e9b10e2d273c41d6f02675"
+    },
+    {
+      "path": "sdk-tools/samples/custom-services/src/test/java/example/technical/CustomServiceTest.java",
+      "sha256": "3f4f80abadd7f262c2da363f8e6405aa4aaec4dfdd5fa44b61aafe396caf8f65"
+    },
+    {
+      "path": "sdk-tools/samples/tutorial/README.md",
+      "sha256": "6b7e6f4b038f8eb43f4a3b681b44093178f5a20ce002d8a8c74625ddeacfa640"
+    },
+    {
+      "path": "sdk-tools/samples/tutorial/VerifyTutorial.java",
+      "sha256": "3686075f83ba6ece7c39a0210182c3e37cbd942c11279b4a47864eee1b0a9732"
+    },
+    {
+      "path": "sdk-tools/samples/tutorial/src/main/spp/ledger.app",
+      "sha256": "3988f73956b4c3e8e33e3f71ccace75f8536b31c9ff4db5554a5423fa1c2812c"
+    },
+    {
+      "path": "sdk-tools/samples/tutorial/src/main/spp/ledger.spp",
+      "sha256": "acc9ee5fddd9e71801a9a88005a653bc89d58255253bc1c6cc78e45009f86ecd"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "2ddf53bca869237c4fd8f814b7869ef55ee52cafb0b575012ac1eb146c4612cc"
+    }
+  ]
+}

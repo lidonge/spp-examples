@@ -11,6 +11,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 import markdown
+from build_manuals import build_manuals
 from markdown.extensions import Extension
 from markdown.treeprocessors import Treeprocessor
 
@@ -198,6 +199,7 @@ def build(source, output):
         target.write_text(document)
     print(f'Built {len(files)} English book pages from {source}')
     build_articles(output)
+    build_manuals(BASE, output, header, PublicLinksExtension)
     build_search_assets(output)
 
 
