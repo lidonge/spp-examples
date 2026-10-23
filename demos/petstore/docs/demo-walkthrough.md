@@ -1,17 +1,50 @@
-# 十分钟演示路线
+# A ten-minute demo walkthrough
 
-以下是需求核对路线及预期数值，本次模型重构未执行网页或业务回归。运行新版前使用独立数据库，见 [运行说明](running-demo.md)。
+This is a requirements walkthrough with expected values, translated from revision
+`417a41f`. The model-refactoring stage described here did not run web or business
+regression tests. Use an isolated database before running a new build; see
+[running the demo](running-demo.md).
 
-先注册买家，填写会员账户号及资料，开户钱包初始为零，独立点击“第三方结算充值”转入5000，再点击“从供应来源入库”为每种商品转入10件。读取或更新买家资料，选择普通/VIP等级。
+First register a buyer with a member account number and details. The wallet opens
+at zero. Separately fund it with 5,000 from the third-party settlement source, then
+receive 10 units of each product from its supply source. Read or update buyer
+details and choose a normal or VIP membership level.
 
-1. 加入2袋猫咪主粮。报价商品59.80、优惠0、运费8、总额67.80。quoteOrder 查询服务端商品事实，priceLine 明确业务舍入；网页只显示结果。
-2. 下单后预期购物车清空、该商品可售8、预占2、售出0，订单待付款。placeShopOrder 明确 Buyer、Cart、StockLine[]、ShopOrder、商品查询条件和集合、Receipt；transaction 内形成订单、预占和回执。
-3. 付款后钱包4932.20、卖家收入67.80。重放同一请求应返回原办理结果；防重键及结果保存属于 APP/PHY，不是 Receipt 内的通用命令。
-4. 发货并收货，预期预占0、售出2。发货合约含物流凭证和出库数量；状态资格由场景显式 check。
-5. 独立调用申请退货，再确认退货退款，预期该商品库存回10、钱包5000、卖家收入0。申请退货合约直接关联 Buyer 和原订单及理由。这是新业务交易，不是技术回滚。
-6. 另试未付款取消和已付款未发货取消；它们是两个独立场景，分别释放库存或同时退款。已发货不能直接取消。
-7. VIP购买4袋主粮，预期119.60−11.96+0=107.64；2袋主粮加1个逗猫棒，普通买家预期72.15+8=80.15。多行缺货不能留下部分订单。
+1. Add two bags of staple cat food. Expected merchandise is 59.80, discount 0,
+   shipping 8 and total 67.80. `quoteOrder` reads server-side product facts;
+   `priceLine` applies explicit business rounding. The UI only displays results.
+2. Place the order. Expect an empty cart, available stock 8, reserved 2 and sold 0;
+   the order awaits payment. `placeShopOrder` declares Buyer, Cart, StockLine[],
+   ShopOrder, product-query criteria and results, and Receipt. Its transaction
+   creates the order, reservation and receipt.
+3. Pay: wallet 4932.20, merchant income 67.80. With request replay enabled, repeating
+   the same request returns its original outcome. Duplicate keys and result storage
+   belong to APP/PHY, not a generic command inside Receipt.
+4. Ship and receive: reserved 0, sold 2. The shipment agreement contains shipment
+   evidence and shipped quantity; explicit scenario checks determine eligibility.
+5. Request a return separately, then confirm the return and refund. Expect stock
+   restored to 10, wallet 5000 and merchant income 0. The return agreement directly
+   relates Buyer, the original order and the reason. This is a new business
+   transaction, not technical rollback.
+6. Try unpaid cancellation and paid-but-unshipped cancellation. These are separate
+   scenarios: one releases stock, the other also refunds payment. A shipped order
+   cannot be canceled directly.
+7. For a VIP buying four bags, expect 119.60 - 11.96 + 0 = 107.64. For a normal
+   buyer purchasing two bags and one cat teaser, expect 72.15 + 8 = 80.15.
+   Insufficient stock on a multi-line order must not leave a partial order.
 
-沿 [源文件导读](source-guide.md) 比较不同场景的参与者和合约，观察实体扮演角色、直接关系、统一数字表达式、显式资格和事务。门店库存与收入由所有买家共享；网页并行刷新6个独立查询不构成同一事务快照。测试使用独立数据库，不能把单案例守恒预期套在已有多客户的网页数据上。
+Follow the [source guide](source-guide.md) to compare participants and agreements,
+entities playing roles, direct relations, shared numeric expressions, explicit
+eligibility and transactions. Stock and merchant income are shared across buyers.
+Six concurrent UI refresh queries are not a single transactional snapshot. Do not
+apply isolated-case conservation expectations to an existing multi-customer database.
 
-可切换中英文商品文案，按product.spp中的常量名查看PHY翻译。量子调用的bounds在销售场景选择范围，inventory.spp只写加减；同JVM四域部署与共同资源分别在APP和PHY。
+Product copy can use the available locale resources. Locate PHY translations by
+constant names in `product.spp`. Sales scenarios choose quantum call `bounds`;
+`inventory.spp` defines only increments/decrements. APP and PHY respectively
+describe same-JVM four-domain deployment and the shared physical resource.
+
+Replay expectations require a compatible optional request-coordination provider.
+A basic compilation warning that replay or duplicate protection is unavailable
+means those enhancement-specific assertions do not apply; business eligibility,
+stock conservation and transaction guarantees still apply.

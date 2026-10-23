@@ -1,36 +1,70 @@
-# 本轮目标验收审计
+# Refactoring completion audit
 
-以当前工作树和执行结果为准。历史批次、故障调查及修复过程保留在 [验证记录](latest-refactoring-verification.md)，不使用历史成功数替代当前回归。
+This is the recorded refactoring audit from revision `417a41f`, not a report of
+the current basic-SDK migration's test runs. It evaluated the working tree and
+executions at that stage. Historical batches, fault investigation and repairs
+remain in the [verification record](latest-refactoring-verification.md).
+Historical pass counts must not substitute for a current regression.
 
-| 目标要求 | 当前实现和验收证据 | 状态 |
+| Requirement | Recorded implementation and evidence | Status at that stage |
 | --- | --- | --- |
-| 先完善需求、功能、实施路径和对比 | latest-petstore-refactoring.md：业务约束、六步实施路径、传统实现对比；legacy-source 保留原始规则 | 已落实 |
-| 业务仅用 SPP/APP/PHY | src/main/spp；无手写生产 Java；测试 Java 仅输入、调用、断言、技术故障；生成目录为 target | 当前 clean develop 生成及回归通过 |
-| 参与者和模块建模 | BankAccount 实体、账户角色和明确合约；八个能力目录、15 个单场景文件；稳定参与者原地补全 | 已迁移 |
-| 默认 CRUD、APP/PHY、存储 | 默认服务、APP 表及自动编号；develop LOCAL，testing 统一量子库与普通 Saga；关联成交快照由 APP 声明 | 生成和真实 JDBC 存储已验证 |
-| 查询普通/量子事实及成交回填 | 默认账户查询、真实资金查询、冲正净余额重算；历史快照不被当前量子值覆盖 | 专项与当前 clean develop 联合回归通过 |
-| 明确最小事务和调用 bounds | 查询、校验、计算在更新边界前；量子边界在调用处；金融开户和资金变动分开 | 两环境已有整场景证据 |
-| 现金及透支偿还 | 正常/坏账/核销/小数；三类银行内部收款户；欠款与敞口仍是量子状态而不重复计入资金守恒 | 两环境通过，KI-R01 已关闭 |
-| 保留现金冲正规则 | 同日/跨日/Mode2、手续费、积数、明细、限额、当前资格；原八槽分录证据及反向分录；原合约归属和金额损坏拒绝 | 已有实际持久化及拒绝验证 |
-| 数学与逻辑 | 独立历史向量，以及日历、分档、日期窗口、积数、费用和分录专项 | 已验证；不等同全部旧入口迁移 |
-| 失败信息和处置 | fail/ResultInfo；存入及冲正的合约、分录、积数故障；处置记录二次失败仍保留主因；CLOB 快照重新查询 | 两环境专项通过；普通 Saga 补偿见 KI-R04 |
-| 技术服务、幂等和 HTTP | APP invocationTrace；可信远程流水号；同流水并发存入/冲正；本地不抑制；回环 HTTP 与多参与者界面防重 | 已有验收；真实网络故障不在此证据内 |
-| 并发及重启 | 独立/同账户竞争、旧冲正与后来成交、原合约乐观冲突；三个独立 JVM 查询及冲正；成交确认后强制退出 | 已验证具体路径；中途崩溃和未知成交自动恢复见 KI-R02 |
-| 历史入口逐项核对 | legacy-entry-migration.md 的 86 个入口全部有具体证据、差异或未迁移说明 | 核对完成，不代表 86 项全部等价实现 |
-| 生成链路与回归 | 公共模块、XBOD、Petstore 的 clean develop；随后 XBOD testing 全量 | develop 1,226 项全部通过；testing 86 项零失败、2 项 LOCAL 专属测试跳过；随后新增试算另有专项 |
+| Document requirements, functions, implementation path and comparison first | latest-petstore-refactoring.md: business constraints, six implementation steps and traditional-implementation comparison; legacy-source preserves original rules | Implemented |
+| Business only in SPP/APP/PHY | src/main/spp; no handwritten production Java; Java tests limited to input, invocation, assertions and technical faults; generated output under target | Clean develop generation and regression passed |
+| Participant/module modeling | BankAccount entity, account roles and explicit contracts; eight capability directories, 15 single-scenario files; stable participants hydrated in place | Migrated |
+| Default CRUD, APP/PHY and storage | Default services, APP tables and automatic identifiers; develop LOCAL, testing shared quantum store plus ordinary Saga; APP-declared associated trade snapshots | Generation and actual JDBC persistence verified |
+| Ordinary/quantum queries and settlement hydration | Default account queries, real-fund queries, reversal net-balance recomputation; historical snapshots not overwritten by current quantum values | Focused tests and clean develop combined regression passed |
+| Explicit minimal transactions and call-site bounds | Queries/checks/calculations before the update boundary; quantum bounds at call sites; financial account opening separate from fund changes | Whole-scenario evidence in both environments |
+| Cash and overdraft repayment | Normal/bad-debt/written-off/fractional cases; three internal bank receiving accounts; debt/exposure remain quantum without double-counting fund conservation | Both environments passed; KI-R01 closed |
+| Preserve cash reversal rules | Same-day/cross-date/Mode2, fees, accrual products, details, limits, current eligibility; original eight-slot postings and inverses; reject corrupted ownership/amounts in original contracts | Actual persistence and rejection verified |
+| Mathematics and logic | Independent historical vectors; focused calendar, bands, date-window, accrual, fee and posting checks | Verified, not equivalent to migrating every old entry |
+| Failure information/disposition | fail/ResultInfo; deposit/reversal contract, posting and accrual faults; secondary disposition-record failure preserves primary cause; CLOB snapshot requery | Focused tests passed in both environments; ordinary Saga compensation remains KI-R04 |
+| Technical services, idempotency and HTTP | APP invocationTrace; trusted remote serials; concurrent same-serial deposit/reversal; no local suppression; loopback HTTP and multi-participant UI duplicate guard | Accepted within recorded scope, excluding real network faults |
+| Concurrency/restart | Independent/same-account races; stale reversal versus later trade; original-contract optimistic conflicts; queries/reversals across three JVMs; forced exit after confirmed commit | Specific paths verified; mid-commit crashes/unknown-commit automatic recovery remain KI-R02 |
+| Per-entry historical reconciliation | All 86 entries in legacy-entry-migration.md have concrete evidence, differences or unmigrated explanations | Reconciled, not 86 equivalent implementations |
+| Generation/regression | Public modules, XBOD and Petstore clean develop, then full XBOD testing | All 1,226 develop tests passed; testing 86 tests had zero failures and two LOCAL-only skips; later preview additions have separate focused evidence |
 
-## 按用户约定保留的已知问题和非等价边界
+## Known issues and non-equivalence retained by agreement
 
-- 已新增 previewCashReversal 独立只读现金试算，LOCAL/testing 各两项专项通过。旧通用部分退费候选不属于已确认的现金规则，仍不支持任意部分退费；不得把现金试算宣称为所有通用候选的等价迁移。
-- 待授权申请持久化与跨进程续办：尚待授权域边界选择，见 KI-R07。已有授权校验不是完整续办流程。
-- 普通 Saga 已提交阶段的业务补偿：见 KI-R04。资金恢复不意味着普通事实已经恢复；必须保留 RECOVERY_REQUIRED，不能隐瞒残留状态或自动覆盖后续操作。
-- 未知成交自动查证、提交途中进程崩溃、异常既存孤立数据碰撞及真实网络/高负载：见 KI-R02。LOCAL 四个提交故障点和确认成交后重启只是其中的已验证部分。
-- 全调用持久化技术审计及 RUNNING 请求有界等待：分别见 KI-R09/KI-R05，现有追踪日志和 REQUEST_IN_PROGRESS 不能冒充它们。
+- Independent read-only `previewCashReversal` was added, with two focused tests
+  passing in each LOCAL/testing environment. Old generic partial-refund candidates
+  are not the confirmed cash rules; arbitrary partial refunds remain unsupported.
+  Cash preview is not equivalent migration of every generic candidate.
+- Pending-authorization persistence and cross-process continuation await the
+  authorization-domain boundary decision, KI-R07. Existing authorization checks
+  are not a complete continuation workflow.
+- Business compensation for committed ordinary Saga stages remains KI-R04.
+  Restored funds do not imply restored ordinary facts. Preserve RECOVERY_REQUIRED;
+  do not conceal residual state or automatically overwrite later operations.
+- Automatic unknown-commit reconciliation, crashes during commit, abnormal
+  pre-existing orphan-data collisions and real-network/high-load testing remain
+  KI-R02. Four LOCAL commit-fault points and restart after confirmed commit cover
+  only part of this scope.
+- Durable technical audit for every call and bounded waiting for RUNNING requests
+  remain KI-R09 and KI-R05 respectively. Trace logs and REQUEST_IN_PROGRESS are
+  not substitutes.
 
-## 完成判定
+## Recorded completion determination
 
-本轮对照最新 Petstore 的语法、参与者、默认 CRUD、APP/PHY、事务、量子边界、失败处置及技术服务重构已落实；已确认现金存入和现金冲正规则有源语言实现及持久化验证，业务生产目录无 Java。新增内部收款账户确保还本还息有真实资金对方；框架修复有公共测试及 Petstore 联合回归证据。
+The requested refactoring aligned syntax, participants, default CRUD, APP/PHY,
+transactions, quantum bounds, failure disposition and technical services with the
+then-current Petstore. Confirmed cash-deposit/reversal rules had source-language
+implementation and persistence verification, with no Java in production business
+directories. New internal receiving accounts supplied actual fund counterparties
+for principal/interest repayment. Framework fixes had public tests and combined
+Petstore regression evidence.
 
-当前共 15 个独立场景。clean develop 联合回归、testing 全量及新增试算的两环境专项均通过；package 和 run-demo.sh 的真实 HTTP 开户通过。命令、日志、跳过原因及适用范围见验证记录。
+There were 15 independent scenarios. Clean develop combined regression, full
+testing execution and focused preview checks in both environments passed.
+Packaging and actual HTTP account opening through `run-demo.sh` passed.
+Commands, logs, skip reasons and scope are in the verification record.
 
-用户明确要求未决问题记录 known issues 并继续实施，本轮已按该要求保留上列边界。完成的是所要求的新版重构、差距梳理及回归，不是未约定授权域、全银行生产配置、真实网络故障恢复或所有旧探索例子的等价实现。已核对的 86 个历史入口均可追溯到具体证据或差异，不以测试数量替代业务等价。
+The user required unresolved issues to be recorded while implementation continued.
+Accordingly, completion meant the requested refactoring, gap analysis and
+regression, not an unagreed authorization domain, complete production bank
+configuration, real-network recovery or equivalence of every historical
+exploratory example. All 86 historical entries trace to specific evidence or
+differences; test counts do not establish business equivalence.
+
+Optional tracing, request replay and duplicate-guard claims in this historical
+audit must not be interpreted as guarantees of the basic SDK without their
+providers. This translation does not rerun the cited historical tests.

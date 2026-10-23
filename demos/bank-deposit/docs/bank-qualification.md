@@ -1,51 +1,133 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes implementation and acceptance before the
+> refactoring, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 通存范围与凭证挂失提示
+# Cross-branch deposit range and lost-document notices
 
-## 业务服务与角色
+## Business services and roles
 
-CSAQRY1 的 DEP 路径调用 9704 挂失提示及 9709 通存检查。demo 将两者实现为共享服务 assessDepositDocumentNotices 和 checkDepositBranchRange，由 assessDepositBankQualification 组合。条件及例外全部在 SPP，APP 提供已经解码的账户和操作事实。
+The DEP path in CSAQRY1 invokes lost-document notices in 9704 and deposit-range
+checks in 9709. The demo implements these as shared services
+`assessDepositDocumentNotices` and `checkDepositBranchRange`, combined by
+`assessDepositBankQualification`. All conditions and exceptions are in SPP;
+APP supplies already decoded account and operation facts.
 
-DepositBankProfile 保存普通储蓄/受限子类、开户机构、省份、支行关系、通兑地区、存入范围、卡关联及卡/存折挂失事实。DepositOperatorFacts 保存当前机构及关系、交易前缀、操作码、柜员、运行模式、代理签约及结算渠道。DepositNotices 分别返回卡和存折提示，避免与现金累计警示合并后丢失信息。
+`DepositBankProfile` retains ordinary-savings/restricted-subtype classification,
+opening institution, province, subbranch relationship, interbranch withdrawal
+area, deposit range, card association and card/passbook loss facts.
+`DepositOperatorFacts` retains current institution and relationships, transaction
+prefix, operation code, teller, operating mode, agency agreement and settlement
+channel. `DepositNotices` returns card and passbook notices separately so that
+combining them with cash-total warnings does not lose information.
 
-支行关系是源 CCMRELO 类型 0300 的查询结果，不能用机构编号前缀代替。地区四位和省级地区两位也分别提供。DepositBankModels 只分配明确的演示事实，不实现银行查询或解码：City 范围、开户机构 001001001、操作机构 001001002、同地区 0001、同支行关系 SB001。完整现金入口要求操作码 1102、前缀 SA01102，并检查机构/地区与收费上下文一致；入口程序名 GSA01102 与解码前缀是不同字段。
+The subbranch relationship is the result of source CCMRELO type 0300 queries,
+not an institution-number prefix. Four-digit area and two-digit provincial area
+are also supplied separately. `DepositBankModels` only allocates explicit demo
+facts; it does not implement bank queries or decoding: City range, opening
+institution 001001001, operating institution 001001002, common area 0001 and
+subbranch relationship SB001. The full cash entry requires operation code 1102
+and prefix SA01102, checking institution/area consistency with the fee context.
+Entry program name GSA01102 and decoded prefix are different fields.
 
-## 来源与规则
+## Sources and rules
 
-| 来源（物理行号） | 迁入的行为 |
+| Source (physical line numbers) | Migrated behavior |
 | --- | --- |
-| CSAQRY1:291 起 | FL06002、AG02891、SA01120、FL06615、FL06618 的特定许可 |
-| CSAQRY1:1738 起，9704 | 49927 卡系列、卡关联且查询存在、未注销、口头/书面挂失及业务/操作条件下提示 WN200；存折挂失独立提示 WN201 |
-| CSAQRY1:1874 起，9709 | 普通储蓄 SameBranch/Subbranch/City/Province/All 范围及机构、业务码、柜员、渠道等例外；机构不符 EN134，支行或地区不符 EN470 |
-| CSAQRY1:9709 的非普通储蓄分支 | 专有范围 SameBranch/WithdrawOnly 的限制及对应代理交易例外；不能套用普通储蓄的全部豁免 |
-| CSAQRY1:2054 起 | DEP_TYP=03 的跨机构检查在外层范围条件之外，另行检查代理及指定交易许可 |
+| CSAQRY1:291 onward | Specific permissions for FL06002, AG02891, SA01120, FL06615 and FL06618 |
+| CSAQRY1:1738 onward, 9704 | WN200 for card series 49927, card association and successful query, not cancelled, oral/written loss and applicable business/operation conditions; independent WN201 passbook-loss notice |
+| CSAQRY1:1874 onward, 9709 | Ordinary savings SameBranch/Subbranch/City/Province/All ranges and institution, business-code, teller and channel exceptions; EN134 for institution mismatch and EN470 for subbranch/area mismatch |
+| Non-ordinary-savings branch of CSAQRY1:9709 | Restricted SameBranch/WithdrawOnly ranges and corresponding agency-transaction exceptions; not all ordinary-savings exemptions apply |
+| CSAQRY1:2054 onward | Cross-institution check for DEP_TYP=03 sits outside the outer range condition, separately checking agency and designated-transaction permissions |
 
-WN200/WN201 不是统一终止错误。非代理签约、数字柜员且 Online/Mode8 时产生提示；CR0 只豁免卡提示，不自动豁免存折提示。mergeDepositNotices 将可执行受理结果标记为 Warning，保留原 F0554 和两个凭证提示。待授权仍是待授权，不因提示变成可执行。
+WN200/WN201 are not unconditional terminating errors. Notices apply to
+non-agency agreements, numeric tellers and Online/Mode8 operation. CR0 exempts
+only card notices, not passbook notices. `mergeDepositNotices` marks executable
+admission as Warning, preserving original F0554 and both document notices.
+Pending authorization remains pending; notices do not make it executable.
 
-外层通存适用性涉及卡关联、FL0/RE0/AG0、人民币会计中心及省份、指定交易和柜员。UH0–9、特定操作码下 O56–99 和 ZD0–9 的豁免不能扩展成所有柜员或所有操作。批量、企业转账及组合子账户 HVP/BEP/NXY 等条件也有各自作用域；受限子类检查不能被卡关联或批量模式一律跳过。
+Outer deposit-range applicability involves card association, FL0/RE0/AG0, RMB
+accounting center and province, designated transactions and tellers. Exemptions
+for UH0–9, and O56–99 or ZD0–9 under specific operation codes, cannot be broadened
+to every teller or operation. Batch, corporate transfer and combined subaccounts
+such as HVP/BEP/NXY have their own scopes. Restricted-subtype checks cannot
+always be skipped because of card association or batch mode.
 
-缺少支行/地区关系时返回 demo 契约错误 DEPOSIT_SUBBRANCH_RELATION_NOT_FOUND 或 DEPOSIT_AREA_NOT_FOUND，避免两个未知值相等而放行。未知普通储蓄范围返回 INVALID_DEPOSIT_RANGE。这些不是声称来自银行的原错误码。
+Missing subbranch/area relationships return demo contract errors
+DEPOSIT_SUBBRANCH_RELATION_NOT_FOUND or DEPOSIT_AREA_NOT_FOUND, rather than
+allowing two unknown values to compare equal. Unknown ordinary-savings range
+returns INVALID_DEPOSIT_RANGE. These are not claimed to be original bank codes.
 
-## 执行和成交依据
+## Execution and settlement evidence
 
-AccountFacts.bankProfile 随账户快照读取并受共同版本/事实条件保护。NormalCashDeposit 在有该角色时调用 prepareQualifiedCashDeposit 或 prepareQualifiedCashDepositWithAccrual，先检查操作事实绑定和银行资格，再执行已有受理、收费、金额、积数及分录场景。检查拒绝不会写入业务成交。
+`AccountFacts.bankProfile` is read with the account snapshot and protected by
+joint version/fact conditions. When that role is present, `NormalCashDeposit`
+invokes `prepareQualifiedCashDeposit` or
+`prepareQualifiedCashDepositWithAccrual`: first operation-fact binding and
+banking qualification, then existing admission, fees, amounts, accruals and
+posting scenarios. Rejection does not write a business trade.
 
-成功成交的 Prepared.bankEligibility 保存账户事实、当次操作事实及提示。相同请求重放直接返回原成交依据和原提示，即使当前调用的代理等操作事实不同，也不重新执行已成交业务。未成交的授权续接则重新检查当前事实。操作事实不加入原金额请求身份，与授权证据一样是当次检查输入。
+A successful trade's `Prepared.bankEligibility` retains account facts, the
+attempt's operation facts and notices. Replay of the same request returns
+original trade evidence and notices without reexecuting settled business, even
+if current agency or other operation facts differ. Authorization continuation
+for an unsettled request rechecks current facts. Operation facts do not become
+part of the original amount-request identity; like authorization evidence, they
+are inputs to that attempt's checks. These are historical coordinated-path
+semantics, not a promise of replay in the basic distribution.
 
-成功提示随成交共同保存；当前拒绝/待授权审计仍使用既有尝试载荷，不能宣称所有中途生成的提示都已持久化。新场景将银行资格放在原受理检查之前；多个条件同时无效时的错误优先级未与 COBOL 全路径核对。
+Successful notices persist jointly with the trade. Rejected/pending audit still
+uses existing attempt payloads; not every intermediate notice is claimed to
+persist. The new scenario placed banking qualification before original admission
+checks. Error precedence when multiple conditions are invalid was not checked
+against all original COBOL paths.
 
-## 验证与限制
+## Historical verification and limits
 
-DepositBankQualificationTest 的八项测试覆盖关系比较、外层许可、柜员边界、不同范围的豁免作用域、两个提示、缺失关系、实际现金/积数/分录共同提交及原提示重放、拒绝与上下文不符。测试执行真实生成场景和 H2；其中成功案例同时保留 F0554、WN200、WN201。
+Eight `DepositBankQualificationTest` tests covered relationship comparison,
+outer permissions, teller boundaries, exemption scope for different ranges,
+both notices, missing relationships, actual joint cash/accrual/posting commit
+and original-notice replay, rejection and context mismatch. Tests exercised real
+generated scenarios and H2. The successful case retained F0554, WN200 and WN201
+together.
 
-这支持所选源码条件的迁入及集成，不支持原 COBOL 运行等价。实际银行账户/卡/机构查询、生产权限、完整多币种规则和黄金运行结果仍未取得或实现；静态 fixture 不替代这些证据。完整冲正和跨日/退费政策也不由通存检查自动决定。
+This supports migration and integration of selected source conditions, not
+runtime equivalence to original COBOL. Real bank account/card/institution
+queries, production permissions, complete multicurrency rules and golden run
+results remained unavailable or unimplemented. Static fixtures cannot replace
+that evidence. Full reversal and cross-date/refund policies are not determined
+automatically by deposit-range checks.
 
-## 存入冲正的独立核心资格
+## Independent core eligibility for deposit reversal
 
-CSAQRY1:235–247 根据 SYS-TX-TYP 选择正常检查或 5000 冲正检查；2312 起的存入冲正路径调用挂失提示、9751 取消开户检查和 9753 全额冻结检查，未调用 9709 正常通存范围。KSADEP0:603 在调用查询前仍检查 Closed 状态 EO082。取消开户为 EN113；Frozen 状态为 EN111，交易前缀 SA01116 是该冻结检查的指定例外，但不豁免取消开户。
+CSAQRY1:235–247 selects normal checks or section 5000 reversal checks using
+SYS-TX-TYP. The deposit-reversal path from 2312 invokes lost-document notices,
+9751 account-opening cancellation and 9753 full-freeze checks, not normal
+deposit-range check 9709. Before querying, KSADEP0:603 still rejects Closed with
+EO082. Cancelled account opening yields EN113; Frozen yields EN111. Transaction
+prefix SA01116 is a designated freeze-check exception, but does not exempt
+cancelled account opening.
 
-checkCoreDepositReversalEligibility 和 assessCoreDepositReversalEligibility 迁入以上子集并复用两个挂失提示，不把正常存入的通存范围或前台机构控制一并加入核心冲正服务。前台控制仍须由正式入口按其真实调用路径处理；核心允许不能推导为整笔业务允许。完整多重非法状态下的消息优先级未实测原 COBOL。
+`checkCoreDepositReversalEligibility` and `assessCoreDepositReversalEligibility`
+migrate that subset and reuse both lost-document notices. They do not incorporate
+normal deposit ranges or front-end institution controls into core reversal.
+The formal entry must apply front-end controls according to its actual call
+path. Core permission does not imply permission for the entire transaction.
+Message priority for multiple invalid states was not tested against original COBOL.
 
-DepositReversalPreparation.prepareCoreQualified 读取原成交及当前 AccountFacts，先做核心资格再生成反向金额，返回当次操作/渠道事实快照及独立提示。它使用当前冻结/取消事实，不恢复原成交的状态。当前角色缺少银行事实时明确拒绝，不把不存在的资格数据视为许可。此 API 仍不提交、退款或修改积数，不是完整冲正入口。
+`DepositReversalPreparation.prepareCoreQualified` reads the original trade and
+current `AccountFacts`, checks core eligibility, then prepares reverse amounts.
+It returns a snapshot of this attempt's operation/channel facts and separate
+notices. It uses current freeze/cancellation facts, not restored original trade
+state. Missing banking facts on the current role cause explicit rejection,
+not implicit permission. This API still does not commit, refund or modify
+accruals; it is not a complete reversal entry.
 
-DepositReversalEligibilityTest 四项测试验证三个错误及指定冻结例外、冲正提示与正常范围的区别、真实原成交后资格变化、前台控制与核心资格分工。通过直接更新带版本的 demo 事实模拟后续冻结/取消，只证明查询当前事实后的规则行为，不声称已经迁入银行冻结/取消业务实现。
+Four `DepositReversalEligibilityTest` tests verified the three errors and the
+designated freeze exception, reversal notices versus normal ranges, eligibility
+changes after an actual original trade, and separation of front-end controls
+from core eligibility. Direct updates to versioned demo facts simulated later
+freeze/cancellation. This proves rule behavior after querying current facts,
+not migration of the bank's freeze/cancellation business implementations.
+
+This English version preserves historical evidence from revision `417a41f`;
+the cited test runs were not repeated as part of translation.

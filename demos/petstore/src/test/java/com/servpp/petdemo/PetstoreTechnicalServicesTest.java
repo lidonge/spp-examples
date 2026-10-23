@@ -36,9 +36,17 @@ public class PetstoreTechnicalServicesTest {
     private long count(String phase, String service) {
         return messages.stream().filter(message -> message.contains("phase="+phase+" service=petshop."+service+" ")).count();
     }
+    private boolean tracingAvailable() {
+        return getClass().getClassLoader().getResource("com/servpp/service/technical/InvocationTraceService.class") != null;
+    }
     @Test public void scenarioAndTypedDefaultQueryAreObservedOnce() {
         var session=shop.openStore("TRACE-READ",false); messages.clear();
         shop.call("readShopCustomer",Map.of("Buyer",Map.of("membershipNumber",session.customerId)));
+        if (!tracingAvailable()) {
+            assertTrue(messages.toString(), messages.isEmpty());
+            assertEquals(session.customerId, shop.customer(session).path("membershipNumber").asText());
+            return;
+        }
         assertEquals(messages.toString(),1,count("BEFORE","readShopCustomer")); assertEquals(1,count("AFTER","readShopCustomer"));
         assertEquals(messages.toString(),1,count("BEFORE","findBuyer")); assertEquals(1,count("AFTER","findBuyer"));
         assertTrue(messages.stream().anyMatch(message -> message.contains("service=petshop.findBuyer kind=ATOMIC_QUERY")));
@@ -51,6 +59,14 @@ public class PetstoreTechnicalServicesTest {
         Object retry=shop.mapper.convertValue(request,request.getClass());
         JsonNode result=shop.execute("reserveShopPet",request);
         assertEquals("REJECTED",result.path("agreement").path("status").asText());
+        if (!tracingAvailable()) {
+            assertTrue(messages.toString(), messages.isEmpty());
+            JsonNode repeated = shop.execute("reserveShopPet", retry);
+            assertEquals(BusinessIdempotencyManager.isAvailable(), BusinessIdempotencyManager.wasReplay());
+            assertEquals("REJECTED", repeated.path("agreement").path("status").asText());
+            assertTrue(messages.toString(), messages.isEmpty());
+            return;
+        }
         assertEquals(1,count("BEFORE","reserveShopPet")); assertEquals(1,count("AFTER","reserveShopPet"));
         assertEquals(0,count("FAILURE","reserveShopPet"));
         assertEquals(1,count("BEFORE","reserveRequestedInventory")); assertEquals(1,count("AFTER","reserveRequestedInventory"));
@@ -65,7 +81,8 @@ public class PetstoreTechnicalServicesTest {
             assertThrows(IllegalStateException.class,()->shop.call("readShopCustomer",Map.of("Buyer",Map.of("membershipNumber",session.customerId))));
             fault.verifyTriggered();
         }
-        assertEquals(1,count("FAILURE","findBuyer")); assertEquals(1,count("FAILURE","readShopCustomer"));
+        assertEquals(tracingAvailable() ? 1 : 0,count("FAILURE","findBuyer"));
+        assertEquals(tracingAvailable() ? 1 : 0,count("FAILURE","readShopCustomer"));
         assertEquals(0,count("AFTER","readShopCustomer"));
     }
 }

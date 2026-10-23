@@ -1,39 +1,121 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes implementation and acceptance before the
+> refactoring, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 一般现金存入执行契约
+# General cash-deposit execution contract
 
-## 范围与输入
+## Scope and inputs
 
-当前入口为 APP 类 NormalCashDeposit，调用真实生成的现金场景；有银行事实时使用 prepareQualifiedCashDeposit，有积数时使用对应 WithAccrual 场景。只接受柜员渠道、GSA01102、与现金渠道一致的收费上下文；渠道例外和其他交易入口不自动套用本场景。请求包含账户身份、金额、币种、起息日及渠道/机构事实；授权凭据另传，授权升级不改变原请求身份。
+At this historical stage the entry was APP class `NormalCashDeposit`, invoking
+actual generated cash scenarios: `prepareQualifiedCashDeposit` when banking
+facts were present, and the corresponding `WithAccrual` scenario for accrual
+facts. It accepted only the teller channel, GSA01102 and a fee context consistent
+with the cash channel. Channel exceptions and other transaction entries do not
+automatically inherit this scenario. Requests contain account identity, amount,
+currency, value date and channel/institution facts. Authorization credentials
+are passed separately; elevated authorization does not change request identity.
 
-数据库查询一次取得账户版本、金额快照和 AccountFacts：账户资格、控制、产品限制、收费账户身份，以及可选积数和银行范围/凭证事实。金额及事实快照一起受条件更新保护。营业日、授权政策、明细数量及科目配置由当前 demo 的 APP 配置给出；它们不是银行生产配置。配置在一次执行中须保持稳定，本版未对外部配置资源提供共同锁或版本提交保证。
+One database query obtains the account version, amount snapshot and
+`AccountFacts`: account eligibility, controls, product restrictions, fee-account
+identity and optional accrual and banking-range/document facts. Both amounts
+and facts are protected by conditional updates. Business date, authorization
+policy, detail count and accounting subjects come from demo APP configuration,
+not production bank configuration. Configuration must remain stable during an
+execution; this version provided no joint locking or versioned-commit guarantee
+for external configuration resources.
 
-DepositDemoServices 按原子服务、查询适配器、子场景、父场景的顺序注册本地实现，因为生成场景构造器会立即查找子服务。此装配列表属于 demo APP，需要随场景依赖更新；不宣称编译器已经提供通用依赖排序或生产容器生命周期管理。
+`DepositDemoServices` registers local implementations in the order atomic
+services, query adapters, child scenarios, parent scenarios, because generated
+scenario constructors immediately resolve child services. This assembly list
+belongs to the demo APP and must track dependency changes. It is not evidence of
+generic compiler dependency ordering or production container lifecycle management.
 
-## 业务场景与物理提交
+## Business scenario and physical commit
 
-SPP 顺序为：所选入口范围检查 → 正金额/营业日/账户控制与产品资格 → 授权评估 → 授权执行门槛 → 收费查询和计算 → 核心偿还、金额分类及分录检查 → 独立账户及资格更新快照。
+The SPP sequence is: selected entry scope checks → positive amount/business
+date/account controls and product eligibility → authorization assessment →
+authorization execution threshold → fee query and calculation → core repayment,
+amount classification and posting checks → independent account/eligibility
+update snapshots.
 
-警示 F0554 可以继续执行；待授权在业务 check 处停止，APP 返回 PendingAuthorization。此时保存请求身份及当次待授权审计，没有账户、债务、分录或成交变化。再次提交相同请求及授权证据时重新查询当前账户、重新运行全部检查，不复用先前金额计划。授权凭据的签发、审批权限与真实性由外部应用提供，demo 不实现审批系统。
+Warning F0554 permits execution. Pending authorization stops at a business
+`check`; APP returns PendingAuthorization. Request identity and that attempt's
+pending audit persist, but account, debt, postings and trade remain unchanged.
+Resubmitting the same request with authorization evidence queries the current
+account and reruns every check; it does not reuse the earlier amount plan.
+Credential issuance, approval authority and authenticity belong to the external
+application. The demo is not an approval system.
 
-SPP prepareDepositEligibilityUpdate 根据 admission.dayCashTotal 更新现金累计，同日保留转账累计、换日清零；更新账户净余额及最后金额交易日。lastTransactionDate 对应 KSADEP0 的 SA-LTM-TX-DT，不能混淆为 SAACNACN 的 SA-LAST-TXN-DT。KSADEP0:689 判断换日，1990–1991 保存/更新金额交易日，2029–2048 更新日累计，2073 按 WK-DET-ITEM 增加明细计数。demo 显式配置 itemCount=1，尚未迁移实际 WK-DET-ITEM 的多明细生成及未打印数量。
+SPP `prepareDepositEligibilityUpdate` updates cash totals from
+`admission.dayCashTotal`, retaining transfer totals on the same day and resetting
+them on date change; it updates net account balance and last amount-transaction
+date. `lastTransactionDate` corresponds to KSADEP0 SA-LTM-TX-DT, not SAACNACN
+SA-LAST-TXN-DT. KSADEP0:689 detects date change, 1990–1991 saves/updates the amount
+transaction date, 2029–2048 updates daily totals, and 2073 increases detail count
+by WK-DET-ITEM. The demo explicitly configures `itemCount=1`; actual multi-detail
+generation from WK-DET-ITEM and unprinted counts had not been migrated.
 
-JdbcDepositStore 将新金额快照、新 AccountFacts、八条展示分录及原成交载荷共同提交到一个本地 JDBC 事务。条件更新同时匹配旧版本、旧金额快照和旧 AccountFacts；未匹配即拒绝旧计划并回滚本次写入。APP/PHY 不计算偿还顺序、借贷金额或日累计政策。
+`JdbcDepositStore` jointly commits new amounts, new `AccountFacts`, eight display
+postings and original trade payload in one local JDBC transaction. Conditional
+updates match the old version, old amount snapshot and old `AccountFacts`.
+Mismatch rejects the stale plan and rolls back the attempt's writes. APP/PHY
+does not calculate repayment order, debit/credit amounts or daily-total policy.
 
-成交载荷保留原请求、前后快照、计划、原偿还分量、分录、授权决定和实际费用。带积数事实的账户通过 prepareCashDepositWithAccrual 另保存普通、协定及透支积数和原期间，见 [积数执行契约](accrual-execution.md)。这些事实为后续冲正提供依据，不代表冲正机制已经实现；遗留协议查询接口与未确认分支仍须完善。
+The trade payload retains the original request, before/after snapshots, plan,
+original repayment components, postings, authorization decision and actual fees.
+Accounts with accrual facts additionally save ordinary, agreement and overdraft
+products and the original period through `prepareCashDepositWithAccrual`; see
+the [accrual execution contract](accrual-execution.md). These facts support later
+reversal, not a claim that reversal was already implemented. Legacy agreement
+query interfaces and unresolved branches still required work.
 
-银行资格场景先检查操作上下文绑定及通存/凭证条件，再调用上述现金场景；成功成交保存当次账户/操作事实及独立提示。多重无效条件的错误优先级未证明与原全路径一致。
+The banking-qualification scenario checks operation-context binding and deposit
+range/document conditions before invoking the cash scenario. Successful trades
+retain the attempt's account/operation facts and separate notices. Error
+precedence for multiple invalid conditions was not proven equivalent to the
+complete original path.
 
-## 请求身份与重试
+## Request identity and retry
 
-deposit_request 在首次受理时保存请求标识和请求内容，即使待授权或业务拒绝也不允许复用该标识改变请求。金额使用数值相等语义，例如 600 与 600.00 为同一金额；其他字段使用明确序列化内容比较。原 Prepared 命令级重放接口仍保留，用于物理边界测试。
+On first admission, `deposit_request` stores the identifier and request contents.
+Even pending authorization or business rejection does not permit reuse of that
+identifier with changed contents. Amount comparison is numeric: 600 and 600.00
+are equal. Other fields use explicit serialized-content comparison. The original
+`Prepared` command-level replay API remained for physical-boundary testing.
 
-已成交时，入口先按标识及原请求内容返回原 Receipt，不再按新的账户、营业日、费率或阈值重算。相同请求并发执行时，共同提交以成交标识唯一约束收敛为同一个结果；不同请求使用同一标识返回 DEPOSIT_REQUEST_ID_REUSED。独立交易竞争旧账户版本则返回 DEPOSIT_VERSION_CONFLICT，由调用方重新查询并决定再次执行，不自动忽略冲突。
+For a completed trade, the entry first matches identifier and original contents
+and returns the original `Receipt`. It does not recalculate using a new account
+state, business date, rate or threshold. Concurrent executions of the same
+request converge on one result through the jointly committed trade-identifier
+unique constraint. Different requests using one identifier return
+DEPOSIT_REQUEST_ID_REUSED. Independent trades racing on an old account version
+return DEPOSIT_VERSION_CONFLICT; callers must requery and decide whether to
+execute again. Conflicts are not silently ignored.
 
-提交应答丢失时可按相同请求查询/重试，以已保存成交为依据；不能根据一次异常断言业务必然没有提交，更不能据此自动补偿。当前尚无网络应答丢失或数据库进程崩溃注入证据。
+After a lost commit response, the same request can query/retry against persisted
+trade evidence. An exception alone cannot prove no commit occurred and must not
+trigger automatic compensation. There was no injected network-response-loss or
+database-process-crash evidence. These replay claims describe this historical
+implementation, not optional coordination guarantees of the basic distribution.
 
-## 当前证据边界
+## Historical evidence boundary
 
-NormalCashDepositTest 执行生成场景到真实 H2 提交；JdbcDepositStoreTest 分别注入账户更新后、部分分录后和提交前失败。数据库 schema、科目及参数均为 demo 配置。重新建立适配器并读取同一 H2 数据不是数据库进程重启测试。
+`NormalCashDepositTest` exercised generated scenarios through real H2 commits.
+`JdbcDepositStoreTest` separately injected failures after account updates, after
+partial postings and before commit. Schema, accounting subjects and parameters
+were demo configuration. Recreating an adapter and reading the same H2 data is
+not a database-process restart test.
 
-审计现已保存拒绝、待授权、成交、回滚及重放等尝试事件；成功审计共同提交、失败审计独立保存，具体异常与故障证据见 [审计与失败](audit-and-failure.md)。命令行报告及所选积数模型的共同保存已执行；通存和挂失提示已接入，来源与边界见 [银行资格服务](bank-qualification.md)；实际银行配置、完整资格边界、剩余协议/积数分支及跨日冲正仍待完善。身份和审计记录不是完整审批系统。此处本地事务保障不等于量子协调器或 Saga 验收；回滚、冲正和补偿继续按已确认概念分别验证。
+Audit persisted rejection, pending authorization, commit, rollback and replay
+attempts. Success audit committed jointly; failure audit persisted independently.
+See [audit and failure outcomes](audit-and-failure.md) for exceptions and fault
+evidence. CLI reporting and joint persistence of the selected accrual model had
+run. Deposit-range and lost-document notices were integrated; see
+[banking qualification](bank-qualification.md) for sources and limits.
+
+Real bank configuration, complete eligibility boundaries, remaining agreement/
+accrual branches and cross-date reversal were still pending at this stage.
+Identity and audit records are not a full approval system. Local transaction
+guarantees are not quantum-coordinator or Saga acceptance; rollback, reversal
+and compensation require separate verification under the confirmed definitions.
+These claims are preserved from revision `417a41f`, not tests rerun for translation.

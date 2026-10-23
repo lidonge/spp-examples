@@ -1,26 +1,68 @@
-# 通用能力、限制与待讨论项
+# Generic capabilities, limits and open questions
 
-## 本轮完善的能力
+This inventory records the stage captured in revision `417a41f`. Its historical
+test claims are not new evidence from the basic-distribution migration.
 
-- 业务字段可写 business("用途")；明显技术字段未声明业务含义时编译拒绝。自然语言真实性仍需审查。
-- APP 定义业务模型外的主键和 version；平台元数据由运行时维护，业务凭证编号由 table 的 auto 声明生成。
-- APP 将 Buyer/Goods/ShopOrder 直接关系展开为存储投影；身份比较按真实业务凭证，版本比较采用查询基线，保存只传当前参与者。
-- 一维参与者集合入口生成可变 List；查询直接补全 Goods[]/ShopOrder[] 内容，无集合包装合约。标量禁止重绑定，集合容器稳定。按自身业务身份逐项补全的一维集合支持optional及锁定；广义筛选集合查询不支持锁定/optional。
-- 量子服务可以只改变完整守恒资源的部分属性，未变化属性仍参与资源快照。普通 check 不受量子执行入口限制。
-- take mapper展示实体/角色扮演、角色特有属性及整体参与者关系；多实体组合是语言能力但本例未展示，原子执行绑定/回填实体事实。它不自动替代实体仓储生命周期。
+## Capabilities added in that phase
 
-## 已有基础能力
+- Business fields may declare `business("purpose")`. Clearly technical fields
+  without declared business meaning are rejected. Natural-language truthfulness
+  still needs review.
+- APP defines keys and versions outside business models. Runtime owns platform
+  metadata; table `auto` declarations generate business credential numbers.
+- APP expands direct Buyer/Goods/ShopOrder relationships into storage projections.
+  Identity comparison uses actual business credentials, version comparison uses
+  the query baseline, and saves receive only current participants.
+- One-dimensional participant collection inputs generate mutable Lists. Queries
+  hydrate Goods[]/ShopOrder[] directly without collection-wrapper contracts.
+  Scalars cannot be rebound; collection containers stay stable. Item-by-item
+  hydration by each participant's business identity supports optional and locked
+  reads; general filtered collection queries support neither.
+- Quantum services may change only part of a complete conserved resource;
+  unchanged attributes still participate in its snapshot. Ordinary checks are
+  not subject to quantum-entry restrictions.
+- Take mappers demonstrate entity/role playing, role-specific attributes and
+  whole-participant relationships. Multi-entity composition is a language
+  capability but not demonstrated here. Atomic execution binds/hydrates entity
+  facts; this does not replace entity repository lifecycle management.
 
-append 返回新序列，copy 复制业务事实，动态明细由原子服务创建。场景不能构造参与者、调用场景或靠通用动作字符串路由。普通原子服务不能互调；calculate 只组合 calculate，无隐藏 check。
+## Existing foundation
 
-SPP 提供 transaction、REQUIRED、REQUIRES_NEW、NESTED，具体资源能力由 APP/PHY 决定。无资源挂起、保存点或一致性能力时应拒绝，不能默认承诺跨库强一致。事务内并行及 TCC/Saga 条件更新仍有限制，详见根目录事务文档。
+`append` returns a new sequence, `copy` copies business facts, and atomic services
+create dynamic detail participants. Scenarios cannot construct participants,
+call scenarios or route through generic action strings. Ordinary atomic services
+cannot call each other; calculate composes only calculate, without hidden checks.
 
-APP web 的 start/expose 生成入口白名单，公共 GeneratedWebServer 接收 JSON 和服务静态页面；它没有商店规则，也不提供生产认证、权限或多租户隔离。测试只在 Java 测试目录，不注册业务入口。
+SPP provides transaction, REQUIRED, REQUIRES_NEW and NESTED. APP/PHY determine
+actual resource capabilities. Missing suspension, savepoint or consistency
+support must be rejected, not treated as cross-database strong consistency.
+Parallel work within transactions and TCC/Saga conditional updates still have
+limits; consult the transaction documentation.
 
-## 待讨论及验证
+APP web start/expose generates entry allowlists. Public GeneratedWebServer
+accepts JSON and serves static pages; it contains no shop rules and supplies no
+production authentication, authorization or tenant isolation. Tests live only
+in Java test directories and are not registered as business entries.
 
-命名共享校验执行组复用语法尚未确认；当前场景显式排列 checks，不能用互调 check 假装支持。字段完整性分析、合约业务含义证明、实体跨角色/跨进程同步与持久化并未完整覆盖。旧数据键、列和快照需要升级方案；本轮保留原数据库。
+## Questions and verification gaps
 
-已按零开户、独立双边资金/库存交易修正业务模型。develop 全套业务及网页通过，testing 三 JVM 的完整网页、注册/入账/退款/预约与重启也通过，旧 KI-001 已解决。框架建立零事实不覆盖已有成交值；旧库任意损坏恢复、并发初始化及分库残留零地址生命周期仍登记为 [known issues](known-issues.md)，不阻塞其他回归。最新证据见 [本轮回归](regression-2026-10-12-conserved-transfers.md)。
+Named reusable validation execution groups had no confirmed syntax. Scenarios
+explicitly order checks; mutually calling check services cannot simulate support.
+Field completeness, proof of contract business meaning, and entity synchronization/
+persistence across roles or processes were not fully covered. Old data keys,
+columns and snapshots require an upgrade plan; the old database was preserved.
 
-本轮还实现四域集中部署、外部实体/角色/合约Reference、按域本地绑定、整数PHY及国际化常量。量子bounds由调用者声明，范围自动检查，服务只写业务加减；这不是新增异常控制语法。运行边界与未覆盖项见[能力矩阵](capability-matrix.md)。
+The business model was corrected to zero opening plus independent, two-sided
+fund/stock transactions. Full develop business/web flows and testing three-JVM
+web, registration/funding/refund/reservation/restart flows passed at that stage;
+KI-001 was resolved. Framework zero-fact creation does not overwrite settled
+values. Arbitrary old-database repair, concurrent initialization and cross-database
+residual-zero lifecycle issues are tracked in [known issues](known-issues.md),
+not grounds to stop other regression work. Later lifecycle resolution is recorded
+there. See the [regression record](regression-2026-10-12-conserved-transfers.md).
+
+The phase also added centralized four-domain deployment, external entity/role/
+contract References, domain-local bindings, integer PHY and localized constants.
+Callers declare quantum bounds; range checks are automatic and services express
+only business increments/decrements. This is not new exception-control syntax.
+See the [capability matrix](capability-matrix.md) for runtime boundaries and gaps.

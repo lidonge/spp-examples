@@ -3,9 +3,10 @@
 from pathlib import Path
 import re
 from urllib.parse import unquote,urlsplit
+from check_english_demo_docs import violations
 
 ROOT=Path(__file__).resolve().parent.parent
-errors=[]
+errors=violations(ROOT)
 ignored={'.git','target','__pycache__','.venv'}
 files=[p for p in ROOT.rglob('*') if p.is_file() and not ignored.intersection(p.relative_to(ROOT).parts) and not p.is_relative_to(ROOT/'website/dist')]
 for p in files:

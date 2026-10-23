@@ -1,62 +1,104 @@
-# Petstore 全场景事务边界审查
+# Petstore scenario transaction-boundary audit
 
-> 2026-10-11 事务及存储规则更新：以下此前的共同提交、自动扮演者保存及 CustomerSubject 描述属于历史设计；当前规则见[实施约定](../../../book/references/transaction-storage-v1.md)。当前 APP 选择 AT 普通更新，量子先独立成交，不同模式通过 Saga 恢复，REQUIRED 不改变这一点。Person/Product 由原域显式维护。
+> Historical audit from revision `417a41f`. The 2026-10-11 transaction/storage
+> update superseded earlier joint-commit, automatic player-save and CustomerSubject
+> descriptions. See [implementation rules](../../../book/references/transaction-storage-v1.md).
+> That update used AT ordinary updates, quantum settlement first and Saga across
+> modes; REQUIRED does not change it. Person/Product belong to their owning
+> domains. Joint rollback statements below require the actual LOCAL shared-resource
+> configuration, not every realization.
 
-当前四域30个场景：22个变更、8个只读。普通查询、校验和可提前完成的计算在事务外；APP缺省使用查询修订基线做原子条件更新。写事务聚焦必须共同提交的变化，量子服务在内部保障成交值与调用处bounds。
+The recorded four-domain inventory had 30 scenarios: 22 changing and eight
+read-only. Ordinary queries, checks and calculations that can finish early occur
+outside transactions. APP defaults to atomic conditional updates against queried
+revision baselines. Write transactions focus on jointly committed changes;
+quantum settlement enforces caller bounds.
 
-## 缩小规则
+## Narrowing rules
 
-普通事实和修订标记一次读取，固定参与者及跨域投影传递基线。普通更新比较其查询基线，不在事务内重读、重验。纯准入角色不参与普通写入比较；量子变化不推进普通修订标记。新增记录由唯一约束保护。独立查询可并行，有依赖的补全保持串行；check留在主block，失败结束场景。
+Read ordinary facts/revisions together; preserve baselines across stable
+participants/domain projections. Updates compare the original query baseline
+rather than rereading/revalidating inside the transaction. Admission-only roles
+are not ordinary write comparisons. Quantum changes do not advance ordinary
+revisions. Unique constraints protect inserts. Independent queries may run
+parallel; dependent hydration stays serial. Checks remain in the main block so
+failure ends the scenario.
 
-## 逐场景结果
+## Per-scenario audit
 
-|域/场景|事务外查询、校验、计算|事务内提交|
-|---|---|---|
-|petshop.initializeStore|主体及目录补全、开设事实|商品、库存、商家共同开立|
-|petshop.registerShopCustomer|准入、注册角色、购物车和回执准备|客户域登记主体，销售域买家、购物车及回执共同开立|
-|petshop.updateShopCustomer|买家和客户域主体查询，拟值计算及输入校验|两域普通事实条件更新与回执|
-|petshop.addCartItem|买家与商品查询链并行，购物车查询、校验及加购计算|购物车条件更新与回执|
-|petshop.setCartQuantity|买家与商品查询链并行，购物车查询及数量计算|购物车条件更新与回执|
-|petshop.removeCartItem|买家及购物车查询、移除计算|购物车条件更新与回执|
-|petshop.clearShopCart|买家、购物车查询和清空计算，展示默认参与者名|购物车条件更新与回执|
-|petshop.placeShopOrder|买家/目录并行，购物车查询、报价、库存范围和资格、订单准备|订单插入、库存预占、购物车条件更新及回执；回执需取得插入时分配的订单号后补全|
-|petshop.payShopOrder|买家/商家并行，订单查询、资格与付款计算、回执准备|嵌套REQUIRED资金结算加入外层，订单条件更新与回执共同提交|
-|petshop.shipShopOrder|买家/订单并行、库存查询、发货校验和计算|库存预占转出库、订单条件更新、回执|
-|petshop.deliverShopOrder|买家及订单查询、收货校验和计算|订单条件更新与回执|
-|petshop.cancelUnpaidShopOrder|买家/订单并行、库存查询、取消校验和计算|释放预占、订单条件更新与回执|
-|petshop.cancelPaidShopOrder|买家/商家/订单并行、库存查询、取消及退款计算|释放预占、退款、订单条件更新与回执|
-|petshop.requestShopReturn|买家及订单查询、理由和资格校验、申请计算|订单条件更新与回执|
-|petshop.approveShopReturn|买家/商家/订单并行、库存查询、退货校验及退款计算|库存退回、退款、订单条件更新与回执|
-|petshop.reserveShopPet|买家/商品并行及申请校验；阶段一后准备并查询库存|事务一提交受理合约；事务二预占库存并条件更新合约；恢复后 fail 用事务三保存拒绝状态和原因，保留阶段一|
-|petshop.previewShopOrder|查询、校验和报价|无写事务|
-|petshop.browseShopProducts|目录补全、国际化、筛选|无写事务|
-|petshop.readShopCustomer|买家及主体查询|无写事务|
-|petshop.readShopCart|购物车查询|无写事务|
-|petshop.readShopOrders|订单集合查询|无写事务|
-|petshop.readShopInventory|商品范围与库存查询|无写事务|
-|petshop.readShopMerchant|商家查询|无写事务|
-|petshop.readShopReservation|预约合约查询|无写事务|
-|customer.registerSubject|输入、是否存在、登记合约准备|主体插入，重复由唯一约束拒绝|
-|customer.initializeCustomerDomain|开设事实、是否存在、输入校验|首次主体插入|
-|customer.updateSubjectProfile|主体查询、拟值计算和事实校验|主体条件更新|
-|product.initializeProductDomain|目录查询、首次目录计算|首次目录集合插入|
-|product.reviseProduct|产品查询、修订计算和事实校验|产品条件更新|
-|inventory.openInventory|库存初值及合约准备|库存角色和量子初值共同开立|
+| Domain/scenario | Before transaction: queries/checks/calculation | Transactional work |
+| --- | --- | --- |
+| petshop.initializeStore | Subject/catalogue hydration, opening facts | Open goods/stock/merchant together |
+| petshop.registerShopCustomer | Admission, registration role/cart/receipt preparation | Register customer subject and open sales Buyer/Cart/Receipt |
+| petshop.updateShopCustomer | Buyer/customer subject queries, proposed values/input checks | Conditional ordinary updates in both domains and receipt |
+| petshop.addCartItem | Parallel buyer/goods query chains, cart query/check/addition calculation | Conditional cart update and receipt |
+| petshop.setCartQuantity | Parallel buyer/goods chains, cart query/quantity calculation | Conditional cart update and receipt |
+| petshop.removeCartItem | Buyer/cart query, removal calculation | Conditional cart update and receipt |
+| petshop.clearShopCart | Buyer/cart query, clearing calculation; default participant names | Conditional cart update and receipt |
+| petshop.placeShopOrder | Parallel buyer/catalogue, cart, quote, stock range/eligibility, order preparation | Insert order, reserve stock, conditional cart update, receipt hydrated after assigned order number |
+| petshop.payShopOrder | Parallel buyer/merchant, order/eligibility/payment calculation, receipt preparation | Nested REQUIRED funds join outer conditional order update/receipt |
+| petshop.shipShopOrder | Parallel buyer/order, stock query, shipping checks/calculation | Reserved stock to dispatched, conditional order update, receipt |
+| petshop.deliverShopOrder | Buyer/order query, receipt eligibility/calculation | Conditional order update and receipt |
+| petshop.cancelUnpaidShopOrder | Parallel buyer/order, stock query, cancellation checks/calculation | Release reservation, conditional order update, receipt |
+| petshop.cancelPaidShopOrder | Parallel buyer/merchant/order, stock query, cancellation/refund calculation | Release reservation, refund, conditional order update, receipt |
+| petshop.requestShopReturn | Buyer/order query, reason/eligibility, request calculation | Conditional order update and receipt |
+| petshop.approveShopReturn | Parallel buyer/merchant/order, stock query, return checks/refund calculation | Restore stock, refund, conditional order update, receipt |
+| petshop.reserveShopPet | Parallel buyer/goods, input checks; after stage one prepare/query stock | Transaction one accepts; two reserves/conditionally updates; after recovery, fail uses transaction three for rejection/reason, retaining stage one |
+| petshop.previewShopOrder | Query/check/quote | No write transaction |
+| petshop.browseShopProducts | Catalogue hydration/localization/filter | No write transaction |
+| petshop.readShopCustomer | Buyer/subject query | No write transaction |
+| petshop.readShopCart | Cart query | No write transaction |
+| petshop.readShopOrders | Order collection query | No write transaction |
+| petshop.readShopInventory | Goods range/stock query | No write transaction |
+| petshop.readShopMerchant | Merchant query | No write transaction |
+| petshop.readShopReservation | Reservation agreement query | No write transaction |
+| customer.registerSubject | Input/existence/registration preparation | Subject insert; unique constraint rejects duplicates |
+| customer.initializeCustomerDomain | Opening facts/existence/input checks | Initial subject insert |
+| customer.updateSubjectProfile | Subject query/proposed facts/checks | Conditional subject update |
+| product.initializeProductDomain | Catalogue query/initial calculation | Initial catalogue collection insert |
+| product.reviseProduct | Product query/revision calculation/checks | Conditional product update |
+| inventory.openInventory | Initial stock/agreement preparation | Open stock role and quantum initial facts |
 
-## 为什么不再重读订单
+## Why the order is not reread
 
-订单、库存范围及业务判断基于同一份事前订单事实，提交时比较这份事实的修订标记。若订单被其他交易改变，本次条件更新拒绝，量子变化及回执随绑定事务撤销。重新查询订单但继续使用旧库存范围和旧计算结果会混用事实，不能替代该保障。不存在“版本变了但依然按旧校验更新成功”的默认路径。
+Order, stock range and business decisions use one pre-read set of facts; commit
+compares that set's revision. If another transaction changes the order, the
+conditional update rejects, with quantum changes/receipt undone under the bound
+LOCAL transaction. Rereading the order while retaining old stock ranges and
+calculations mixes baselines rather than providing protection. There is no
+default success path using obsolete checks after the version changes.
 
-购物车与实际跨域资料更新也采用同样规则。准入买家后续停用不重新否决已经开始更新的在途交易；量子金额/库存始终由成交内部的权威基线和bounds保障。
+Cart and actual cross-domain profile updates follow the same rule. Later buyer
+deactivation does not retroactively reject already admitted in-flight business.
+Authoritative settlement baselines/bounds still protect quantum funds/stock.
 
-## 顺序、嵌套及请求协调
+## Sequential/nested transactions and request coordination
 
-预约合约第一阶段已受理，第二阶段库存不足时仍可凭预约号查询原申请，fail 保存 REJECTED 与 INSUFFICIENT_STOCK；不撤销已经受理的申请。付款内层REQUIRED不是独立提交，订单或回执失败会撤销资金。原子服务不互相调用，场景不组合场景。
+Accepted reservation stage one remains queryable by reservation number even if
+stage two lacks stock. fail saves REJECTED/INSUFFICIENT_STOCK rather than undoing
+acceptance. Payment's inner REQUIRED is not an independent commit: order/receipt
+failure undoes funds within LOCAL shared resources. Atomics do not call atomics,
+and scenarios do not call scenarios.
 
-JDBC防重登记与结果保存使用短技术事务，不包住场景。已发生独立提交或结果不确定的失败保留恢复状态，不能自动重放整个场景；自动恢复协调器尚未实现。
+JDBC deduplication registration/result storage uses short technical transactions,
+not a transaction wrapped around the scenario. Failures after independent commits
+or uncertain outcomes retain recovery state; the entire scenario cannot be
+automatically replayed. An automatic recovery coordinator was not implemented.
+These coordination semantics require the optional provider; absence in basic
+builds is warned, not presented as equivalent replay behavior.
 
-## 与传统方案比较及验证范围
+## Comparison and verification boundary
 
-Java也能实现相同事务保障，但常依赖手写版本判断与方法级事务。SPP显示准入、并行依赖和共同/分阶段提交范围；APP统一管理修订基线，PHY实现条件更新与量子成交。代价是跨域基线、权威事实组合和恢复协议必须由框架正确实现。
+Java can provide the same guarantees, often through handwritten version checks
+and method transactions. SPP exposes admission, parallel dependencies and joint/
+staged boundaries; APP manages baselines and PHY conditional writes/quantum
+settlement. Framework correctness is required for cross-domain baselines,
+authoritative fact composition and recovery protocols.
 
-本例使用共同JDBC资源/schema/连接；其他量子提供方须实现事实加载与初始化协议。现有数据库没有自动迁移；新快照修订列和量子事实拆分详见[默认乐观保障](../../../book/references/spp-optimistic-participant-facts.md)。本轮只生成、编译及静态审查，不运行回归、服务或数据库。
+This example's joint boundary uses common JDBC resource/schema/connection.
+Other quantum providers must implement loading/initialization protocols.
+Existing databases are not automatically migrated; see
+[optimistic protection](../../../book/references/spp-optimistic-participant-facts.md)
+for snapshot revision columns and separated quantum facts. The original audit
+phase generated/compiled/statically reviewed only, without running regression,
+services or databases. Later runs must supply their own evidence.

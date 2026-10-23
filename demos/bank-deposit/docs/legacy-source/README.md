@@ -1,7 +1,16 @@
-# 旧版源语言对照资料
+# Legacy source-language reference material
 
-这些文件是重构前的完整源快照，只供银行公式、规则出处、历史验收期望和迁移台账核对。它们不在 Maven 的 SPP 源目录中，不生成或部署服务。
+These files are complete pre-refactoring source snapshots, retained only to
+cross-check banking formulas, rule origins, historical acceptance expectations
+and the migration ledger. They are outside Maven's SPP source directory and
+neither generate nor deploy services.
 
-旧 APP 的 86 个 examples、旧异常/幂等/场景编排及技术存储映射不能直接作为新版实现。新版验收只认 `src/main/spp` 生成的服务和 `src/test` 的测试结果。历史报告的成功次数也只适用于当时版本。
+The old APP's 86 examples, exception/idempotency/scenario orchestration and
+technical storage mappings cannot be used directly as the new implementation.
+Current acceptance uses only services generated from `src/main/spp` and results
+from `src/test`. Historical pass counts apply only to their recorded versions.
 
-存款核心的 15 组记录期望已原样提取到 `src/test/resources/deposit-kernel-cases.json`；测试只调用新版计算预览场景并比较原记录期望，没有重新实现公式。
+The 15 recorded deposit-kernel expectation sets were extracted unchanged into
+`src/test/resources/deposit-kernel-cases.json`. Tests invoke the new calculation
+preview scenario and compare the original recorded expectations; they do not
+reimplement the formulas.

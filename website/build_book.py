@@ -7,6 +7,8 @@ import json
 import re
 from urllib.parse import unquote, urlsplit
 import shutil
+import subprocess
+import sys
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -157,6 +159,7 @@ def source_page(output, url, title, body, sidebar):
 
 
 def build(source, output):
+    subprocess.run([sys.executable, str(BASE.parent / 'tools/check_english_demo_docs.py')], check=True)
     source = source.resolve()
     shutil.copytree(BASE / 'static', output, dirs_exist_ok=True)
     files = sorted(source.rglob('*.md'))

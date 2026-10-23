@@ -1,14 +1,33 @@
-# XBOD demo 实现约束
+# XBOD demo implementation rules
 
-本文件落实用户对本 demo 的明确要求，优先于早期设计文档中的实现选择。
+These explicit user requirements take precedence over implementation choices in
+older design documents.
 
-- 实现语言只能是 SPP、APP、PHY；不得手写业务 Java，包括业务服务、查询/更新实现、事务包装、部署启动和 demo 入口。按用户后续测试移出 SPP 的约定，允许 Java 测试仅准备输入、组合生成服务、断言及注入技术故障。
-- 所有 demo 业务和部署 Java 代码只能由源语言的编译与生成链路产生，放入 target 的生成目录；不得修改生成结果。
-- SPP 必须明确表达业务事务的完整边界与传播语义；事务实现模式由 APP/PHY 配置。Java 不能另行开启一个在业务源中不可见的整笔交易，也不能改变已声明边界。
-- APP 负责服务实现与部署绑定；PHY 负责物理数字表示、存储和事务保障。它们不能隐藏应由 SPP 表达的业务分支、执行顺序和恢复策略。
-- 优先使用现有语法。现有语法无法表达的能力须登记具体缺口，完善语法、语义检查、生成和通用运行支持，再迁移 demo；不得用手写 Java 补齐。
-- 不得把银行专属 Java 移入公共运行库或生成模板，或者将其作为字符串、外部脚本嵌入声明以绕过约束。公共运行库只实现通用技术能力，银行语义必须可追溯到源语言。
-- 历史 SPP 测试夹具仅在 docs/legacy-source 中留作规则对照，不得重新注册为生产服务。验收采用与 Petstore 相同的 Java 测试规则，不能在测试中补写银行业务。
-- 改编译器和公共运行库的工作与编写 demo Java 不同：前者为源语言提供通用生成和执行能力，后者禁止。框架扩展须有通用语义与验证，不能硬编码本 demo。
-
-- 对齐最新版 Petstore：默认 CRUD 不重复声明；场景不得调用场景；计算不得调用 check；量子调用处声明 bounds；失败处置使用 fail 与系统 ResultInfo，禁止 SPP try/catch/throw。
+- Implement the demo in SPP, APP and PHY. No handwritten business Java, including
+  business services, query/update implementations, transaction wrappers, deployment
+  startup or demo entries. Under the later agreement moving tests out of SPP,
+  Java tests may only prepare input, compose generated services, assert and inject
+  technical faults.
+- All business/deployment Java must come from the language compiler/generator
+  under target. Do not edit generated output.
+- SPP explicitly declares complete business transaction boundaries and propagation.
+  APP/PHY configure realization modes. Java must neither introduce an invisible
+  whole-business transaction nor change declared boundaries.
+- APP owns implementation/deployment bindings; PHY owns numeric representation,
+  storage and transaction guarantees. Neither may hide business branches,
+  execution order or recovery policy that belongs in SPP.
+- Prefer existing syntax. Register concrete expressiveness gaps, then complete
+  grammar, semantics, generation and generic runtime before migrating the demo.
+  Do not fill gaps with handwritten Java.
+- Do not move bank-specific Java into public runtime/templates or embed it as
+  strings/external scripts to bypass these rules. Runtime provides generic
+  technical capabilities; bank semantics must trace to source language.
+- Historical SPP test fixtures remain under docs/legacy-source for rule comparison,
+  never re-registered as production services. Use the same Java-test boundaries
+  as Petstore, without implementing banking business in tests.
+- Compiler/runtime work supplies generic language generation/execution and differs
+  from prohibited demo business Java. Extensions need generic semantics and
+  verification, not hardcoded demo behavior.
+- Align with current Petstore: do not redeclare default CRUD; scenarios cannot call
+  scenarios; calculate cannot call check; quantum call sites declare bounds;
+  failure disposition uses fail/system ResultInfo, not SPP try/catch/throw.

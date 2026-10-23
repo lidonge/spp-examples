@@ -1,51 +1,117 @@
-# SPP 与传统 Java 的比较
+# SPP compared with traditional Java
 
-> 2026-10-11 事务及存储规则更新：以下此前的共同提交、自动扮演者保存及 CustomerSubject 描述属于历史设计；当前规则见[实施约定](../../../book/references/transaction-storage-v1.md)。当前 APP 选择 AT 普通更新，量子先独立成交，不同模式通过 Saga 恢复，REQUIRED 不改变这一点。Person/Product 由原域显式维护。
+> Historical comparison from revision `417a41f`. The 2026-10-11 transaction/storage
+> update superseded earlier joint-commit, automatic player-save and CustomerSubject
+> descriptions. See [implementation rules](../../../book/references/transaction-storage-v1.md).
+> It selected AT ordinary updates, quantum first and Saga across modes; REQUIRED
+> does not change that. Person/Product are maintained in their own domains.
+> Later LOCAL configurations are distinguished below.
 
-比较相同 Petstore 需求，而不是假定 Java 无法做领域建模。Java/ORM 也能采用角色、值对象、领域服务及模型外技术元数据；SPP 的目标是把业务边界变成可检查的语言约束。
+Compare the same Petstore requirements, not an assumption that Java cannot model
+domains. Java/ORM can use roles, value objects, domain services and external
+technical metadata. SPP aims to make business boundaries enforceable language rules.
 
-|维度|SPP方案|传统Java方案|收益与代价|
-|---|---|---|---|
-|实体与角色|Entity/Role/take，Person扮演Merchant并新增角色事实|接口、组合对象、显式映射|业务身份可见；生成映射和实体生命周期仍有成本|
-|参与者|入口仅实际参与者，稳定实例，无业务返回|参数、返回对象、引用重绑定|范围和查询补全更确定；需要集合原地协议及别名约束|
-|合约|每份Contract对应真实场景|领域协议对象或DTO|避免万能命令；不能靠类型名称证明业务含义|
-|关系|ShopOrder直接含Buyer，APP投影外键|对象关联或customerId|业务不受存储简化污染；查询补全及身份语义更复杂|
-|数字|业务公式，PHY选表示，明确业务舍入|BigDecimal方法链或工具函数|读公式更直接；生成器须保证适配及转换|
-|校验|场景显式check及局部范围/撤销标记|if、领域验证、异常或返回值|控制范围可审查；复杂复用组语法仍待确认|
-|原子组合|普通原子不互调，calculate只组合calculate|自由方法调用|依赖更受控；复用和表达自由度下降|
-|事务|业务transaction及传播，APP/PHY选保障|注解、模板、框架配置|边界与提交关系可见；资源能力不能由语法自动创造|
-|量子变化|增量和成交约束绑定完整资源|SQL增量、锁、账簿及验证|取消/退款保留后续变化；通用运行时和审计复杂|
-|平台身份/版本|APP表列、扮演者身份映射及查询基线|ORM映射、乐观锁版本|技术事实不入业务模型；平台元数据需准确保留|
-|防重|APP请求键与facts|拦截器、唯一键、结果表|业务不写重复防护；共同提交与结果恢复仍需验证|
-|独立场景|每动作独立，前端组合|controller路由与服务编排|业务动作明确；场景数量增加，兼容成本更高|
-|测试|Java组合生成场景|Java测试领域服务|无需混入测试语法；仍要真正运行故障与并发测试|
+| Dimension | SPP | Traditional Java | Benefit/cost |
+| --- | --- | --- | --- |
+| Entities/roles | Entity/Role/take; Person plays Merchant with added role facts | Interfaces, composition, explicit mappings | Visible business identity; mapping/entity lifecycle still costs effort |
+| Participants | Actual inputs only, stable instances, no business returns | Parameters, returned objects, rebinding | More definite scope/hydration; in-place collection and alias rules required |
+| Contracts | Each Contract represents a real scenario | Domain agreement objects or DTOs | Avoids universal commands; names do not prove business meaning |
+| Relationships | ShopOrder contains Buyer; APP projects foreign keys | Object associations or customerId | Storage simplification stays out of business; hydration/identity are more complex |
+| Numbers | Formulas, PHY representation, explicit rounding | BigDecimal chains/helpers | Direct formulas; generator must preserve adaptation/conversion |
+| Checks | Explicit scenario checks with lexical scope/rollback marker | if, validation, exceptions/return values | Reviewable control scope; reusable group syntax still pending |
+| Atomic composition | Ordinary atomics do not call peers; calculate composes calculate | Free method calls | Controlled dependencies at cost of reuse/expression freedom |
+| Transactions | Business boundary/propagation; APP/PHY realization | Annotations/templates/configuration | Visible commit relationships; syntax cannot create resource capabilities |
+| Quantum changes | Deltas/settlement constraints over complete resources | SQL deltas, locks, ledgers/checks | Cancellation/refund preserves later changes; runtime/audit complexity |
+| Platform identity/revisions | APP columns, player mapping, query baselines | ORM mappings/optimistic versions | No technical facts in business model; metadata must be preserved correctly |
+| Duplicate protection | APP request keys/facts | Interceptors, unique keys, result tables | Less business boilerplate; joint commit/result recovery still need verification |
+| Independent scenarios | Separate actions, frontend composition | Controller routing/service orchestration | Clear actions, more scenarios/compatibility cost |
+| Tests | Java composes generated scenarios | Java tests domain services | No embedded test syntax; faults/concurrency still must actually run |
 
-申请退货直接声明 Buyer、原 ShopOrder、ReturnRequestAgreement；资格在场景显式 check，申请原因属于约定，transaction 内修改并保存。不接收 ShopCommand 再 switch action。下单 ShopOrder 自身就是合约；付款或退货使用原订单不等于调用下单场景。
+Return requests directly declare Buyer, original ShopOrder and ReturnRequestAgreement.
+Eligibility is explicitly checked, reason belongs to the agreement, and updates
+persist transactionally. There is no ShopCommand/switch action. ShopOrder itself
+is the ordering contract; using it for payment/return does not call ordering again.
 
-本例库存由量子实现保护成交，普通参与者查询在事务内自动锁定；物理并发开销由实现决定。前端并行读取不是一致快照；同一 JDBC 后端的保障不能延伸为跨库强一致；take 映射也不能冒充已实现实体持久化同步。
+Quantum realization protects stock settlement; ordinary in-transaction reads lock
+where required. Physical concurrency cost depends on realization. Parallel UI
+reads are not a snapshot, same-JDBC guarantees do not extend to cross-database
+strong consistency, and take mapping alone is not implemented entity synchronization.
 
-当前生成和编译可检查语法、接口及类型。本轮未运行回归，不能宣称 SPP 的性能、并发或恢复优于 Java。历史验收属于旧模型；后续需用同等数据规模和故障条件比较运行结果。
+Generation/compilation verify syntax/interfaces/types. The original phase ran no
+regression and claimed no performance, concurrency or recovery superiority to Java.
+Earlier runtime evidence used an older model; comparisons require equal data
+volumes and fault conditions.
 
-真实客户/产品域已独立建模，APP选择同JVM部署并绑定域限定原子服务，PHY共用声明的资源；Java模块和接口也能实现此模式。SPP增加了参与者投影、集合身份、调用类别及绑定循环的编译检查，代价是需要生成器、目录聚合和平台基线管理。四域源码已生成编译，未运行，不能据此比较事务可靠性或性能。
+Customer/product are real independent domains. APP selects same-JVM qualified
+atomic bindings; PHY shares declared resources. Java modules/interfaces can do
+the same. SPP adds compile checks for projections, collection identities, service
+kinds and binding cycles, at the cost of generation, catalog aggregation and
+baseline management. Compiling four domains alone does not compare reliability
+or performance.
 
-数量缺省采用int，金额缺省采用带精度与scale的BigDecimal；二者均为number的缺省表示，PHY可全局替换或按字段覆盖，业务舍入显式。Java也可做到，但通常要在接口、序列化和计算处统一规则。SPP通过统一声明生成这些表示代码。
+Quantities default to int, amounts to precision/scale BigDecimal; both are number
+representations globally/locally replaceable in PHY, with explicit business
+rounding. Java can likewise unify interface, serialization and arithmetic rules;
+SPP generates that representation code from unified declarations.
 
-bounds让共用量子服务只描述加减，调用者选择负下限、动态范围或null无限制，由量子成交实现自动控制边界。Java可用策略对象和事务模板达到同样结果；SPP减少调用者重复书写校验，量子实现仍需保证范围与成交绑定及事务撤销；不同实现采用自己的控制机制。
+Bounds keep quantum services focused on increments/decrements while callers
+choose negative/dynamic/null limits. Settlement enforces them. Java can use
+policy objects/transaction templates too. SPP reduces repetitive caller checks,
+but each quantum implementation must bind limits to settlement and rollback.
 
-Goods扮演明细角色时保留完整商品关系，Buyer扮演Cart。这比继承更适合有多种角色的主体；Java组合同样可表达。SPP没有替代业务分析，也不能从编译通过推导性能或可靠性优势。
+Goods retains its whole relationship when playing line roles; Buyer plays Cart.
+This suits multiple roles better than simple inheritance, though Java composition
+can express it. SPP does not replace business analysis or establish advantages
+merely by compiling.
 
-本轮补充：普通参与者的事务内查询自动生成锁定；混合参与者也修改普通属性时锁定，只有量子变化时不加锁。库存findStockLine不锁定量子事实，lockStock已移除；addCartItem资格查询移出写事务。量子属性逻辑统一归量子域，数据库/TCC/专用量子服务由APP选择、PHY接入，不能把共同JDBC示例当作所有模式的运行证据。参见[事务读取与量子域](../../../book/references/spp-transaction-reads.md)。
+## Transaction refinements
 
-本轮四域30个场景（22个变更、8个只读）已按可靠乐观基线缩小事务：普通查询、校验与计算在事务前，事务内原子条件写入；只读准入不成为提交条件，量子成交不推进普通修订标记。预约展示两个顺序事务，预占失败保留已受理合约；付款展示嵌套REQUIRED逻辑边界；非LOCAL策略下量子阶段先成交，跨模式失败采用Saga恢复；本轮develop使用LOCAL共同提交量子与普通更新。详见[事务审计](transaction-boundary-audit.md)和[实施计划](transaction-evolution-plan.md)。
+Ordinary in-transaction queries lock; mixed participants lock if ordinary fields
+also change, not for quantum-only work. findStockLine does not lock quantum facts;
+lockStock was removed and addCartItem admission moved outside writes.
+APP selects database/TCC/dedicated quantum realization, PHY integrates it.
+Shared-JDBC evidence is not every mode's evidence. See
+[transaction reads](../../../book/references/spp-transaction-reads.md).
 
-默认乐观提交减少长时间持有普通资源锁的需求，省去逐业务手写版本条件，但冲突仍会出现，不能承诺无冲突。普通修订与量子事实分离避免余额变化无谓冲突资料更新。顺序事务让阶段结果可保留，也要求明确恢复协议；当前请求结果记录与业务最后提交并非同一事务，未知结果需查询业务凭证并恢复技术登记，不能自动重放。
+The recorded four-domain set had 30 scenarios (22 changing/eight read-only).
+Reliable optimistic baselines move queries/checks/calculation before transactions,
+with atomic conditional writes inside. Admission-only reads are not commit
+conditions; quantum settlement does not advance ordinary revisions.
+Reservation retains acceptance after second-stage failure; payment has nested
+REQUIRED. Non-LOCAL settles quantum first and uses Saga across modes; recorded
+develop uses LOCAL joint commit. See [audit](transaction-boundary-audit.md) and
+[plan](transaction-evolution-plan.md).
 
-## 本轮生成规则的比较
+Optimistic commit reduces long ordinary locks and handwritten version predicates,
+not conflicts themselves. Separating ordinary revisions from quantum facts avoids
+unnecessary profile-update conflicts from balance changes. Sequential transactions
+retain stage results but require recovery protocols. Request-result recording and
+last business commit are not one transaction; unknown outcomes require business
+credential queries and technical-registration recovery, not automatic replay.
 
-传统 Java 需要手工区分角色 DTO 的继承事实、角色表写入和实体域调用，并复制量子更新后的余额。SPP 把事实及扮演关系保留在业务模型，APP/PHY 驱动分表、查询补全及量子回填。购物车明细的联合身份和订单明细的独立业务凭证展示了组合角色的存储归属。
+## Generated persistence rules
 
-代价是一次角色查询可能产生角色、扮演者、集合成员及量子来源的多次查询；当前逐成员补全偏重语义正确，尚未优化批量查询。非LOCAL独立量子阶段成交后，普通记录失败需要反交易；LOCAL同库共同提交可以真实回滚，两种保证不能混淆。只通过生成与编译，性能、并发及故障恢复没有运行实测。
+Traditional Java explicitly separates inherited role DTO facts, role-table writes
+and entity-domain calls, often copying quantum balances after updates. SPP retains
+facts/playing in the model while APP/PHY drive split tables, hydration and quantum
+readback. Joint cart-line identity and independent order-line credentials illustrate
+composed-role storage ownership.
+
+One role query may trigger role/player/member/quantum-source queries. Per-member
+hydration prioritized semantics, not optimized batch querying. Non-LOCAL quantum
+commit followed by ordinary failure requires inverse recovery; LOCAL shared-store
+work can truly roll back. These are different guarantees. The original comparison
+had generation/compile evidence, not measured performance/concurrency/recovery.
 
 ## Zero opening and conserved external transfers
 
-开户只建立零钱包；商品库存、第三方结算账户、库存供应来源均从零开始。充值和入库是独立场景，量子服务执行双边增减，来源调用 bounds 不设下限，接收方要求不小于零。网页提供独立入口；测试组合生成场景获取演示余额/库存，不手写业务 Java。具体需求、实施顺序与传统初始化赋值方案的比较见 [设计说明](conserved-opening-and-transfers.md)。
+Wallets, product stock, settlement and supply accounts start at zero.
+Funding/stock receipt are separate two-sided quantum scenarios. Source bounds
+have no lower limit; recipients must remain nonnegative. UI exposes separate
+entries; tests compose generated scenarios rather than implement business Java.
+See [design and initialization comparison](conserved-opening-and-transfers.md).
+
+Optional official coordination/tracing is not part of basic guarantees. Missing
+providers produce warnings; basic persistence and optimistic protection remain.
+This comparison's historical enhanced behavior must not be attributed to an
+unconfigured basic build.

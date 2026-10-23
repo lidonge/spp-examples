@@ -1,38 +1,87 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# Saga 节点的显式业务恢复
+# Explicit business recovery for Saga stages
 
-## 对已确认概念的验证
+## Verifying the agreed concepts
 
-Saga 已成功节点的局部事务结束，后续失败不能让这些数据库成交消失。恢复必须调用明确绑定的业务冲正或补偿。本 demo 用金融组件的已提交存款和独立反交易验证这项区别，不把恢复旧快照作为 Saga 默认操作。
+A successful Saga stage has finished its local transaction. Later failure cannot
+make that database commit disappear. Recovery invokes explicitly bound business
+reversal or compensation. This demo used a committed financial-component deposit
+and an independent inverse trade, not snapshot restoration as a default Saga action.
 
-ExplicitSagaStep 是 APP 对原生 DefaultTransactionManager/SagaTransactionStrategy 的绑定，实现 Service 和 TransactionalService，使用 SAGA 模式。局部执行动作、成功成交查询和业务恢复动作均必须明确提供。框架现有接口仍叫 TransactionParticipant.rollback；在本绑定中它调用业务恢复，名称不代表真正的全局技术回滚。未提供恢复动作时构造拒绝，没有默认补偿。
+Historical APP binding ExplicitSagaStep implemented Service and TransactionalService
+against native DefaultTransactionManager/SagaTransactionStrategy in SAGA mode.
+Local execution, successful-trade lookup and business recovery had to be supplied
+explicitly. The framework interface was still named TransactionParticipant.rollback;
+this binding invoked business recovery through it, not global technical rollback.
+Construction rejected a missing recovery action; there was no default compensation.
 
-局部执行使用实际生成的 SPP 金额/分录计划和 JdbcDepositStore。恢复使用原成交查询、生成反向计划和 JdbcDepositReversalStore，新反交易有自己的标识、分录、审计及原交易关联。业务公式仍在 SPP；APP 只绑定执行、查询和恢复，不根据一次异常猜测是否已经成交。
+Local execution used generated SPP amount/posting plans and JdbcDepositStore.
+Recovery queried original settlement, generated an inverse plan and used
+JdbcDepositReversalStore. The new inverse trade had its own identity, postings,
+audit and original-trade link. Business formulas remained in SPP. APP bound
+execution/query/recovery without guessing settlement from a single exception.
 
-## 原生执行及失败边界
+## Native execution and failure boundaries
 
-局部动作必须有可查询成功成交依据。成功记录 LOCAL_COMMITTED；执行失败记录 LOCAL_EXECUTION_FAILED，但该事件不等于业务肯定未提交。原生管理器反序调用已执行参与者，绑定再次查询实际成交依据：无成交记录为 LOCAL_NOT_COMMITTED，不构造反交易；有成交记录则调用绑定的业务恢复。
+Local actions require queryable evidence of successful settlement. Success logs
+LOCAL_COMMITTED; execution failure logs LOCAL_EXECUTION_FAILED, which does not
+prove the business failed to commit. The native manager visits executed
+participants in reverse order. The binding queries actual trade evidence again:
+no trade produces LOCAL_NOT_COMMITTED without an inverse; an existing trade
+invokes bound business recovery.
 
-恢复前写 RECOVERY_REQUESTED，完成后写 RECOVERY_DONE；失败写 RECOVERY_FAILED 并把异常交回原生管理器。它将恢复异常作为原失败的 suppressed 保留，不把流程改成成功。若业务恢复已经返回成功、随后完成日志写入失败，则记录 RECOVERY_RESULT_QUERY_REQUIRED，不能据此再次执行一个新的反交易或推断原业务尚未撤销。
+Recovery writes RECOVERY_REQUESTED, then RECOVERY_DONE on completion or
+RECOVERY_FAILED on failure, propagating the recovery exception to the manager.
+The manager preserves it as suppressed on the original failure, not success.
+If recovery returns successfully but completion logging fails, record
+RECOVERY_RESULT_QUERY_REQUIRED. Do not execute a new inverse or infer that
+original business remains unreversed from that logging failure.
 
-日志由框架 SagaLogRecorder 写 JdbcSagaLogStore，含业务标识、步骤名、原生事务身份、状态及显式 recoveryPayload。日志存储不是局部业务数据库提交的同一事务；需要根据成交/冲正记录查询结果，不能仅用日志状态代替真实业务结果。日志失败会保留主异常并附加日志异常。
+SagaLogRecorder writes JdbcSagaLogStore with business identity, step name,
+native transaction identity, state and explicit recoveryPayload. Log persistence
+is not the same transaction as local business commit. Query actual trade/reversal
+records rather than treating log state as business outcome. Logging failure
+preserves the primary exception and adds the log exception.
 
-## 实际案例
+## Historical executed cases
 
-DepositSagaRecoveryTest 调用原生管理器，绑定实际金融组件并使用 H2：
+DepositSagaRecoveryTest used the native manager, actual financial components
+and H2:
 
-- 成功节点：200 存入 10 得到 210，保留原成交，不执行恢复。
-- 后续失败且有独立业务：原 10 已成交，另有独立存入 20；只反向原 10，最终 220。原及后续记录保留，新增反交易 R1；不是恢复旧快照 200。
-- 节点未成交：执行失败且查询无成功记录，不调用默认逆操作。
-- 恢复被业务拒绝：冻结金额使 ES020 容量检查不通过；原存款保持成交，记录恢复失败，框架不创造补偿。
-- 明确恢复重试：解除 fixture 冻结后调用 recoverCommitted；使用稳定 R1，重复恢复不重复减少金额，不再次执行原存款。
-- 反交易已成交但完成日志失败：实际 R1 仍可查询，记录 RECOVERY_RESULT_QUERY_REQUIRED；之后按稳定身份恢复日志，不再次执行金额反向。
+- Successful stage: deposit 10 into 200 produces 210; original trade remains and
+  no recovery executes.
+- Later failure with independent business: original 10 settled, then an
+  independent deposit of 20. Reverse only original 10, leaving 220. Original and
+  later records remain; new inverse R1 is recorded, not restoration to 200.
+- Unsettled stage: execution fails and no successful record exists; no default
+  inverse is invoked.
+- Business-rejected recovery: frozen amount violates ES020 capacity. The original
+  deposit stays committed and recovery failure is recorded; the framework does
+  not invent compensation.
+- Explicit recovery retry: after fixture unfreezing, recoverCommitted uses stable
+  R1. Repetition neither deducts again nor reruns the original deposit.
+- Inverse committed but completion log fails: actual R1 remains queryable and
+  RECOVERY_RESULT_QUERY_REQUIRED is recorded. Later stable-identity recovery
+  repairs logging without another monetary inverse.
 
-原费及显式退费均为零，无产品/积数事实。这是金融组件的 Saga 恢复证据，不为完整现金入口选择跨日、退费或非量子政策。冻结/解除通过带版本的 fixture 更新模拟，不宣称迁入了真实银行冻结交易。
+Original fee and explicit refund were zero, with no product/accrual facts.
+These are financial-component Saga recovery cases, not selection of full cash
+cross-date/refund/non-quantum policy. Versioned fixture updates simulated freeze/
+unfreeze; no real bank freeze transaction was claimed migrated.
 
-## 当前限制
+## Limits at that stage
 
-本绑定验证原生执行策略、明确恢复调用及持久化事件。它不提供自动 pending 扫描、跨进程回调重建或跨断线可靠恢复；payload 保存了示例原交易/反交易身份，但如何注册和重建恢复服务仍需正式执行契约。稳定身份与业务数据库结果查询仍由绑定保证。
+The binding verified native execution strategy, explicit recovery invocation and
+durable events. It did not provide automatic pending scanning, cross-process
+callback reconstruction or reliable recovery across disconnection. Payloads
+retained example original/inverse identities, but registration/reconstruction of
+recovery services still required a formal execution contract. The binding still
+owned stable identities and queries of business database results.
 
-不能从这些案例宣称完整银行 Saga 已迁移、任意动作都有默认补偿，或量子性事务已在存款场景接通。技术回滚、量子协调器和业务冲正分别验收。
+These cases do not establish complete banking Saga migration, default compensation
+for arbitrary actions or quantum integration in deposit scenarios. Technical
+rollback, quantum coordination and business reversal require separate acceptance.
+This English edition preserves claims from revision `417a41f`, not new test runs.

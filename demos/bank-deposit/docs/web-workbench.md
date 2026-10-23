@@ -1,60 +1,111 @@
-# 中文存款工作台
+# Deposit workbench
 
-界面在 `src/main/resources/web/`，由现有 GeneratedWebServer 作为静态资源提供。后端仍全部由 SPP/APP/PHY 生成，无手写 Java 业务或 Java HTTP 控制器。
+The UI under `src/main/resources/web/` is served as static resources by
+GeneratedWebServer. Backend logic is entirely generated from SPP/APP/PHY, with
+no handwritten Java business implementation or HTTP controller.
 
-## 演示步骤
+## Walkthrough
 
-1. 设置客户账号、现金结算账号、业务日期。首次使用新数据库，在“账户开立”中先建立银行内部户，再开立客户账户。
-2. “现金存入”输入金额并提交。界面显示客户及资金对方余额、存入回执、八槽分录，并记住原存入回执号。
-3. “现金冲正”先试算，再确认正式冲正。修改顶部业务日期可测试跨日；Mode2 开关仅作为场景输入，规则仍由服务判断。
-4. “账务查询”按账号查询资金，按回执号查询真实持久化的存入/冲正合约与分录。最近回执列表只保存在本浏览器，不代表服务器交易全集；点击回执会恢复对应客户、现金结算和银行内部账户，业务日期保持当前选择。
-5. “高级测试”选择场景生成完整参与者 JSON，按需修改业务参数，点击“执行 JSON 请求”。常规按钮不会使用这个编辑器中的改动。
+1. Set customer account, cash settlement account and business date. On a fresh
+   database, open bank internal accounts before the customer account.
+2. Enter an amount and submit a cash deposit. The UI shows customer/counterparty
+   balances, receipt and eight-slot postings, retaining the original receipt number.
+3. Preview a cash reversal before confirming it. Change the top-level business
+   date for cross-date tests. Mode2 is only input; service rules determine behavior.
+4. Query funds by account and actual persisted deposit/reversal contracts/postings
+   by receipt. Recent receipts exist only in this browser, not a complete server
+   transaction list. Selecting one restores its customer, cash settlement and
+   internal bank accounts while keeping the currently selected business date.
+5. Advanced testing creates complete participant JSON for a selected scenario.
+   Edit business parameters and execute the JSON request. Ordinary buttons do
+   not use changes in this editor.
 
-业务拒绝保留后端错误码。fail 返回的失败、恢复状态不会显示为成交成功。通信中断时显示“结果未确认”，页面不会自动重试更新；应先核对账务。失败请求不展示输入中的零值或候选分录为已确认余额/成交；通信失败会清除上一笔结果。办理中账号、表单和 JSON 暂时不可编辑，防止请求与显示上下文错配。页面不计算资金、费用、利息或补偿，不实现校验业务规则。
+Business rejection preserves backend error codes. Failed/recovery-required
+ResultInfo is not shown as successful settlement. Communication interruption
+shows an unconfirmed outcome; the page never automatically retries updates.
+Query accounting first. Failed requests do not present input zeros or candidate
+postings as confirmed balances/trades. Communication failure clears the previous
+result. Account selectors, forms and JSON are frozen while a request runs to
+avoid mismatched request/display context. The UI does not calculate funds, fees,
+interest or compensation, or implement business validation.
 
-## 与 OpenAPI 的关系
+## Relationship to OpenAPI
 
-这是定制的中文工作台，不是通用 OpenAPI UI 生成器。`templates.json` 是输入骨架，从编译输出 OpenAPI 的属性类型及枚举、SPP 场景的参与者声明生成；布局、表单、动作和结果展示为手工编写。金额输入使用字符串，响应数字以原始十进制文本保留，避免浏览器浮点运算修改金额。
+This is a custom workbench, historically first written in Chinese, not a generic
+OpenAPI UI generator. Input skeletons in `templates.json` derive from compiled
+OpenAPI property types/enums and SPP scenario participant declarations; layout,
+forms, actions and result presentation are custom UI code. Amount inputs use
+strings and response numbers retain original decimal text to avoid browser
+floating-point changes.
 
-变更参与者后，先运行 Maven 生成，再刷新输入骨架（需要 PyYAML）：
+After participant changes, run Maven generation, then refresh skeletons with PyYAML:
 
 ```bash
 python3 demos/bank-deposit/tools/web-templates.py
 ```
 
-表单中的柜员、授权、协议和科目是可见的演示输入，沿用验收样例，不代表生产环境可信外部事实。没有在前端新增偿还、收费或冲正算法。
+Teller, authorization, agreement and accounting-subject fields are visible demo
+inputs inherited from acceptance fixtures, not trusted production external facts.
+No repayment, fee or reversal algorithm is implemented in the browser.
 
-## 服务入口
+## Service entries
 
-APP 显式暴露开户、存入、试算、冲正及查询场景。新增 `readDepositAccount` 查询账户资格、积数和资金账户，`readCashDeposit` 查询原成交及分录；两者只有查询和校验，没有事务或更新。默认原子 CRUD 仍不直接暴露 HTTP。
+APP explicitly exposes account opening, deposit, preview, reversal and query
+scenarios. readDepositAccount queries eligibility, accrual and fund accounts;
+readCashDeposit queries original trade/postings. Both only query/check, without
+transactions or updates. Default atomic CRUD is not directly exposed over HTTP.
 
-## 启动
+## Start
+
+From the examples root:
 
 ```bash
 ./demos/bank-deposit/run-demo.sh web
 ```
 
-默认地址 http://127.0.0.1:8089/ ，数据保存到 `target/xbod-deposit` H2 文件。`mvn clean` 会删除 target 下的演示数据库；需要长期保留可用 SPP_XBOD_JDBC_URL 指向其他路径。
+Default URL: http://127.0.0.1:8089/. Data persists in the demo module's
+`target/xbod-deposit` H2 file. `mvn clean` removes databases under target.
+For longer retention, point SPP_XBOD_JDBC_URL elsewhere.
 
-局域网演示：
+For trusted LAN demonstration:
 
 ```bash
 SPP_WEB_HOST=0.0.0.0 ./demos/bank-deposit/run-demo.sh web
 ```
 
-分库演示使用 `SPP_ENVIRONMENT=testing`。已有构建可加 `SPP_DEMO_SKIP_BUILD=1`。数据源、端口等继续使用 run-demo.sh 现有环境变量。页面没有登录功能，按演示服务使用。
+Use SPP_ENVIRONMENT=testing for split databases, SPP_DEMO_SKIP_BUILD=1 for an
+existing build, and the run script's datasource/port variables as usual.
+There is no login; this is a demonstration service, not a public production host.
+The basic SDK emits warnings for unavailable enhancements and does not promise
+automatic replay/duplicate suppression without a coordination provider.
 
-## 验证
+## Verification
 
-`XbodHttpTest` 核对静态首页、APP 暴露的账户查询、界面防重、冲正和默认原子服务不可访问。`tools/web-acceptance.cjs` 使用 Playwright 驱动真实浏览器，从全新账号开始完成开户、精确小数存入、负数拒绝、试算、正式冲正、回执查询、页面刷新及手机布局，断言无浏览器脚本错误。
+XbodHttpTest checks the static homepage, APP-exposed account query, profile-specific
+duplicate behavior, reversal and inaccessible default atomic services.
+`tools/web-acceptance.cjs` uses Playwright against a real browser, starting with
+new accounts and testing opening, exact fractional deposit, negative rejection,
+preview, reversal, receipt lookup, refresh and mobile layout without script errors.
 
 ```bash
-# Playwright 需安装于当前 Node 环境；DEMO_URL 指向隔离测试服务。
 DEMO_URL=http://127.0.0.1:18089 node demos/bank-deposit/tools/web-acceptance.cjs
 ```
 
-脚本使用独立账号但会写入真实演示交易，宜连接临时测试库。默认 Chrome 路径 `/usr/bin/google-chrome`，可用 CHROME_BIN 修改。
+Install Playwright in the Node environment and target an isolated test service.
+The script uses separate accounts but writes actual demo transactions; use a
+temporary database. Chrome defaults to /usr/bin/google-chrome; CHROME_BIN overrides it.
 
-2026-10-13 实际验证：develop/testing 的 XbodHttpTest + XbodReversalPreviewTest 各 3 项通过；两环境的 Playwright 完整浏览器流程均通过，包含金额 100.005 的原样显示、负数存入拒绝后余额保持、试算无写入、正式冲正归零、服务端回执查询及 390px 移动布局。日志 `/tmp/xbod-web-tests.log` 与 `/tmp/xbod-web-testing-tests.log`。
+Historical 2026-10-13 evidence: XbodHttpTest plus XbodReversalPreviewTest passed
+three tests in each develop/testing environment. Both complete browser flows
+passed exact display of 100.005, unchanged balance after negative rejection,
+read-only preview, reversal to zero, server receipt queries and 390px mobile
+layout. Logs: `/tmp/xbod-web-tests.log` and `/tmp/xbod-web-testing-tests.log`.
 
-后续交互验收：develop 的浏览器全流程追加通过历史回执账户恢复、高级 JSON 缺原成交拒绝、处理中表单冻结、技术网络中断后状态待确认及结果清理；无浏览器脚本错误。记录 `/tmp/xbod-ui-followup-browser.log`。未重复运行已通过的后台回归，新增变更仅涉及页面交互。
+Follow-up develop browser acceptance also passed historical-receipt account
+restoration, advanced JSON rejection without original trade, frozen forms during
+execution, unconfirmed outcome/result clearing after technical network failure,
+and no script errors. Log: `/tmp/xbod-ui-followup-browser.log`. Backend regression
+was not repeated then because changes concerned UI interaction only.
+
+These historical browser results come from revision `417a41f`; translating this
+guide does not rerun them or establish browser acceptance under every SDK profile.

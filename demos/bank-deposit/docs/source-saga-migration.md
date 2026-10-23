@@ -1,50 +1,54 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation and acceptance, not current source/test results. See [the current refactoring](latest-petstore-refactoring.md); retired source is under `legacy-source/`.
 
-# Saga 源语言迁移路径
+# Saga source-language migration
 
-状态：通用场景恢复语义与调用元数据已实现并通过针对性248项测试和完整公共模块303项lang测试；99zv的银行六项源案例已实际通过完整verify（967项JUnit、81入口）；对应旧测试已删除，删除后的clean verify尚待执行。本文列出旧 DepositSagaRecoveryTest 的六项迁移责任；没有据此认定银行 Saga 已通过验收。demo 仍禁止手写 Java。
+Historical status at this checkpoint: generic scenario-recovery semantics and invocation metadata passed 248 focused tests and all 303 public lang tests. The six bank source cases in 99zv passed complete verify with 967 JUnit tests and 81 entries. Corresponding old tests were deleted, but post-deletion clean verify remained pending. The six responsibilities of DepositSagaRecoveryTest are recorded below; this checkpoint alone was not final bank Saga acceptance. This phase still prohibited handwritten demo Java.
 
-## 业务与事务边界
+## Business and transaction boundaries
 
-SPP 的 `transaction saga` 表达多个已各自结束的本地交易组成的业务过程。每个存款节点仍调用已有存款场景，其整笔 `transaction quantum` 清楚可见。后续节点失败不能撤回先前本地提交；需要显式业务恢复，现金冲正采用已有 XBOD 资格、日期、收费和反向计算场景。
+SPP `transaction saga` expresses a business process composed of local transactions that finish independently. Each deposit node invokes the existing deposit scenario with its explicit whole-operation `transaction quantum`. A later node's failure cannot undo an earlier local commit. Explicit business recovery is required, using existing XBOD cash-reversal eligibility, dates, fees, and inverse calculations.
 
-恢复服务必须先查询原成交证据。没有成交时不创建冲正；已有成交时查询稳定冲正身份并确认是否完成，未完成才按业务资格处理。原交易、冲正交易和后续独立交易的身份由 SPP 的参与者事实明确给出。不能由公共框架推导银行冲正资格，也不能把保留原成交称为技术回滚失败。
+Recovery first queries original settlement evidence. If absent, create no reversal. If present, query the stable reversal identity and confirm whether reversal already completed; only incomplete work proceeds through eligibility checks. SPP participant facts explicitly identify original, reversal, and later independent transactions. The public framework must not infer bank eligibility; retaining original settlement is not a technical rollback failure.
 
-恢复资格拒绝后，保留原成交和后续业务，记录恢复失败。重试恢复只调用恢复服务，不能重新执行存款。恢复已成交但完成记录不可写时，必须可查询实际冲正成交，再作结果确认；不能另造冲正身份重复扣减。
+If recovery eligibility is rejected, preserve original and later business and record recovery failure. Retrying recovery invokes only recovery services, never deposits again. If recovery settled but its completion record could not be written, query the actual reversal and confirm it. Do not invent another identity and deduct twice.
 
-## 已确认的能力与缺口
+## Confirmed capabilities and gaps
 
-已有 SPP 显式 Saga/Quantum 模式、场景调用、参与者构造与复制、条件、失败事实捕获、显式重抛、查询响应绑定。已有 APP `compensate(target)` 声明和公共参与者按源调用参数执行目标，银行存款与现金冲正已有完整源实现。
+Existing facilities included explicit Saga/Quantum modes, scenario calls, participant construction/copy, conditions, failure-fact capture, explicit rethrow, and query response binding. APP already provided `compensate(target)`; generic participants invoked the target with source-call arguments. Bank deposit and cash reversal already had complete source implementations.
 
-迁移前语义检查只允许本地原子更新恢复目标，须声明本地事务模式或资源。现已扩展为也接受本地完整场景：目标必须自身在SPP声明或委托给拥有显式本地事务的源场景，保持参数兼容与禁止嵌套恢复链检查。完整现金冲正是场景：先查询与校验，再构造反向计划，最后进入显式 Quantum 提交。不能用没有实际逻辑的原子服务包装它来绕过目标检查。
+Before migration, semantic checks accepted only local atomic-update recovery targets with local transaction mode or resources. They were extended to complete local scenarios, provided the target itself declared an SPP local transaction or delegated to a source scenario with one. Parameter compatibility and prohibition of nested recovery chains remained. Complete cash reversal queries/checks facts, builds an inverse plan, then enters explicit Quantum submission. A meaningless atomic wrapper must not bypass target validation.
 
-需要完善通用场景恢复目标的语义、参数兼容检查与生成，验证公共调用正确传入原参与者。恢复目标的本地事务必须在其 SPP 中声明；APP 绑定不能隐藏整笔事务。继续拒绝缺失目标、自我恢复、重复目标、不兼容参数、非法嵌套恢复链等原有错误。是否还需恢复证据目录、日志读取及日志故障注入扩展，以实际生成和运行核查为准。
+Generic scenario-target semantics, argument compatibility, generation, and actual propagation of original participants required verification. Recovery's local transaction belongs explicitly in SPP, not hidden by an APP binding. Missing targets, self-recovery, duplicate targets, incompatible arguments, and invalid nested chains remain errors. Any recovery-catalog, journal-read, or journal-fault extensions were to be determined from generated/runtime evidence.
 
-公共默认参与者会对已开始执行的节点发起恢复调用，因此“是否真正成交”必须由业务恢复场景查询判断；不能凭 Java 回调中的布尔值决定。公共日志的完成/失败表示调用结果，不能代替银行成交证据。需要持久恢复事实时使用源声明的角色、查询/更新服务及 APP/PHY 存储配置。
+The default generic participant invokes recovery for nodes that started execution. Therefore business recovery must query whether settlement actually happened; a Java callback boolean cannot decide this. Generic journal success/failure describes call results, not bank settlement evidence. Persistent recovery facts use declared Roles, query/update services, and APP/PHY storage.
 
-## 实施顺序与独立验收
+## Implementation order and independent acceptance
 
-1. 在通用编译器及运行测试中，用与银行无关的业务模型验证完整场景恢复绑定、参数、嵌套本地事务和主异常保留；不引入银行名称或公式。
-2. 用 SPP 声明存款节点、后续节点、业务恢复和稳定身份；APP/PHY 仅绑定实现、资源与存储。
-3. 无后续失败：存款只成交一次，没有冲正。
-4. 后续失败：原成交仍可查询；反向交易只撤销该笔增量，后续独立存入仍保留。
-5. 节点没有本地成交：不生成反交易，不产生逆向分录。
-6. 恢复资格拒绝：原成交保留，恢复失败有记录，没有伪造的成功补偿。
-7. 资格恢复后显式重试：使用同一冲正身份，可再次确认结果；原存款不重执行，分录和余额不重复变化。
-8. 业务恢复已成交而完成记录失败：查询实际冲正确认结果，随后重试仍只保留一份成交和分录。
-9. 完整源运行通过后删除对应旧测试；最终与所有其他责任一起删除主 Java，并在 clean 生成目录核对无旧字节码残留。
+1. Verify complete-scenario recovery bindings, parameters, nested local transactions, and primary-failure preservation in generic compiler/runtime tests using a non-bank model; introduce no bank names/formulas.
+2. Declare deposit nodes, later nodes, business recovery, and stable identities in SPP. APP/PHY binds only implementations, resources, and storage.
+3. No later failure: one deposit settlement, no reversal.
+4. Later failure: original settlement remains queryable; inverse removes only its increment and preserves a later independent deposit.
+5. No local settlement: no inverse transaction or inverse entries.
+6. Recovery eligibility rejection: original settlement remains, failure is recorded, no fabricated successful compensation.
+7. Explicit retry after eligibility is restored: reuse the same reversal identity and confirm outcomes; do not reexecute deposit or duplicate balance/entry changes.
+8. Recovery settled but completion recording failed: query actual reversal, then retry with only one settlement/entry set.
+9. Delete corresponding old tests only after source execution passes. Ultimately remove main Java with other migrated responsibilities and inspect a clean generation directory for residual bytecode.
 
-这些案例属于单数据库参考 demo 的业务恢复验证。跨数据库/跨服务生产部署需各 PHY 实现提供其事务保障，不能从本地参考运行推断分布式保障已验证。
+These are business-recovery checks in a single-database reference demo. Cross-database/service production deployments require each PHY implementation's guarantees; local results do not prove distributed guarantees.
 
-## 实际责任接替证据
+## Actual responsibility handover evidence
 
-| 旧责任 | 源入口及独立事实 |
-|---|---|
-| 成功后不恢复 | cashSagaSuccessExampleRun：版本1/余额700、原八条分录、无冲正与恢复记录 |
-| 后续失败保留独立业务 | cashSagaLaterFailureExampleRun：原600和后续100均可查，冲正后余额200/版本3，三份八条分录各自平衡、原收费退款2、恢复Done |
-| 未成交不造反交易 | cashSagaAbsentCommitExampleRun：E1155、版本0/余额100，原/逆交易及分录均不存在，NotCommitted |
-| 资格拒绝保留成交 | cashSagaRejectedRecoveryExampleRun：实际冻结700、ES020，原余额700/版本2保持，没有冲正分录，主后续失败保留且附加ES020恰好一次，持久恢复Failed |
-| 独立恢复重试 | cashSagaRetryExampleRun：显式解冻后调用同一恢复源，最终版本4/余额100；第三次只查询确认，八条反向分录和原交易保持，Confirmed/attempts3 |
-| 成交后完成记录失败 | cashSagaCompletionFaultExampleRun：storeCashSagaRecoveryDone实际故障，冲正已成交版本2/余额100，QueryRequired及附加失败保留；再次查询确认，没有第二笔冲正，Confirmed/attempts2 |
+| Old responsibility | Source entry and independent facts |
+| --- | --- |
+| No recovery after success | cashSagaSuccessExampleRun: version 1/balance 700, original eight entries, no reversal/recovery record |
+| Later failure preserves independent activity | cashSagaLaterFailureExampleRun: original 600 and later 100 remain queryable; reversal leaves balance 200/version 3; three separate balanced eight-entry sets; original fee refund 2; recovery Done |
+| No inverse without settlement | cashSagaAbsentCommitExampleRun: E1155, version 0/balance 100; no original/inverse transaction or entries; NotCommitted |
+| Rejected recovery preserves settlement | cashSagaRejectedRecoveryExampleRun: actual freeze 700, ES020; original balance 700/version 2 retained; no reversal entries; primary later failure retained with ES020 appended exactly once; persisted Failed |
+| Independent recovery retry | cashSagaRetryExampleRun: after explicit unfreeze, invoke the same recovery source; final version 4/balance 100; third call only queries/confirms; eight inverse entries and original transaction retained; Confirmed/attempts3 |
+| Completion-record failure after settlement | cashSagaCompletionFaultExampleRun: actual storeCashSagaRecoveryDone fault; reversal settled at version 2/balance 100; QueryRequired and secondary failure retained; next query confirms with no second reversal; Confirmed/attempts2 |
 
-六类通过的完整日志 /tmp/spp-source-saga-runtime-evidence-validation.log，JSON/Markdown为各入口名文件。现金恢复使用完整XBOD源资格、日期、收费、反向计算和显式Quantum提交，已替代旧Java金融组件包装的六项行为责任。源持久恢复状态由CashSagaRecoveryRecord描述，不宣称复刻旧ExplicitSagaStep的内部状态名或回调接口。通用恢复目录现已对齐：从已注册本地服务及生成事务调用目录确认SPP场景本地边界，有有效本地恢复绑定时标明BUSINESS拥有的SPP_DECLARED_SCENARIO恢复，不要求对象快照或声称适配器自动量子反向；缺少已注册恢复目标时保持RECOVERY_OPEN。三项新目录案例与完整appframe536项JUnit通过，日志 /tmp/spp-scenario-recovery-catalog-framework-validation.log；银行83入口亦实际通过。单数据库参考验证也不证明跨服务生产保障。
+Historical full log: `/tmp/spp-source-saga-runtime-evidence-validation.log`; JSON/Markdown files use each entry's name. Cash recovery uses complete XBOD eligibility, dates, fees, inverse calculations, and explicit Quantum submission, replacing the six responsibilities formerly wrapped by Java financial components. CashSagaRecoveryRecord declares persistent recovery states; it does not claim to reproduce old ExplicitSagaStep internal state names or callback interfaces.
+
+The generic recovery catalog was aligned: registered local services and generated transaction-call catalogs establish a scenario's local SPP boundary. A valid local recovery binding reports BUSINESS-owned SPP_DECLARED_SCENARIO recovery without requiring object snapshots or claiming automatic adapter quantum inversion. A missing registered recovery target retains RECOVERY_OPEN.
+
+Three new catalog cases and all 536 appframe JUnit tests passed; log: `/tmp/spp-scenario-recovery-catalog-framework-validation.log`. All 83 bank entries also passed at that later checkpoint. These remain single-database reference results, not cross-service production guarantees or fresh results from this translation.

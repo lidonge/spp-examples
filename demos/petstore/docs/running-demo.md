@@ -1,29 +1,48 @@
-# 构建与运行
+# Build and run
 
-需要JDK17、Maven及项目依赖。仓库根目录：
+Use JDK 17, Maven and installed SDK dependencies. From the examples directory
+(the directory containing its root `pom.xml`):
 
 ```bash
 mvn -pl :petstore-demo -am package -DskipTests
 ./demos/petstore/run-demo.sh web
 ```
 
-网页默认http://127.0.0.1:8086。允许局域网访问：
+The default web address is http://127.0.0.1:8086. To allow LAN access:
 
 ```bash
 SPP_WEB_HOST=0.0.0.0 ./demos/petstore/run-demo.sh web
 ```
 
-SPP_WEB_PORT可改端口。已完成构建时可设置SPP_DEMO_SKIP_BUILD=1跳过重复构建。网页脚本默认构建生产代码和测试代码，但跳过测试执行。
+Use SPP_WEB_PORT to change the port and SPP_DEMO_SKIP_BUILD=1 to reuse an existing
+build. The web script normally compiles production and test code while skipping
+test execution. This demonstration server does not provide production access
+control; expose it only to a trusted test network.
 
-脚本运行公共GeneratedWebServer，加载APP web目录、PHY资源和生成服务。默认持久化数据库在demos/petstore/target/petstore；重启保留数据，mvn clean会删除该目录。SPP_PETSTORE_JDBC_URL可指定其他H2地址。
+The script runs public GeneratedWebServer, loading APP web catalogs, PHY resources
+and generated services. The default persistent database is under
+`demos/petstore/target/petstore`. Restart retains data; `mvn clean` deletes that
+directory. SPP_PETSTORE_JDBC_URL selects another H2 URL.
 
-APP 的 `web start` 自动执行客户域、产品域和商店初始化，首次提供商户、四件商品及对应库存、供应和结算记录；已有记录不会在重启时重复灌入。页面上预填的客户资料不是已注册账号，购物客户仍须点击 Register 注册。账户余额和可售库存初始为零，充值、入库步骤见下文。
+APP `web start` initializes customer, product and shop domains, initially creating
+the merchant, four products and corresponding stock/supply/settlement records.
+Existing records are not reseeded on restart. Prefilled customer details are not
+registered accounts: click Register to register a shopper. Balances and available
+stock start at zero; funding and stock receipt are separate steps below.
 
-局域网 HTTP 下浏览器可能不提供 `crypto.randomUUID()`，网页以 `crypto.getRandomValues()` 生成请求流水号。修改页面脚本后可用 Ctrl+F5 刷新缓存。
+Over LAN HTTP, browsers may lack `crypto.randomUUID()`; the UI uses
+`crypto.getRandomValues()` to generate request serials. Ctrl+F5 refreshes cached
+scripts after changes.
 
-## Java验收
+The default build uses the basic SDK. Missing optional enhancements emit compiler
+warnings: serial headers alone do not provide replay or duplicate suppression
+without a coordination provider. Do not retry financial commands blindly after
+an uncertain response. The optional `-Penhanced` Maven profile requires separately
+supplied enhanced artifacts; it is not needed to build the basic example.
 
-以下命令会实际执行测试，仅在需要回归时使用：
+## Java acceptance
+
+These commands execute tests; use them when regression execution is intended:
 
 ```bash
 ./demos/petstore/run-demo.sh examples
@@ -31,18 +50,56 @@ APP 的 `web start` 自动执行客户域、产品域和商店初始化，首次
 mvn -pl :petstore-demo -am test -Dtest=PetstoreScenarioTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-examples保留为脚本命令名称，内部已改为JUnit，不执行APP examples或GeneratedExampleRunner。28个测试方法位于src/test/java；默认独立内存数据库，不操作网页数据库。持久化重启测试启动两个独立子JVM并使用专用临时文件数据库。
+`examples` remains the script command name but now invokes JUnit, not APP examples
+or GeneratedExampleRunner. Tests live under `src/test/java` and normally use
+independent in-memory databases, not the web database. Persistence restart tests
+launch two independent child JVMs against dedicated temporary file databases.
+The earlier document's 28-method count was a historical inventory, not a fixed
+current test total.
 
-生产生成Java、SQL/OpenAPI与目录仍在target；测试编译结果在target/test-classes，JUnit执行报告在target/surefire-reports。旧target/spp-examples/evidence是历史APP验收证据，不代表当前测试结果。覆盖与测试边界见[Java验收](java-tests.md)。
+Generated production Java, SQL/OpenAPI and catalogs stay under target; compiled
+tests are in `target/test-classes`, and JUnit reports in
+`target/surefire-reports`. Old `target/spp-examples/evidence` contains historical
+APP acceptance evidence, not current test results. See [Java acceptance](java-tests.md)
+for coverage and boundaries.
 
-浏览器请求流水号回归可运行 `node --test demos/petstore/src/test/browser/RequestIdTest.cjs`。安装 Playwright 并准备独立测试数据库后，`SPP_DEMO_URL=http://<局域网IP>:8089 node demos/petstore/src/test/browser/PetstoreLanCartRegression.cjs` 验证 HTTP 兼容、注册、充值、入库、添加两个不同商品及下单；该流程会写入测试客户和订单，不应指向正在手工使用的数据库。
+Browser request-serial regression:
+`node --test demos/petstore/src/test/browser/RequestIdTest.cjs`.
+With Playwright installed and an independent test database prepared, run:
 
-## 当前需求与设计核对方式
+```bash
+SPP_DEMO_URL=http://<LAN-IP>:8089 node demos/petstore/src/test/browser/PetstoreLanCartRegression.cjs
+```
 
-本轮执行test-compile -DskipTests：编译生产源码和Java测试，但不执行任何回归、HTTP业务或浏览器流程。生成成功及测试编译成功均不代表运行验收通过。其他模块中的旧嵌套场景尚未迁移。
+It checks HTTP compatibility, registration, funding, stock receipt, adding two
+different products and ordering. It writes test customers/orders; do not point it
+at a database currently used for manual work.
 
-## 新模型与旧数据
+## Historical requirements/design checkpoint
 
-当前模型移除了通用命令、技术业务字段及集合包装，修改了键、外键投影和聚合快照。原 target/petstore 数据库已保留，未自动迁移。运行新版请指定独立数据库，例如 SPP_PETSTORE_JDBC_URL='jdbc:h2:file:/tmp/spp-petstore-new-model'；不要用 clean 清除旧数据，也不要把旧快照直接当成新模型验收。本文运行命令未在本轮执行。
+The original phase ran `test-compile -DskipTests`: production and Java tests
+compiled, but no regression, HTTP business flow or browser workflow executed.
+Generation/test compilation alone did not establish runtime acceptance. At that
+checkpoint old nested scenarios in other modules had not been migrated. This is
+historical scope from revision `417a41f`, not a description of every later run.
 
-新演示库启动后余额和库存均为零：先注册买家，再点击“第三方结算充值”（示例金额 5000），点击“从供应来源入库”（示例每商品 10）。注册、充值、入库为独立场景，后两者有明确的负向来源账户，守恒入账；重新启动不自动重复充值或入库。
+## New model and old data
+
+The model removed generic commands, technical business fields and collection
+wrappers, changing keys, foreign-key projections and aggregate snapshots.
+The old target/petstore database was preserved, not automatically migrated.
+Use an independent database, for example:
+
+```bash
+SPP_PETSTORE_JDBC_URL='jdbc:h2:file:/tmp/spp-petstore-new-model' ./demos/petstore/run-demo.sh web
+```
+
+Do not clean away old data or treat old snapshots as new-model acceptance.
+The original document did not claim its run commands had been executed during
+that documentation phase.
+
+A new demo database starts with zero balances and stock. Register a buyer, fund
+from third-party settlement (example amount 5000), then receive from supply
+(example quantity 10 per product). Registration, funding and stock receipt are
+independent scenarios. The latter two have explicit negative source accounts
+and conserved transfers. Restart does not automatically repeat them.

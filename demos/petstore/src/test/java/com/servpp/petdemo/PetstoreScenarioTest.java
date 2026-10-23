@@ -324,9 +324,15 @@ public class PetstoreScenarioTest {
     @Test public void idempotencyExample() {
         Session session = order("REPLAY", "2", false);
         Map<String, Object> command = session.command("Pay", "PAY");
-        JsonNode first = shop.command("payShopOrder", command), replay = shop.command("payShopOrder", command);
-        assertEquals(first.path("receipt"), replay.path("receipt"));
-        assertTrue(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+        JsonNode first = shop.command("payShopOrder", command);
+        if (com.servpp.service.idempotency.BusinessIdempotencyManager.isAvailable()) {
+            JsonNode replay = shop.command("payShopOrder", command);
+            assertEquals(first.path("receipt"), replay.path("receipt"));
+            assertTrue(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+        } else {
+            reject("ORDER_NOT_PAYABLE", () -> shop.command("payShopOrder", command));
+            assertFalse(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+        }
         money(session, "4932.20", "67.80");
     }
 
@@ -335,6 +341,14 @@ public class PetstoreScenarioTest {
         JsonNode first = com.servpp.service.runtime.InvocationContext.remote(
                 com.servpp.service.runtime.InvocationContext.Origin.USER, "browser", "click-one",
                 () -> shop.command("payShopOrder", session.command("Pay", "PAY-ONE")));
+        if (!com.servpp.service.idempotency.BusinessIdempotencyManager.isAvailable()) {
+            reject("ORDER_NOT_PAYABLE", () -> com.servpp.service.runtime.InvocationContext.remote(
+                    com.servpp.service.runtime.InvocationContext.Origin.USER, "browser", "click-two",
+                    () -> shop.command("payShopOrder", session.command("Pay", "PAY-TWO"))));
+            assertFalse(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+            money(session, "4932.20", "67.80");
+            return;
+        }
         JsonNode replay = com.servpp.service.runtime.InvocationContext.remote(
                 com.servpp.service.runtime.InvocationContext.Origin.USER, "browser", "click-two",
                 () -> shop.command("payShopOrder", session.command("Pay", "PAY-TWO")));
@@ -345,8 +359,14 @@ public class PetstoreScenarioTest {
 
     @Test public void requestCollisionExample() {
         Session session = shop.openStore("COLLISION", false); shop.setQuantity(session, "FOOD", "2", "CART");
-        reject("REQUEST_ID_REUSED", () -> shop.setQuantity(session, "FOOD", "3", "CART"));
-        amount(shop.cart(session).path("lines").get(0).path("quantity"), "2");
+        if (com.servpp.service.idempotency.BusinessIdempotencyManager.isAvailable()) {
+            reject("REQUEST_ID_REUSED", () -> shop.setQuantity(session, "FOOD", "3", "CART"));
+            amount(shop.cart(session).path("lines").get(0).path("quantity"), "2");
+        } else {
+            shop.setQuantity(session, "FOOD", "3", "CART");
+            assertFalse(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+            amount(shop.cart(session).path("lines").get(0).path("quantity"), "3");
+        }
     }
 
     @Test public void rollbackRetryExample() {
@@ -377,7 +397,8 @@ public class PetstoreScenarioTest {
         }
         JsonNode orders = shop.orders(session);
         assertEquals(1, orders.size()); assertEquals("UNPAID", orders.get(0).path("status").asText()); stock(session, "38", "2", "0");
-        reject("REQUEST_RECOVERY_REQUIRED", () -> shop.place(session, "ORDER"));
+        reject(com.servpp.service.idempotency.BusinessIdempotencyManager.isAvailable()
+                ? "REQUEST_RECOVERY_REQUIRED" : "EMPTY_CART", () -> shop.place(session, "ORDER"));
         assertEquals(1, shop.orders(session).size());
         // A durable business query resolves the fact; a technical recovery workflow is still required
         // before replaying an attempt whose response was not atomically recorded with its last commit.
@@ -524,8 +545,14 @@ public class PetstoreScenarioTest {
             amount(item.path("available"), "10"); amount(item.path("reserved"), "0");
         }
         JsonNode replay = shop.execute("reserveShopPet", retry);
-        assertTrue(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
-        assertEquals(number, replay.path("agreement").path("reservationNumber").asText());
+        if (com.servpp.service.idempotency.BusinessIdempotencyManager.isAvailable()) {
+            assertTrue(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+            assertEquals(number, replay.path("agreement").path("reservationNumber").asText());
+        } else {
+            assertFalse(com.servpp.service.idempotency.BusinessIdempotencyManager.wasReplay());
+            assertNotEquals(number, replay.path("agreement").path("reservationNumber").asText());
+            assertEquals("REJECTED", replay.path("agreement").path("status").asText());
+        }
         assertEquals(resultInfo, replay.path("agreement").path("resultInfo"));
     }
 

@@ -1,41 +1,43 @@
 # Conserved opening and transfer regression — 2026-10-12
 
-本页记录资金/库存守恒回归时的实现状态；后续 KI-003 已由 [分库零记录技术恢复](quantum-opening-recovery.md) 完善，旧“残留零地址待处理”描述保留为当时的历史记录。
+This is a historical implementation/verification record, not a fresh test run. KI-003 was subsequently addressed by [cross-store zero-record technical recovery](quantum-opening-recovery.md). References to residual zero addresses below describe the state at that time.
 
-本轮 Goal 延续回归，先修正业务模型：开户零余额，库存零初值，第三方结算账户/库存供应来源也从零开始；独立充值及入库场景按双边增减守恒成交，来源 bounds 不设下限。没有手写业务 Java。
+The regression goal first corrected the business model: account opening and inventory start at zero; third-party settlement accounts and stock-supply sources also start at zero. Separate funding and stock-receipt scenarios settle conserved two-sided changes, with no lower bound on source balances. No handwritten business Java was added.
 
-旧 KI-001 的描述归因不准确：原注册直接赋 5000、开店直接赋 10 库存，是业务模型混入非零入账。新模型用普通服务建立零参与者、量子服务转入非零余额/库存，不通过将注册伪装为技术启动初始化绕行。框架零事实建立采用 missing-only，不产生量子交易流水，已有值不覆盖；分库失败残留零地址的生命周期仍单独记录，不承诺开户跨库强原子性。
+Old KI-001 had an inaccurate diagnosis: directly granting 5000 at registration and 10 stock at shop creation mixed nonzero funding into opening. The new model uses ordinary services to establish zero participants and quantum services for nonzero transfers, rather than disguising registration as technical startup initialization. Framework zero-fact creation is missing-only, creates no quantum transaction entries, and never overwrites existing values. Residual zero-address lifecycle after cross-store failure was tracked separately; cross-store atomic opening was not promised.
 
-实施证据：SPP 新增 SettlementAccount、StockSupply、WalletFundingAgreement、StockReceiptAgreement、fundShopWallet/receiveShopStock。APP 定义主键及 web 暴露、防重；PHY 沿用既有统一量子系统。浏览器与 Java 测试组合独立生成场景，无自动注册赠款。编译器默认共享资源不再要求相同属性集合，推导守恒组与显式固定属性契约分开；显式冲突测试保留。
+Implementation evidence: SPP added SettlementAccount, StockSupply, WalletFundingAgreement, StockReceiptAgreement, fundShopWallet, and receiveShopStock. APP declared primary keys, web exposure, and duplicate protection; PHY retained the existing unified quantum system. Browser and Java tests composed independently generated scenarios without automatic registration grants. Compiler default shared resources no longer required identical property sets: inferred conservation groups were separated from explicit fixed-property contracts, with explicit-conflict tests retained.
 
-验收路径：develop 生成与全部 Petstore 场景（含零开户、来源负值及每笔流水守恒）、框架/语言/生成器/Seata 回归、中文网页；testing 重新生成，三个 JVM 独立数据库启动、完整网页及重启。所有测试使用隔离库，现有常驻演示服务与数据库不改动。未决问题登记 known issue 后继续独立验证，不 block。
+Acceptance covered develop generation and all Petstore scenarios, including zero opening, negative sources, and per-transaction conservation; framework/language/generator/Seata regressions; and the Chinese-language UI. Testing was regenerated and checked with three JVMs, independent databases, the complete UI, and restart. All used isolated stores, leaving resident demo services/databases untouched. Open issues were recorded while independent verification continued.
 
-当前状态：实现与 develop/testing 回归已完成；未决技术生命周期及补偿议题保留在 known issues，不阻塞本轮验收。
+At completion, implementation and develop/testing regressions passed. Technical-lifecycle and compensation questions remained in known issues without blocking this acceptance.
 
-## 已取得证据
+## Evidence obtained
 
-独立新测试 zeroOpeningAndExternalTransfersAreConserved 通过：零开户、零库存；独立充值后钱包 5000、结算来源 -5000；独立入库后可售 10、来源 -10；逐 transaction_id 汇总量子流水增减为零；非法充值/入库不改变成交事实。日志 `/tmp/spp-conserved-transfer-test.log`，BUILD SUCCESS。
+The new zeroOpeningAndExternalTransfersAreConserved test passed: zero account/inventory opening; independent funding leaves wallet 5000 and settlement source -5000; independent receipt leaves available stock 10 and supply source -10; quantum deltas grouped by transaction_id sum to zero; invalid funding/receipt preserves settlement facts. Log: `/tmp/spp-conserved-transfer-test.log`, BUILD SUCCESS.
 
-采用现有跨域外观声明 `atomic update receiveInventory(...)` 自动绑定 inventory 域实际 `quantum update` 实现，避免将外观错误地声明为本域空量子实现。真实 develop Chrome 完整流程（显式零开户→充值→入库→购物/支付/履约/退款/取消/预约及英文目录）通过，pageErrors=[]，日志 `/tmp/spp-bootstrap-develop-8dq0k4hk/browser.log`，服务已停止。早期生成及第一次网页失败日志只作诊断，不作为通过证据。
+The existing cross-domain facade declaration `atomic update receiveInventory(...)` automatically bound the inventory domain's real `quantum update` implementation, avoiding a wrongly declared empty local quantum implementation. The real develop Chrome flow passed: explicit zero opening → funding → stock receipt → shopping/payment/fulfillment/refund/cancellation/reservation, plus the English catalog. pageErrors=[]; log: `/tmp/spp-bootstrap-develop-8dq0k4hk/browser.log`. Test services stopped. Early generation and initial UI failure logs were diagnostic only, not passing evidence.
 
-联合回归 `mvn -fae -pl petstore-demo,appframe-seata -am test -Dspp.environment=develop` 最终 BUILD SUCCESS：lang 340、appframe 579、generator 105、appframe-seata 20、Petstore 34，共 1078 项全部通过，无失败/错误/跳过。日志 `/tmp/spp-conserved-reactor.log`。包含所有原场景及新增零开户/外部双边转入验收。
+Combined regression `mvn -fae -pl petstore-demo,appframe-seata -am test -Dspp.environment=develop` ended BUILD SUCCESS: lang 340, appframe 579, generator 105, appframe-seata 20, Petstore 34; total 1,078 passed, no failures/errors/skips. Log: `/tmp/spp-conserved-reactor.log`. This included existing scenarios and new zero-opening/external two-sided-transfer acceptance.
 
-最新版 develop Chrome 网页再次通过，补充断言注册钱包 0、结算来源 -5000、各商品入库后可售 10、库存供应来源 -10，随后完成原购物/退款/预约流程，pageErrors=[]。日志 `/tmp/spp-bootstrap-develop-mhlx8i3_/browser.log`；测试服务已停止。
+The latest develop Chrome UI passed again with additional assertions: registered wallet 0, settlement source -5000, each received product's available stock 10, and supply source -10, followed by the original shopping/refund/reservation flow. pageErrors=[]; log: `/tmp/spp-bootstrap-develop-mhlx8i3_/browser.log`. Test services stopped.
 
-## testing 分库阶段
+## Testing-profile separate stores
 
-`mvn -pl :petstore-demo -am package -DskipTests -Dspp.environment=testing` BUILD SUCCESS，日志 `/tmp/spp-conserved-testing-package.log`，只表示生成/编译/打包。首次 testing 验证 `/tmp/spp-bootstrap-testing-ol4gdd43` 三 JVM 及重启全部就绪，零开户、结算充值及供应入库通过，已解除旧 KI-001；下单因 `Undefined repository property lineNumber on java.util.LinkedHashMap` 失败。停机后只读量子库证实钱包 5000、结算 -5000、现金 0；每商品所有库存及来源合计 0，每笔量子流水合计 0。证据 ledger-audit.log。
+`mvn -pl :petstore-demo -am package -DskipTests -Dspp.environment=testing` ended BUILD SUCCESS, proving generation/compilation/packaging only. Log: `/tmp/spp-conserved-testing-package.log`. The first testing run, `/tmp/spp-bootstrap-testing-ol4gdd43`, started three JVMs and restarted successfully. Zero opening, settlement funding, and stock receipt passed, resolving old KI-001. Ordering failed with `Undefined repository property lineNumber on java.util.LinkedHashMap`. Read-only quantum-store inspection after shutdown showed wallet 5000, settlement -5000, cash 0; inventory plus source summed to zero for every product, and each transaction's quantum deltas summed to zero. Evidence: ledger-audit.log.
 
-该下单错误是通用仓储访问器不支持 JSON 快照 Map，并非新的 SPP 业务规则：访问器现支持嵌套 Map 与省略的 nullable 字段，普通 Java 对象仍对不存在属性报错。新增 ObjectPropertyAccessTest 验证该行为，appframe 全套 580 项通过，日志 `/tmp/spp-conserved-map-appframe.log`。后续 testing 完整网页已通过，见下文。
+The order error came from generic repository property access lacking JSON-snapshot Map support, not a new SPP business rule. Property access gained nested Map and omitted nullable-field support, while ordinary Java objects still reject nonexistent properties. New ObjectPropertyAccessTest covered this behavior; all 580 appframe tests passed. Log: `/tmp/spp-conserved-map-appframe.log`. The later complete testing UI passed as recorded below.
 
-第二次 testing 的编号 setter 错误进一步证明问题根因是跨域属性回填只用 raw List 类型，使 `ShopOrder.lines` 元素退化为 LinkedHashMap（develop 在入库更新前已经保存明细，testing 量子先执行使错误暴露）。LocalDomainServices 现依据 setter 泛型构造 JavaType 回填，量子延迟回填回调也使用相同类型。新增 LocalDomainCollectionFactsTest 通过，appframe 全套 581 项通过，日志 `/tmp/spp-conserved-generic-appframe.log`。没有给业务编号逻辑补上 Map setter 来绕过泛型错误。
+A second testing run's identifier-setter error exposed the deeper cause: cross-domain property backfill used raw List types, degrading ShopOrder.lines elements to LinkedHashMap. Develop saved details before inventory updates; testing executed quantum changes first and exposed the problem. LocalDomainServices now derives JavaType from setter generics, including deferred quantum-backfill callbacks. New LocalDomainCollectionFactsTest and all 581 appframe tests passed. Log: `/tmp/spp-conserved-generic-appframe.log`. No business identifier Map-setter workaround was introduced.
 
-最终 testing 实测目录 `/tmp/spp-bootstrap-testing-l5oqppgs`：customerService/productService/petstore 三个独立 JVM、四个隔离 H2 文件库（customer/product/shop/ledger）；完整 Chrome 网页通过（含来源余额与零开户断言），pageErrors=[]，商店停机再启动 readiness=true。全部测试进程已停止。旧 KI-001 已解决，无依赖步骤跳过；已有未决技术生命周期和补偿议题继续留在 known issues。
+Final testing evidence: `/tmp/spp-bootstrap-testing-l5oqppgs`. Three independent JVMs—customerService/productService/petstore—and four isolated H2 file stores—customer/product/shop/ledger—passed the complete Chrome flow, including source-balance and zero-opening assertions, with pageErrors=[]. Shop restart reached readiness=true. All test processes stopped. Old KI-001 was resolved with no dependent steps skipped; technical-lifecycle and compensation questions remained documented.
 
-## 最终联合回归与守恒核对
+## Final combined regression and conservation audit
 
-最终联合回归（包含 Map 读取与泛型集合回填修复）`mvn -fae -pl petstore-demo,appframe-seata -am test -Dspp.environment=develop` BUILD SUCCESS：lang 340、appframe 581、generator 105、appframe-seata 20、Petstore 34，共 1080 项全部通过，失败/错误/跳过均为 0。日志 `/tmp/spp-conserved-final-reactor.log`。
+The final combined regression, including Map reads and generic collection backfill fixes, used `mvn -fae -pl petstore-demo,appframe-seata -am test -Dspp.environment=develop` and ended BUILD SUCCESS: lang 340, appframe 581, generator 105, appframe-seata 20, Petstore 34; total 1,080 passed with zero failures/errors/skips. Log: `/tmp/spp-conserved-final-reactor.log`.
 
-testing 停机重启之后，以只读方式核对隔离量子库：钱包＋经营者现金＋第三方结算余额合计为 0；每个 SKU 的可售＋预留＋已售＋供应来源合计为 0；每个 transaction_id 的流水增减合计为 0。全部通过，证据 `/tmp/spp-bootstrap-testing-l5oqppgs/ledger-audit.log`。
+After testing shutdown/restart, read-only isolated quantum-store checks passed: wallet + operator cash + third-party settlement balances sum to zero; available + reserved + sold + supply-source stock sums to zero for each SKU; deltas sum to zero for each transaction_id. Evidence: `/tmp/spp-bootstrap-testing-l5oqppgs/ledger-audit.log`.
 
-最终 develop 生成产物再执行一次完整 Chrome 流程也通过，浏览器 exit=0，日志 `/tmp/spp-bootstrap-develop-14zgz50m/browser.log`；测试服务已停止。文档 worktree `docs/writing` 于最后验收前复制了当前 Markdown 快照，之后的回归记录仅更新主目录，以免覆盖用户文档编辑。
+A final complete Chrome flow against regenerated develop artifacts also passed with browser exit=0. Log: `/tmp/spp-bootstrap-develop-14zgz50m/browser.log`; test services stopped. The docs/writing worktree received a Markdown snapshot before final acceptance. Subsequent regression records were updated only in the main directory to avoid overwriting the user's documentation edits.
+
+Commands and paths above are historical evidence from the earlier repository layout, not current build instructions.

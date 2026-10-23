@@ -1,23 +1,67 @@
 # Petstore known issues
 
-未决问题不将回归 Goal 标记 blocked；继续独立验证，保留失败证据与影响范围。不能将跳过的验证记为通过。
+Unresolved issues do not by themselves block independent regression work.
+Continue verification while preserving failure evidence and scope. Skipped
+verification must not be reported as passed. The evidence below records the
+implementation stage captured in revision `417a41f`, not tests rerun for this
+English translation.
 
-## KI-001：注册场景混入非零资金入账（已解决）
+## KI-001: Nonzero funding mixed into registration (resolved)
 
-原场景注册直接赋钱包 5000、开店直接赋库存 10，把维护与资金/货物入账混在一起；早期记录把它归因为量子初值资源协调缺口，归因已修正。
+Originally registration directly assigned wallet 5000 and opening a shop assigned
+stock 10, mixing maintenance with money/goods intake. Earlier attribution to a
+quantum-initial-value resource-coordination gap was corrected.
 
-现开户/角色准备全部为零；独立充值从零起始的 SettlementAccount 转出，独立入库从零起始的 StockSupply 转出，来源 bounds 不设下限，双边量子成交守恒。框架支持不覆盖已有值的零事实建立。testing 三 JVM 的注册、充值、入库、完整购物/退款/预约流程与重启通过，pageErrors=[]；证据 `/tmp/spp-bootstrap-testing-l5oqppgs/browser.log`。新技术生命周期问题见 KI-003，不能把它与非零业务入账混同。
+Account/role preparation now starts at zero. Separate wallet funding transfers
+from a zero-initialized SettlementAccount; separate stock receipt transfers from
+a zero-initialized StockSupply. Source bounds have no lower limit; both-sided
+quantum settlement conserves the total. The framework establishes zero facts
+without overwriting existing values. The testing three-JVM registration, funding,
+stock receipt, complete shopping/refund/reservation flow and restart passed with
+`pageErrors=[]`. Evidence: `/tmp/spp-bootstrap-testing-l5oqppgs/browser.log`.
+The separate technical lifecycle issue is KI-003, not nonzero business funding.
 
-本轮还修复跨域集合回填泛型丢失导致 testing 下单失败的通用框架问题，详情见 [本轮回归](regression-2026-10-12-conserved-transfers.md)。
+This stage also fixed a generic framework issue where lost collection generic
+types during cross-domain hydration broke testing-environment order placement.
+See the [regression record](regression-2026-10-12-conserved-transfers.md).
 
-## KI-002：初始化重试范围
+## KI-002: Initialization retry scope
 
-当前支持启动时 missing-only insert 与量子初值补齐，已有普通事实和量子成交值不覆盖；已验证普通种子先成交、量子初值缺失的插入重试。任意旧库损坏的自动修复、并发初始化同一身份，以及查询先遇到缺失量子事实时的恢复流程尚未验证，不宣称提供通用数据库修复协议。
+Startup supports missing-only inserts and completion of quantum initial facts,
+without overwriting existing ordinary facts or settled quantum values.
+Retry after ordinary seeds committed but quantum initial facts were missing was
+verified. Automatic repair of arbitrary damaged databases, concurrent
+initialization of the same identity, and recovery when a query first encounters
+missing quantum facts remained unverified. This is not a generic database-repair
+protocol.
 
-## KI-003：分库零余额开户的技术恢复（已实现）
+## KI-003: Technical recovery for cross-database zero-balance opening (implemented)
 
-原实现会在角色所在库尚未提交时，向量子库提交零记录，角色插入后续失败可能留下孤立零记录。本轮改为本地角色插入、APP 表写入与技术待办一起提交；本地提交确认后，再创建远端零记录。全部封装在生成 CRUD 使用的通用运行时中，SPP 仍只调用 insertBuyer，不拆为两个业务步骤，也不要求业务补偿。
+Previously, zero records could commit in the quantum database before the role
+database committed. Later role-insert failure could leave orphan zero records.
+The revised flow jointly commits the local role insert, APP table write and
+technical pending task. Only after confirmed local commit does it create the
+remote zero record. This is entirely generic runtime behavior used by generated
+CRUD. SPP still invokes only `insertBuyer`; it neither splits opening into two
+business steps nor requires business compensation.
 
-同库使用原本地共同事务。分库失败恢复由技术待办表持久记录：本地回滚时角色与待办一起撤销，远端尚未创建；远端不可用或响应丢失时保留待办，运行时启动、参与者查询或显式技术恢复 API 重试补齐；远端成功后删除待办。重放只创建缺失零记录，不覆盖已有成交值，不产生量子交易流水。远端失败作为技术恢复待处理错误，零记录恢复不依赖业务反交易；场景其他服务仍遵从既有事务恢复规则。已有本地角色而远端未完成时不能宣称开户完整成功；本地持久记录用于恢复，不承诺分库瞬时原子提交。
+Same-database deployment retains the local joint transaction. Cross-database
+recovery persists a technical pending task: local rollback removes both role and
+task before any remote creation; remote unavailability or a lost response leaves
+the task for retry at runtime startup, participant query or explicit technical
+recovery API. Remote success removes the task.
 
-范围：当前内置 JDBC 普通仓储＋JDBC 量子库；不追溯清理旧版本已遗留的孤立零记录，不支持借本机制写非零业务初值。其他量子服务提供方需要按相同技术创建/重放协议实现，不能由 SPP 场景补偿替代。验证与机制见 [分库零记录技术恢复](quantum-opening-recovery.md)。
+Replay creates only missing zero records, does not overwrite settled values and
+creates no quantum transaction entries. Remote failure is a pending technical
+recovery error. Zero-record recovery does not depend on business reversal; other
+scenario services still follow their existing transaction recovery rules.
+A local role with incomplete remote initialization is not a fully successful
+opening. Local durable evidence supports recovery, not instantaneous atomic
+commit across databases.
+
+Scope is the built-in ordinary JDBC repository plus JDBC quantum store. This
+does not retroactively clean orphan zero records from older versions, nor permit
+nonzero business initial values through this mechanism. Other quantum providers
+must implement the same technical creation/replay protocol; SPP compensation is
+not a substitute. See [cross-database zero-record recovery](quantum-opening-recovery.md)
+for mechanism and verification.

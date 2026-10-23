@@ -1,75 +1,202 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 存入冲正的金融分量与业务政策
+# Financial components and business policy for deposit reversal
 
-> 当前现金政策已确认沿用 XBOD，见 [源码契约](cash-reversal-source.md)。下文较早阶段的通用金融组件及显式退费输入不是正式现金入口默认政策。
+> Cash policy was confirmed to follow XBOD; see the [source contract](cash-reversal-source.md).
+> Earlier generic financial components and explicit refund inputs below are not
+> formal cash-entry defaults. Pending-policy statements record earlier stages,
+> not renewed requests to choose policy.
 
-## 已确认分类对应的金额计划
+## Amount plans under the confirmed classification
 
-原交易成功后的冲正使用当前账户和原成交分量，是一笔新业务。describeOriginalDepositMovement 从原请求、原账户快照及已成交计划取得计息金额实际 delta、本金/两类利息实际偿还分量和透支敞口实际 delta；检查原金额等于计息金额 delta 加三类偿还。它不重新执行原偿还公式。
+Reversal after successful settlement is a new operation against current accounts
+and original settled components. describeOriginalDepositMovement derives actual
+interest-base delta, principal/two interest repayment components and exposure
+delta from original request, account snapshot and settled plan. It checks original
+amount equals interest-base delta plus the three repayments, without rerunning
+the original allocation formula.
 
-calculateDepositReversalAmounts 对当前金额应用原实际分量的相反数：计息金额减去原 delta、债务增加原偿还、透支敞口减去原 delta。当前冻结、授权和贷款状态不被恢复成旧值；可用余额按当前冻结和授权推导，净余额按反向后的金额关系推导。反向后的净余额应等于当前净余额减原存入金额。
+calculateDepositReversalAmounts applies opposite actual components to current
+amounts: subtract original interest-base delta, add repaid debt and subtract
+original exposure delta. Current frozen/authorized amounts and loan status are
+not restored to old values. Available balance derives from current freezes/
+authorizations; net balance derives from reversed amounts and must equal current
+net balance minus original deposit.
 
-这落实用户确认的量子类非覆盖语义。例如原余额 200、存入 10、后消费 100，当前余额 110；冲正原存入得到 100，而不是恢复成 200。后续存入、消费及贷款状态变化仍保留。本组件没有把所有数值字段自动归类为量子更新，也不提供开户/销户或其他生命周期的默认逆操作。
+This implements the confirmed non-overwriting quantum semantics. Initial balance
+200, deposit 10 and later spending 100 leave 110; reversing the deposit yields
+100, not 200. Later deposits/spending/status changes survive. The component does
+not automatically classify every numeric field as quantum or supply default
+account-opening/closure or lifecycle inverses.
 
-## 源码资格与差异
+## Source eligibility and differences
 
-KSADEP0:637 的冲正前置条件为当前可用余额覆盖原金额，或者账户允许透支且额度覆盖不足部分；不满足 ES020。4610 的新计息金额小于零为 EN249。4640 恢复债务后，计息金额与本金均为正且计息金额大于冻结金额时为 EN177。上述是业务资格，逆运算存在不等于必然获准执行。
+KSADEP0:637 requires current available balance to cover original amount, or allowed
+overdraft with sufficient limit for the shortfall; otherwise ES020.
+Section 4610 rejects negative new interest base with EN249. After restoring debt,
+4640 rejects simultaneous positive interest base/principal when interest base
+exceeds frozen amount with EN177. An algebraic inverse does not imply permission.
 
-对应共享服务为 checkDepositReversalCapacity/checkDepositReversalAccount，使用角色化的当前透支政策，不依赖数据库部署。prepareDepositReversalAmounts 先检验原分量和容量，计算金额计划，再检查净余额关系及结果资格。全部为计划，没有执行数据库更新。
+Shared checkDepositReversalCapacity/checkDepositReversalAccount use role-based
+current overdraft policy independently of deployment. prepareDepositReversalAmounts
+checks original components/capacity, calculates amounts, then checks net-balance
+relationships and result eligibility. These are plans, not database updates.
 
-原 4640 对 SA-OD-AMT 增加 KBN 原偿还本金；demo 的默认量子反交易则逆转原**实际敞口 delta**。当原敞口曾被 max(0,...) 截断时，二者可能不同：原敞口 5、偿还本金 10、成交敞口 0，demo 恢复 5，原语句增加 10。这里以已确认的“撤销实际原分量且不覆盖后续操作”为目标，记录遗留差异，不声称逐位银行等价。是否将敞口作为派生业务量另行重算，需要独立政策，不能默默用旧值覆盖。
+Original 4640 adds original KBN principal repaid to SA-OD-AMT. The generic quantum
+inverse instead reverses actual original exposure delta. They differ when
+max(0,...) clipped exposure: original exposure 5, principal repayment 10 and
+settled exposure 0 yield generic restoration 5, versus original-source addition
+10. The component targets reversal of actual components without overwriting
+later operations, explicitly recording this legacy difference rather than
+claiming bank equivalence. Recomputing exposure as a derived business amount
+requires separate policy; do not silently overwrite it with an old value.
 
-## 跨日、费用与非量子状态
+## Cross-date, fees and non-quantum state
 
-KSADEP0 的 4630 只从累计存款积数减 KBN-ADD-PRDT；正常当日起息存入的该分量来自回溯起息增量，不能把原正常期间积数全部视为原存入影响。4640 也没有重算所有后续普通、协定及透支积数。因此撤销金额与追溯撤销整个历史计息效果是两种不同业务政策。
+KSADEP0 section 4630 subtracts only KBN-ADD-PRDT from accumulated deposit product.
+For ordinary same-day-value deposits, this field originates in backdated-value
+adjustment; the entire original period product is not the deposit's reversible
+effect. Section 4640 also does not recompute all later ordinary/agreement/overdraft
+products. Monetary reversal and retroactively reversing all historical interest
+effects are different business policies.
 
-已向用户提出两项决策：跨日是当日反交易并保留此前积数，还是追溯撤销成交后的计息影响；退费是使用显式政策，还是本 demo 全额退实际原收费。前者若选择追溯，在单位量化和协定分档下不能简单使用“原金额×天数”，需要分期间重新计算差额。收费是另一个业务分量，不因存款核心可以反向而推断必然退费。
+Earlier proposals asked whether cross-date reversal should preserve accumulated
+products or retroactively undo post-trade interest effects, and whether refunds
+should follow an explicit decision or return the full original charge. Retroactive
+handling under unit quantization/agreement bands cannot simply use amount × days;
+it requires period-by-period difference calculation. Fees are independent
+components, not implied refundable by an invertible deposit core. Later cash
+decisions follow XBOD as stated above.
 
-日期和明细不使用“交换原 before/after”恢复。原记录保留、反向明细新增；日累计须按原业务日与当前营业日的明确规则处理。非量子更新依然先检查业务依赖；没有推断“同版本即可以撤销开户”或“金额能够逆转则整笔交易一定可以逆转”。
+Dates/details are not restored by swapping before/after. Original records remain,
+inverse details are added, and daily totals follow explicit original/current
+business-date rules. Non-quantum updates still require dependency checks.
+Matching versions do not alone permit reversing account opening; invertible
+amounts do not imply an entirely reversible trade.
 
-## 当前边界
+## Boundary of the original component
 
-金融计划组件独立于以上待决策项，可验证后续操作保留、普通/呆账原分量恢复、精确三位金额、容量与结果拒绝，以及伪造原分量拒绝。原成交查询现通过 DepositReversalPreparation 接入，见下节；独立冲正身份、互斥重复冲正、分录/审计共同提交、跨日/收费政策或业务补偿仍未实现。不能把金额计划测试称为完整 P4 验收。
+The independent financial plan can verify preservation of later operations,
+normal/bad-debt component restoration, exact three-decimal amounts, capacity/result
+rejection and forged-component rejection. Original-trade lookup was added through
+DepositReversalPreparation below. At that checkpoint independent reversal
+identity, mutually exclusive repeated reversal, joint posting/audit commit,
+cross-date/fee policy and compensation were still pending. Amount-plan tests were
+not full P4 acceptance.
 
-## 从真实成交准备金融反交易
+## Preparing an inverse from actual settlement
 
-APP 入口 DepositReversalPreparation.prepare(originalTransactionId, capacity) 从 deposit_trade 取得成功成交，按其账户身份查询当前快照。不存在的标识或仅被拒绝而未成交的请求返回 ORIGINAL_DEPOSIT_TRADE_NOT_FOUND；不由调用方上传原偿还分量，也不从失败审计猜测原交易成功。原成交账户身份与载荷不一致时拒绝。
+APP DepositReversalPreparation.prepare(originalTransactionId, capacity) reads
+successful deposit_trade and current snapshot by its account identity.
+Absent IDs or rejected-but-unsettled requests return ORIGINAL_DEPOSIT_TRADE_NOT_FOUND.
+Callers do not upload original repayments, and failed audit does not establish
+settlement. Account-identity/payload mismatch is rejected.
 
-生成场景 prepareRecordedDepositReversal 先通过 checkOriginalDepositSettlement 核对原前后金额与已存计划、本金/两类利息偿还及原净余额/可用余额关系，再提取实际分量并调用已有反向计划。该核对是 demo 成交契约的一致性检查，不是数字签名、原 KBN 格式适配或防篡改系统，也不重新运行原分配公式。
+Generated prepareRecordedDepositReversal first uses checkOriginalDepositSettlement
+to compare original before/after amounts, stored plan, principal/two interest
+repayments and original net/available-balance relationships. It then extracts
+actual components and invokes the inverse plan. This is demo trade-contract
+consistency, not a digital signature, KBN-format adapter or tamper-proof system,
+and does not rerun original allocation.
 
-结果包含原 Receipt、当前 Snapshot 及版本、当次容量政策快照、原金融分量和反向金额。外部传入的容量角色被复制，后续修改不会改变已返回的政策依据。查询与当前快照读取不是一个锁定的提交事务；它们只形成候选计划，后续正式执行必须重新检查当前版本及完整资格。
+The result includes original Receipt, current Snapshot/version, this attempt's
+capacity-policy snapshot, original components and inverse amounts. Capacity roles
+are copied so later caller changes do not alter returned evidence. Trade/current
+snapshot reads are not a locked commit transaction; these are candidate plans.
+Formal execution must recheck current version and full eligibility.
 
-准备过程不写账户、分录、请求身份或审计，不退费，不改积数，也不产生新的成交状态。再次准备只读取当前事实，不能称为重复冲正幂等保证。跨日原成交可以生成金额候选，但不能据此认为跨日完整冲正已经获准；原费和日期依据仍保留在 Receipt 的成交事实中，交由尚待明确的政策处理。
+Preparation writes no account, postings, request identity or audit; it neither
+refunds, changes accruals nor creates settlement. Repeated preparation reads
+current facts, not idempotent reversal. Cross-date originals may yield monetary
+candidates without permitting complete cross-date reversal. Original fee/date
+facts stay in Receipt for the applicable policy.
 
-DepositReversalPreparationTest 使用生成场景及 JDBC 保存的实际现金、普通/呆账及三位小数交易，验证原成交取得、后续成交保留、债务分量恢复、容量拒绝、无成交请求拒绝、存储中不一致的成交拒绝，以及准备不改变业务和审计记录。它补充真实成交到金融计划的证据，不扩大为完整新冲正成交的验收。
+DepositReversalPreparationTest used generated scenarios and actual JDBC-persisted
+cash, normal/bad-debt and three-decimal trades. It checked original lookup, later
+trade preservation, debt restoration, capacity rejection, unsettled-request
+rejection, inconsistent stored-trade rejection and unchanged business/audit
+records after preparation. This extends evidence from settlement to plan, not
+complete new inverse settlement.
 
-## 原分录到反向分录计划
+## Actual postings to inverse posting plan
 
-DepositReversalPreparation.preparePostings 增加显式 DepositReversalFeeDecision，调用方必须提供 refundAmount；业务服务校验其处于零至原实际收费之间。零、不为零的部分金额及全额是该计划契约可表达的决定，不是框架自行选择的退费政策。该角色可以由共享业务服务依据原交易计算，也可以由业务请求明确声明；APP 只传递角色，不提供技术默认退费。当前 test 中的金额均为明确 fixture；银行适用政策和 demo 默认选择仍未确定。
+DepositReversalPreparation.preparePostings added explicit DepositReversalFeeDecision.
+Callers must provide refundAmount between zero and actual original fee.
+Zero, partial and full amounts are expressible decisions, not framework-selected
+refund policy. A shared business service or explicit request may supply the role;
+APP passes it without a technical refund default. Test amounts were explicit
+fixtures. Bank applicability/default policy remained pending in that earlier stage.
 
-APP 从 deposit_ledger 查询按槽位排序的实际分录。prepareRecordedDepositReversalPostings 先检查实际分录与原成交载荷的科目、方向、金额一致，再核对八槽完整性、六类核心金额、两项原费用以及借贷平衡。不能只凭总额平衡放行科目错误或丢失零金额槽位。该契约仍是 DEMO 科目映射，不是原 ART 配置或任意银行分录格式。
+APP reads actual deposit_ledger ordered by slot. prepareRecordedDepositReversalPostings
+checks actual accounts/directions/amounts against original trade payload, then
+eight-slot completeness, six core amounts, two original fee slots and debit/credit
+balance. Balanced totals alone cannot excuse wrong accounts or missing zero slots.
+This is a DEMO mapping, not original ART or arbitrary bank posting format.
 
-核心槽位保持原科目和金额，借贷方向反转；收费两个槽位保持原科目，使用显式退费金额反转。零金额槽位保留。checkDepositFeeRefund 拒绝负数及超出原实际收费的金额，calculateDepositReversalPostings 后再次检查借贷平衡。业务层完成判断和数学计算，JDBC 只读取实际数据，Java 分配独立结果角色。
+Core slots keep original accounts/amounts and reverse directions. Fee slots keep
+accounts and reverse explicit refund amounts. Zero slots remain.
+checkDepositFeeRefund rejects negative/excess refunds; after
+calculateDepositReversalPostings, balance is checked again. Business source owns
+decisions/math; JDBC reads actual data and the historical Java layer allocates
+independent output roles.
 
-返回的 PostingResult 包含金融候选、退费决定快照、实际原分录、新反向分录及汇总。输出角色与输入原分录分离，既不更改原账簿，也不执行费用退款。它不是完整冲正成交：跨日积数、日累计、整体资格、独立冲正身份及共同提交仍须连接。缺少原收费事实的旧物理 Prepared 测试记录不自动假定零费。
+PostingResult contains financial candidate, copied refund decision, actual
+original postings, new inverse postings and totals. Outputs do not mutate
+original input/ledger or execute a refund. Full reversal still required cross-date
+accrual/daily-total policy, complete eligibility, independent identity and joint
+commit. Old physical Prepared records missing fee facts do not imply zero fee.
 
-DepositReversalPreparationTest 增补四项测试，验证显式零/部分/全额计划及核心反向方向、普通/呆账和三位金额、缺少/负数/超额退费拒绝、实际分录被改写或缺失时拒绝。准备仍不写账户、成交、分录或审计。这些证据不等于用户已选择部分退费政策，也不等于跨日业务资格已确定。
+Four added DepositReversalPreparationTest cases checked explicit zero/partial/full
+plans and core reversed directions, normal/bad-debt/three-decimal amounts, missing/
+negative/excess refund rejection and altered/missing actual postings. Preparation
+still wrote no account/trade/posting/audit. These tests did not establish that the
+user selected partial refunds or cross-date eligibility.
 
-## 提交能力的增量
+## Incremental commit capability
 
-金融候选现在可经 prepareDepositReversalAccountUpdate 形成当前账户更新，再由 JdbcDepositReversalStore 保存新冲正、原交易关联、反向分录及成功审计。物理测试已实际执行金融组件；本文件前述只读准备 API 仍不提交。完整现金入口、产品/积数和日累计事实更新及所需政策尚未连接。范围与故障/重复契约见 [冲正提交](reversal-submission.md)，不能将组件成交说成完整 P4 已验收。
+Later, prepareDepositReversalAccountUpdate produced a current-account update and
+JdbcDepositReversalStore persisted new inverse, original link, inverse postings
+and success audit. Physical tests executed this financial component; read-only
+preparation APIs still did not commit. Full cash entry and product/accrual/daily
+facts/policies were not connected at that stage. See [reversal submission](reversal-submission.md);
+component settlement is not full P4.
 
-核心资格增量通过 prepareCoreQualified 读取当前销户、取消开户、全额冻结及凭证事实，使用独立冲正规则并返回提示，不套用正常通存范围。它仍只形成金额候选，未连接完整现金提交。规则来源及边界见 bank-qualification.md。
+prepareCoreQualified additionally reads current closed/cancelled/full-freeze/
+document facts and applies separate reversal rules with notices, not normal
+deposit-range rules. It still produces only a candidate. See
+[bank qualification](bank-qualification.md).
 
-## 纯源语言的查询及候选入口
+## Source-language query and candidate entries
 
-`cboddeposit-99ca-reversal-preparation.spp` 新增 DepositReversalPreparationRequest 和 DepositReversalPreparationFacts：请求提供原成交身份、容量，以及按入口需要的操作者/渠道或显式费用退款决定。原成交和当前账户由 APP 绑定的仓库服务查询，financial 中保存原成交、当前版本、原数学分量和金融候选；可选的操作者/渠道及容量/退款决定由 SPP copy 形成独立快照。
+cboddeposit-99ca-reversal-preparation.spp added DepositReversalPreparationRequest
+and DepositReversalPreparationFacts. Requests supply original identity, capacity
+and, by entry, operator/channel or explicit refund decision. APP-bound repository
+services query original/current account. financial retains original trade,
+current version, original components and candidate. SPP copy makes independent
+operator/channel, capacity and refund snapshots.
 
-- prepareFinancialDepositReversal 只查询事实并生成金融反向候选。
-- prepareCoreQualifiedDepositReversal 先使用当前账户和当前操作者验证核心资格，保留文档提示，再生成候选；它不借用普通存入机构范围或前端现金控制门槛。
-- prepareFinancialDepositReversalPostings 要求显式 feeDecision，另查询实际原分录、与成交保存的分录证据比较，再生成相反方向的分录；无决定、负数或超过原费用不能形成退款计划。
+- prepareFinancialDepositReversal only queries facts and prepares a monetary inverse.
+- prepareCoreQualifiedDepositReversal first validates current core eligibility
+  with current account/operator, retaining document notices; it does not import
+  normal deposit-range or front-end cash controls.
+- prepareFinancialDepositReversalPostings requires feeDecision, queries actual
+  original postings, compares stored settlement evidence and builds opposite
+  directions. Missing, negative or excessive decisions cannot produce a refund plan.
 
-这些场景没有更新服务或 transaction，因而不创建冲正记录、不改变账户/积数/日累计/审计，也不锁定以后提交资格。实际新交易仍必须声明完整提交边界并重新保护当前版本；原现金入口 executeCashReversal 的资格、XBOD 日期政策、费用政策及 quantum 提交继续单独存在。不能把只读候选成功解释成现金冲正已经允许或已成交。
+These scenarios have no updates or transaction: they create no reversal, change
+no account/accrual/daily/audit facts and do not lock future eligibility.
+Actual new trades must declare full commit boundaries and protect current
+versions again. executeCashReversal separately retains cash eligibility, XBOD
+date/fee policy and quantum commit. A successful read-only candidate is neither
+permission nor completed cash reversal.
 
-新核心资格例子已通过 clean verify：947 项 JUnit 与 36 个源入口分别全部成功，旧资格四项测试已删除且 class 不残留；金融/分录准备的完整独立责任尚待后续源验收。旧手写 DepositReversalPreparation 仍是待删除违规项，不是新源路径依赖的实现。
+New core-eligibility examples passed historical clean verify: all 947 JUnit tests
+and 36 source entries, with four old eligibility tests/classes removed.
+Complete independent financial/posting-preparation responsibilities still awaited
+source acceptance. Handwritten DepositReversalPreparation was a retirement
+obligation, not a dependency of the new source path.
+
+All results and staged pending statements here come from revision `417a41f`,
+not tests rerun during translation.

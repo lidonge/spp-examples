@@ -56,6 +56,8 @@ for page, parsed in pages.items():
             if f'href="{destination}"' not in navigation.group(1):
                 errors.append(f'{page.relative_to(root)}: missing platform or basic source navigation')
     if page == root / 'index.html':
+        if not navigation or '<a href="https://github.com/lidonge/spp-basic/tree/main/examples">Source</a>' not in navigation.group(1):
+            errors.append('Homepage Source navigation must open the public examples repository directly')
         if 'https://github.com/lidonge/spp-examples' not in parsed.targets:
             errors.append('Homepage must link to the public examples repository')
         if 'Public platform registration is not open yet.' not in text:
@@ -63,7 +65,7 @@ for page, parsed in pages.items():
     for href in parsed.targets:
         link = urlsplit(href)
         if link.hostname and link.hostname.lower() in {'github.com', 'www.github.com', 'raw.githubusercontent.com'}:
-            allowed_repositories = {'/lidonge/spp-basic', '/lidonge/spp-examples'}
+            allowed_repositories = {'/lidonge/spp-basic', '/lidonge/spp-basic/tree/main/examples', '/lidonge/spp-examples'}
             if link.hostname.lower() != 'github.com' or link.path.rstrip('/') not in allowed_repositories:
                 errors.append(f'{page.relative_to(root)}: unapproved GitHub repository link: {href}')
         if link.scheme or link.netloc:

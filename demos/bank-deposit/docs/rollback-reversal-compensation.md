@@ -1,54 +1,54 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this records the pre-refactoring design or acceptance, not current source or test results. See [the current refactoring](latest-petstore-refactoring.md); retired source is under `legacy-source/`.
 
-# 回滚、冲正与补偿：语义及实现讨论
+# Rollback, reversal, and compensation
 
-2026-10-07。本文记录用户确认的概念分工及待讨论的实现细节；不表示相关 demo 能力已经实现。
+2026-10-07. This records the agreed conceptual responsibilities and implementation questions still open at that time. It does not claim that the demo implemented these capabilities.
 
-## 已确认的概念
+## Agreed concepts
 
-### 回滚
+### Rollback
 
-回滚是纯技术概念。当事务失败时，撤销该事务的全部影响，恢复事务开始前的状态，仅留下审计记录。这里恢复的是该事务涉及的状态和影响，不能覆盖其他独立事务已经成功产生的结果。
+Rollback is technical: when a transaction fails, undo its effects and restore its pre-transaction state, retaining audit records. This applies only to that transaction's state and effects; it must not overwrite successful results of independent transactions.
 
-回滚保证取决于事务模式：
+The guarantee depends on the transaction mode:
 
-- 量子性事务由量子服务提供确定的回滚。所有参与状态必须在其保证范围内，资源释放、失败重试和恢复协议由 APP/PHY 承接。
-- Saga 中已经成功提交的节点，其局部事务已经结束；不能再通过局部事务回滚撤销这些成交结果。失败节点尚未提交的局部事务仍可在自身范围内回滚。Saga 整体失败后的恢复需要业务冲正或补偿，不能称为与量子性事务相同的真正回滚。
+- A quantum transaction provides deterministic rollback through its quantum services. Every participating state must fall within that guarantee. APP/PHY owns resource release, retries, and recovery protocols.
+- A successfully committed Saga node has already completed its local transaction. Local rollback cannot undo that committed business result. An uncommitted failing node can still roll back locally. Recovery of the overall Saga requires business reversal or compensation, not the same rollback guarantee as a quantum transaction.
 
-Saga 的协调、重试和进度记录可以自动化，但不能因此自动获得业务逆操作。
+Automating Saga coordination, retries, and progress recording does not automatically provide business inverse operations.
 
-### 冲正
+### Reversal
 
-冲正是纯业务概念：原业务结束后，因某种业务原因需要撤销该笔业务。冲正自身是一笔新的交易逻辑，其是否可以执行、作用范围和特殊规则由业务定义，与原业务采用哪种事务模式无关。
+Reversal is business behavior: after an original operation completes, a business reason requires undoing it. The reversal is a new transaction. Business rules determine eligibility, scope, and exceptions, independently of the original transaction mode.
 
-大多数冲正可以采用“反交易”这种默认业务逻辑。系统根据原成交事实生成和执行反向更新，不要求业务重复书写能够确定的反向数学公式。这个执行能力不会把冲正变成技术回滚。
+Many reversals can use a default inverse-transaction rule. The system generates and executes inverse updates from actual settlement facts, without requiring business authors to repeat mathematically determined inverse formulas. This does not turn reversal into technical rollback.
 
-反交易分量子类与非量子类：量子类具有确定、不覆盖后续操作的反向关系；非量子类须先确认不会覆盖其他已发生业务。开户之后已有存款，不能反向取消开户；这一依赖不能以开户状态字段版本未变来忽略。具体分类与实现差异见 [默认反交易设计](default-reversal-design.md)。
+Inverse transactions may be quantum or non-quantum. Quantum inverses have a deterministic relationship that preserves subsequent operations. Non-quantum inverses first require confirmation that they will not overwrite other business activity. An account cannot be canceled after receiving deposits merely because its opening-status field version is unchanged. See [default reversal design](default-reversal-design.md).
 
-冲正自身执行失败时，按它自身的事务模式处理：量子性事务可回滚本次冲正；Saga 需要处理本次冲正中已经提交的节点。原业务是否已经撤销必须依据实际成交状态判断，不能仅根据调用报错判断。
+A failed reversal follows its own transaction mode: a quantum transaction can roll back that reversal; a Saga must handle its already committed nodes. Whether the original operation has been reversed depends on actual settlement state, not merely an error returned by a call.
 
-### 补偿
+### Compensation
 
-补偿是纯业务概念。当冲正不能完成，或业务确定无法撤销时，需要使用业务定义的其他处理方式。系统不能自动推导补偿逻辑，也不能提供普适的默认技术手段代替业务决策。
+Compensation is business behavior for cases where reversal cannot complete or business rules determine that an operation cannot be undone. The system cannot infer compensation rules or substitute a universal technical mechanism for a business decision.
 
-系统可以执行显式绑定的补偿服务、记录结果并按声明重试，但补偿的内容、适用条件与完成标准必须由业务给出。
+It can invoke explicitly bound compensation services, record outcomes, and retry as declared. Business rules must define their contents, applicability, and completion criteria.
 
-## 默认反交易的拟议实现
+## Proposed default inverse implementation
 
-正常业务只描述一次；框架记录实际成交分量和参与对象，业务提出冲正时，以这些事实生成反交易计划。冲正资格校验及特殊处理仍属于业务层，事务模式、存储、执行和技术恢复属于 APP/PHY。
+Describe the normal business operation once. Record its actual settlement components and participants, then generate an inverse plan from those facts when reversal is requested. Eligibility and exceptional handling remain business responsibilities; transaction mode, storage, execution, and technical recovery belong in APP/PHY.
 
-金额更新应使用原实际变更量：余额由 100 加 50，再被另一笔交易加到 170，冲正第一笔应减去原 50，得到 120。直接恢复旧快照 100 会破坏后续业务。原交易偿还的本金和利息也应使用原成交分量，不能按当前偿还政策重新分配。
+Use the original actual amount delta. If a balance of 100 increases by 50 and another transaction then raises it to 170, reversing the first transaction subtracts 50, leaving 120. Restoring the old snapshot of 100 would destroy subsequent business. Similarly, reverse the original settled principal and interest components, rather than reallocating them under today's repayment policy.
 
-赋值、状态转换、集合增删和外部效果并不都能从旧值推导出可安全执行的业务逆操作。需逐类确认默认反交易契约、后续依赖和资格；无法推导时要求显式冲正逻辑或业务补偿，不用旧快照强行撤销。
+Assignments, state transitions, collection changes, and external effects do not always have safe business inverses derivable from old values. Establish each inverse contract, subsequent dependencies, and eligibility separately. Require explicit reversal logic or business compensation when inference is impossible; do not force an undo using old snapshots.
 
-已有 `DefaultTransactionManager` 的已提交量子边界导出与反向执行接口可作为候选执行基础，但仍须验证它与业务成交记录、冲正资格、重复处理及跨日规则的连接，不能以接口存在证明银行业务冲正已经完整实现。
+The committed quantum-boundary export and inverse-execution interfaces of `DefaultTransactionManager` were candidate execution foundations. Their connection to settlement records, eligibility, duplicate handling, and cross-day rules still required verification. An interface's existence did not prove complete bank reversal support.
 
-## 实现前仍需讨论
+## Questions remaining before implementation
 
-1. 哪些更新类型默认提供反交易，哪些必须声明显式冲正规则；如何识别原交易之后发生的业务依赖。
-2. 成交记录保存哪些分量和规则事实；反交易范围如何覆盖账户、明细、积数与分录。
-3. 冲正失败后的处理：技术暂时失败、结果未知、资格拒绝及确定不可撤销如何区分。不能把一次超时直接认定为不可撤销并启动补偿；需业务定义补偿触发条件，避免重复处理。
-4. Saga 如何绑定节点的冲正/补偿服务；协调器只负责执行明确的业务绑定，不自动创造补偿规则。
-5. XBOD 跨日计息、收费与后续交易约束采用哪些明确政策及证据。
+1. Which update types have default inverses, which require explicit rules, and how are subsequent business dependencies identified?
+2. Which components and rule facts must settlement records retain, and how does reversal cover accounts, details, accrual bases, and journal entries?
+3. How are transient failures, unknown outcomes, eligibility rejection, and confirmed irreversibility distinguished? A timeout alone must not trigger compensation; business-defined conditions must prevent duplicate processing.
+4. How does a Saga bind each node's reversal or compensation service? The coordinator executes explicit business bindings rather than inventing rules.
+5. Which explicit policies and evidence govern XBOD cross-day interest, fees, and subsequent transactions?
 
-概念分工已确认；上述具体契约继续讨论后再实现。相关新增冲正/恢复机制暂不推进，其他独立的存款规则验证可以继续，Goal 保持活动。
+At the time of this discussion, the conceptual division was agreed, but these contracts remained open. New reversal/recovery mechanisms were deferred; independent deposit-rule verification could continue and the implementation goal remained active. This is a historical status, not a statement about the current goal.

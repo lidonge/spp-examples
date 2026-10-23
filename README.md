@@ -4,12 +4,13 @@ S++ describes business systems through participants, roles, atomic services, sce
 
 **[Read the English book](https://us.servpp.top/book/)** · **[Browse demo source](https://us.servpp.top/sources/)** · **[Project website](https://us.servpp.top/)** · **[Report an issue](https://github.com/lidonge/spp-examples/issues)**
 
-The current full Petstore and bank demos explicitly select the official enhanced
-generator and runtime (`generator-enhanced` and `appframe-enhanced`). Install those
-SDK artifacts as well as the public compiler/runtime before building the demos.
-Their source code remains under this repository's scoped license. A basic-runtime
-custom-service example is supplied separately with the compiler; no commercial
-implementation source is copied here.
+Petstore and bank demos use the public basic compiler/runtime by default.
+Missing optional official enhancements produce compilation warnings rather than
+blocking generation. Ordinary full-field persistence and optimistic revision
+checks remain enabled; replay, duplicate suppression and other absent enhanced
+services are not promised by the fallback. Use `-Penhanced` only when the separately
+supplied `generator-enhanced` and `appframe-enhanced` artifacts are installed.
+No commercial implementation source is copied here. See [toolchain setup](docs/toolchain.md).
 
 ## Start here
 

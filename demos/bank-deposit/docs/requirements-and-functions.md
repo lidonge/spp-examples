@@ -1,40 +1,93 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical requirements: this records the pre-refactoring scope and rules.
+> See [current refactoring](latest-petstore-refactoring.md); old sources are in
+> `legacy-source/`.
 
-# 需求与功能
+# Requirements and functions
 
-## 实现语言与事务声明：强制要求
+## Implementation language and transaction declarations
 
-只允许 SPP、APP、PHY 实现本 demo，全部 Java 必须由编译和生成链路产生，不得手写任何 Java。业务规则、服务编排以及完整事务边界和模式必须在 SPP 明确表达；APP 绑定服务实现与部署，PHY 落实物理资源及保障。语法不足须登记并完善，不能以手写实现补齐。当前迁移缺口见 [纯源语言核查](source-language-only.md)。此要求取代早期允许 Java 入口或事务包装的实现选择。
+The historical source-only rule required this demo to use SPP, APP and PHY with
+all Java generated, no handwritten Java. Business rules, orchestration and full
+transaction boundaries/modes had to be explicit in SPP; APP bound implementations/
+deployment and PHY supplied physical resources/guarantees. Syntax gaps required
+registration and completion, not handwritten bypasses. See the
+[source-only audit](source-language-only.md). This superseded earlier Java entry/
+transaction-wrapper choices.
 
-## 目标与业务范围
+Later applicable instructions allow Java tests solely for input preparation,
+composition of generated services, assertions and technical fault injection.
+Handwritten production business Java remains prohibited. Current transaction
+realization belongs to APP/PHY under the applicable transaction/storage rules;
+historical mode wording does not override that separation.
 
-以 GSA01102 一般存入及 KSADEP0 存款核心为依据，创建可以独立构建、重复运行的 SPP demo。验证真实业务规则的表达、生成执行、数据更新与恢复，不以语法可编译替代交易可执行。
+## Objective and business scope
 
-第一批包含普通现金存入、带普通/呆账透支债务的存入，以及对应原交易冲正。转账、托收、交换和批量路径登记为扩展；本轮已由用户确认。核心零金额还债与前台正金额受理分别建模，不能混为同一交易。
+Create an independently buildable, repeatable SPP demo based on GSA01102 general
+deposit and KSADEP0 deposit core. Verify expression of real business rules,
+generated execution, data updates and recovery. Compilable syntax is not an
+executable transaction.
 
-## 四个重点及验收要求
+The confirmed first batch includes ordinary cash deposits, deposits with ordinary/
+bad-debt overdraft debt, and reversals of their original trades. Transfers,
+collections, clearing and batch paths are registered extensions. Core zero-amount
+debt repayment and front-end positive-amount admission are modeled separately,
+not conflated into one transaction.
 
-| 编号 | 功能 | 必须验证的业务结果 |
+## Four priorities and acceptance
+
+| ID | Function | Required business evidence |
 | --- | --- | --- |
-| P1 | 偿还分配及余额计算，数字物理绑定 | 普通先息后本、呆账先本后息；冻结/授权区别；本金相等边界；三位利息、币种与计息单位边界分别说明依据 |
-| P2 | 共享银行规则服务库 | 账户受理、起存和余额上限、拒绝/警示/待授权、授权后重验、营业日期、计息积数与分档、收费适用政策 |
-| P3 | 端到端交易和业务账务 | 查询→校验→计算→校验计划→更新；账户、资金来源、分录、日志一致提交；失败不留下部分业务结果；重复请求与并发不重复入账 |
-| P4 | 原交易驱动的冲正 | 查原交易、检查资格、使用原偿还分量恢复债务及余额、积数和分录；重复冲正、跨日和交易后状态变更 |
+| P1 | Repayment allocation, balance calculation, physical numeric binding | Ordinary interest-before-principal versus bad-debt principal-before-interest; frozen/authorized distinctions; equal-principal boundary; separate provenance for three-decimal interest, currency and interest-unit boundaries |
+| P2 | Shared banking-rule library | Account admission, minimum opening amount and balance ceiling; rejection/warning/pending authorization; revalidation after authorization; business dates; accrual products/bands; fee applicability |
+| P3 | End-to-end transaction and business accounting | Query → check → calculate → validate plan → update; consistent account/funding/posting/log commit; no partial business outcome after failure; no duplicate posting under coordinated retry/concurrency |
+| P4 | Original-trade-driven reversal | Query original trade, check eligibility, restore debt/balance/accrual/postings from original repayment components; duplicate reversal, cross-date behavior and post-trade state changes |
 
-P2 不默认构建全部银行规则：从实际选择路径的调用及配置追踪出所需子集。不可获取的产品、费率和账务配置使用明确标注的 demo fixture，不能称为银行实际参数。警示与授权不是统一异常；业务计算授权要求，APP 获取授权事实，执行时重验。
+P2 does not imply a complete bank rule library. Trace the subset required by
+selected paths and configuration. Unavailable product, rate and accounting
+configuration uses explicitly labeled demo fixtures, not claimed actual bank
+parameters. Warnings and authorization are not generic exceptions: business
+calculates authorization requirements, APP obtains authorization facts, and
+execution revalidates them.
 
-## 业务契约与分层
+Optional coordination requirements are accepted only with the relevant provider.
+The basic example explicitly warns when replay/duplicate suppression is absent;
+business checks and optimistic database protection remain mandatory.
 
-请求、账户快照、债务、产品政策、币种政策、业务日历、授权事实、处理计划、原交易和分录为主要参与者。保存计息金额、账户余额、可用余额和总透支金额的区别。计划与输入快照分离，便于拒绝、授权重验和版本冲突验证。
+## Business contracts and layering
 
-业务规则与公式必须位于 SPP 的 check/calculate 服务。共享服务只暴露角色契约，本地或远程部署由 APP 决定。完整业务事务边界和模式在 SPP 声明；数据库访问、版本条件更新、实际事务保障和调用编解码由 APP/PHY 声明及生成承接；APP 不重写偿还顺序、受理政策和记账分类。
+Principal participants are request, account snapshot, debt, product policy,
+currency policy, business calendar, authorization facts, processing plan,
+original trade and postings. Preserve distinctions among interest base, account
+balance, available balance and total overdraft. Separate plans from input
+snapshots for rejection, authorization revalidation and version-conflict tests.
 
-量子性事务失败须提供确定的技术回滚；Saga 已提交节点的业务恢复不能以同等回滚保证宣称。冲正作为新的业务交易，优先采用原成交事实驱动的默认反交易；补偿必须显式提供业务逻辑，不能由技术层自动推导。验收分别检查技术回滚、业务冲正与补偿，具体契约见 [语义及实现讨论](rollback-reversal-compensation.md)。
+SPP check/calculate services own rules and formulas. Shared services expose role
+contracts; APP chooses local/remote deployment. SPP declares complete business
+transaction boundaries; applicable APP/PHY declarations and generation implement
+resource modes, database access, conditional versioned updates, actual guarantees
+and call codecs. APP does not rewrite repayment order, admission or amount
+classification.
 
-short/double 等业务声明仅作为默认实现提示，PHY 选择实际数字表示。demo 初始使用内置 BigDecimal；业务取整或舍入必须明确规则依据。遗留 PIC 截断尚未确认前，不在业务服务中添加猜测的舍入规则。
+Quantum transactions require deterministic technical rollback within supported
+resource contracts. Business recovery of committed Saga stages cannot claim the
+same rollback guarantee. Reversal is a new trade, preferably an inverse driven
+by original settled facts. Compensation requires explicit business logic, not
+automatic technical inference. Verify technical rollback, business reversal and
+compensation separately; see the [semantics discussion](rollback-reversal-compensation.md).
 
-## 证据与边界
+Business declarations such as short/double only hint at defaults; PHY chooses
+actual representation. The demo initially uses built-in BigDecimal. Business
+quantization/rounding requires explicit provenance. Do not guess rounding rules
+from unconfirmed legacy PIC truncation.
 
-每个案例须记录输入、输出、错误或授权结果、源程序/段落、预期值来源、执行层级。证据分为源码推导、银行确认黄金值、原 COBOL 实测三种；同公式 Java 对照用于验证生成一致性，不能升级为 COBOL 等价证明。
+## Evidence and boundaries
 
-测试含正常和拒绝路径、金额/日期边界、故障注入、重复及并发。完成 P3 前只能声称计算/规则子集实现；完成 P4 后仍明确未覆盖的渠道和产品。生产部署、真实客户数据和外部银行系统接入不在当前范围。
+Each case records input, output, error/authorization outcome, source program/
+section, expected-value provenance and execution level. Distinguish source
+derivation, bank-confirmed golden values and actual original-COBOL execution.
+A same-formula Java comparison checks generation consistency, not COBOL equivalence.
+
+Tests cover normal/rejected paths, amount/date boundaries, fault injection,
+duplicates and concurrency. Before P3 completion, claim only calculation/rule
+subsets. After P4, still identify excluded channels/products. Production deployment,
+real customer data and integration with external banking systems are out of scope.

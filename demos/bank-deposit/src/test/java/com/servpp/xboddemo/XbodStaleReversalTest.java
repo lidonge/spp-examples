@@ -4,7 +4,6 @@ import org.junit.Test;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.*;
 import static org.junit.Assert.*;
 import static com.servpp.xboddemo.XbodTransactionTest.*;
 
@@ -16,20 +15,21 @@ public class XbodStaleReversalTest {
             open(demo);var paid=demo.call("depositCash",deposit(100));
             Object request=demo.request("reverseCash",reversal(paid.path("CashDepositAgreement"),20261007,false));
             var prepared=new CountDownLatch(1);var resume=new CountDownLatch(1);var armed=new AtomicBoolean(true);
-            var logger=Logger.getLogger("spp.xbod.invocations");
-            // Technical trace hook pauses execution after all business queries and checks.
-            Handler gate=new Handler() {
-                public void publish(LogRecord record) {
-                    String text=record.getMessage();
-                    if (text.contains("phase=BEFORE service=cboddeposit.prepareCashReversalPostings ") && armed.compareAndSet(true,false)) {
+            var services=com.servpp.service.server.DefaultServiceContainer.getInstance();
+            var originalService=services.getService("cboddeposit", "prepareCashReversalPostings");
+            var gated=(com.servpp.service.Service)java.lang.reflect.Proxy.newProxyInstance(
+                    originalService.getClass().getClassLoader(), originalService.getClass().getInterfaces(), (proxy, method, arguments) -> {
+                    if (method.getName().equals("prepareCashReversalPostings") && armed.compareAndSet(true,false)) {
                         prepared.countDown();
                         try { if (!resume.await(30,TimeUnit.SECONDS)) throw new IllegalStateException("TEST_REVERSAL_GATE_TIMEOUT"); }
-                        catch (InterruptedException e) { Thread.currentThread().interrupt();throw new IllegalStateException(e); }
+                        catch (InterruptedException interrupted) { Thread.currentThread().interrupt();throw new IllegalStateException(interrupted); }
                     }
-                }
-                public void flush() {} public void close() {}
-            };
-            var worker=Executors.newSingleThreadExecutor();logger.addHandler(gate);
+                    try { return method.invoke(originalService, arguments); }
+                    catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+                });
+            services.registerService("cboddeposit.prepareCashReversalPostings", gated);
+            demo.runtime.registerGeneratedService("/META-INF/spp/domains/cboddeposit/services.properties", "cboddeposit.reverseCash");
+            var worker=Executors.newSingleThreadExecutor();
             try {
                 var attempt=worker.submit(()->demo.execute("reverseCash",request));
                 assertTrue("Reversal reached its prepared boundary",prepared.await(20,TimeUnit.SECONDS));
@@ -69,7 +69,7 @@ public class XbodStaleReversalTest {
                 var remaining=demo.call("listDepositPostings",Map.of("CashDepositAgreement",Map.of("depositNumber",later.path("CashDepositAgreement").path("depositNumber").asText())));
                 assertEquals(8,remaining.path("DepositPostingLineArray").size());
                 }
-            } finally { resume.countDown();logger.removeHandler(gate);worker.shutdownNow();assertTrue(worker.awaitTermination(5,TimeUnit.SECONDS)); }
+            } finally { resume.countDown();worker.shutdownNow();assertTrue(worker.awaitTermination(5,TimeUnit.SECONDS)); }
         }
     }
     private void changeStoredReceiptFee(XbodTestSupport demo,String number,int fee) throws Exception {

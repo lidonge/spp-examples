@@ -1,18 +1,60 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 纯源重构最终验证
+# Final verification of the source-only refactoring
 
-2026-10-09完成 `mvn -pl :xbod-deposit-demo -am clean verify`，日志 `/tmp/spp-source-only-final-clean-validation.log`，耗时15分19秒，BUILD SUCCESS。
+The historical 2026-10-09 run of
+`mvn -pl :xbod-deposit-demo -am clean verify` completed with BUILD SUCCESS in
+15 minutes 19 seconds. Log: `/tmp/spp-source-only-final-clean-validation.log`.
 
-- 主/测试/其他源目录手写Java均为0；14原主类、21原测试族及嵌套class不存在，JAR不含旧银行主类。
-- 从空target生成并编译4207个Java文件。业务、事务、案例、断言和中文报告内容来自SPP；APP绑定查询更新/部署/验收控制，PHY绑定BigDecimal及共同JDBC/量子资源。
-- 945项公共JUnit通过：lang303、appframe537、generator105，零失败/错误/跳过。银行已无手写JUnit，86个APP入口独立执行，86通过、0失败。
-- 五组两独立JVM验收通过：冲正身份与后续交易、待授权续接、现金报告、完整存款报告、实际冲正报告。每阶段从空参与者查询文件数据库，保持打开只限单JVM，下一JVM重新打开；60秒时限不变。
-- 96份JSON与96份Markdown状态均PASS，位于target/spp-examples/evidence。存款resume：十案例、六实际成交48分录、五未执行候选、2300/版本3/积数2200、拒绝EN432/E1043、精确本金0.001和逐案例请求/日期/授权/来源；重放当前2200/版本2而返回原700/版本1。
-- 冲正resume：四实际冲正32反向分录、20量子日志且差额和0；首笔冲正及重放/重复拒绝保持14行，现金1700/版本4/积数2200，退款2；普通/不良/小数债务恢复原分量、保留当前积数，后续存款保持。
-- 完整回归还覆盖实际并发、快照/凭证篡改、版本竞争、四JDBC提交点、未知结果查询、分录中途失败、审计不可用、精确量子存储及六种Saga恢复。具体入口责任见source-example-coverage.md，事务源码为92/93/98/99b/99zv。
-- 公共Java/模板搜索未发现银行旧类或KSADEP0/GSA01102/EN432/F0554硬编码；没有把银行业务挪入框架。公共扩展及语义测试见重构记录。
+- Handwritten Java in main/test/other source directories: zero. The 14 original
+  main classes, 21 original test families and nested classes were absent.
+  The JAR contained no old banking main classes.
+- From empty target directories, 4,207 Java files were generated and compiled.
+  Business logic, transactions, cases, assertions and Chinese report contents
+  originated in SPP; APP bound queries/updates, deployment and acceptance
+  controls; PHY bound BigDecimal and shared JDBC/quantum resources.
+- All 945 public JUnit tests passed: lang 303, appframe 537, generator 105;
+  zero failures/errors/skips. Banking had no handwritten JUnit at that stage;
+  all 86 APP entries executed independently and passed.
+- Five two-independent-JVM groups passed: reversal identity/later transactions,
+  pending authorization continuation, cash report, complete deposit report and
+  actual reversal report. Each stage queried a file database from empty
+  participants. Only one JVM held it open at a time; the next JVM reopened it.
+  The 60-second limit remained unchanged.
+- All 96 JSON and 96 Markdown statuses under `target/spp-examples/evidence`
+  were PASS. Deposit resume: ten cases, six actual trades/48 postings, five
+  unexecuted candidates, balance 2300/version 3/product 2200, EN432/E1043
+  rejections, exact principal 0.001, and per-case request/date/authorization/source
+  facts. Replay observed current 2200/version 2 but returned original 700/version 1.
+- Reversal resume: four actual reversals/32 inverse postings, 20 quantum records
+  with zero summed delta. First reversal and replay/duplicate rejection retained
+  14 rows, cash 1700/version 4/product 2200, refund 2. Normal/bad/fractional debt
+  restored original components while preserving current products and later deposits.
+- Full regression also covered actual concurrency, snapshot/document tampering,
+  version races, four JDBC commit points, unknown-outcome queries, partial posting
+  failure, unavailable audit, exact quantum persistence and six Saga recovery
+  cases. Entry responsibilities are in [source coverage](source-example-coverage.md);
+  transaction sources are 92/93/98/99b/99zv.
+- Searches of public Java/templates found no old banking classes or hardcoded
+  KSADEP0/GSA01102/EN432/F0554. Banking business logic was not moved into the
+  framework. Public extensions/semantic tests are in the refactoring record.
 
-最终报告：`target/spp-examples/evidence/depositCompleteReportResumeExampleRun.json`及.md，`depositActualReversalReportResumeExampleRun.json`及.md。这是已确认范围的SPP纯源重构验收，不是生产银行替代或原COBOL黄金等价；报告productionReplacementVerified=false的范围含义保持。
+Final reports were
+`target/spp-examples/evidence/depositCompleteReportResumeExampleRun.json` and
+its Markdown counterpart, plus `depositActualReversalReportResumeExampleRun.json`
+and its Markdown counterpart in the same directory. This was acceptance of the
+agreed source-only SPP refactoring scope, not production bank replacement or
+golden equivalence to original COBOL. The scope represented by
+`productionReplacementVerified=false` remains unchanged.
 
-需求P1–P4、完整事务/恢复、全部手写实现责任、启动/存储/报告及文档迁移均已完成；核对表见acceptance-audit.md，实施和对比见implementation-path.md、spp-vs-cobol-java.md。
+At that historical milestone, P1–P4, full transaction/recovery responsibilities,
+handwritten-implementation retirement, startup/storage/reporting and documentation
+migration were recorded complete. See [acceptance audit](acceptance-audit.md),
+[implementation path](implementation-path.md) and [comparison](spp-vs-cobol-java.md).
+
+These claims are preserved from revision `417a41f`, not newly executed tests.
+Later rules permit Java acceptance tests; the zero-test-Java requirement and
+Chinese report description above record that historical stage, not the current
+public documentation policy.

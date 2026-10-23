@@ -1,40 +1,94 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 存入记账计划的来源与实施准备
+# Deposit posting-plan sources and implementation preparation
 
-2026-10-07。本文记录源码追踪及 P3 方案。业务金额分类与展示分录计划已实现并验证；完整交易落地仍在实施。
+2026-10-07 source tracing and P3 design record. Business amount classification and
+the demonstration posting plan were implemented/verified at this stage;
+complete transaction persistence was still in progress.
 
-## 已确认的金额分类
+## Confirmed amount classification
 
-KSADEP0:3714 的普通交易依次调用 6100 金额、6200 条件和 6300 规则处理。6100 传给 GCCBAAMT 的业务分量为本次交易金额、计息金额增加、透支本金偿还、透支息偿还、催收透支息偿还和计息金额减少；错账标志为真时改变这些分量的符号。
+Normal transactions at KSADEP0:3714 invoke sections 6100 amounts, 6200 conditions
+and 6300 rules in order. Section 6100 passes GCCBAAMT the transaction amount,
+interest-bearing amount increase, overdraft principal repayment, overdraft-interest
+repayment, collection-overdraft-interest repayment and interest-bearing amount
+decrease. The correction flag reverses these component signs.
 
-根据已迁入的余额公式，可以检查如下业务金额关系：
+The migrated balance formulas support this business relationship:
 
 ```text
-本次存入金额 + 计息金额减少
-    = 计息金额增加 + 偿还本金 + 偿还透支息 + 偿还催收透支息
+cash deposit amount + interest-bearing amount decrease
+    = interest-bearing amount increase + principal repayment
+      + overdraft-interest repayment + collection-overdraft-interest repayment
 ```
 
-不能只按存入金额增加存款余额：旧有计息金额也可能参与偿还，使存款计息金额减少。零金额核心还债路径仍可能生成非零偿还分量；前台现金输入是否受理零金额另由业务规则决定。
+Do not simply add the deposit amount to the deposit balance: existing
+interest-bearing funds may also repay debt, reducing the deposit's interest base.
+The zero-amount core repayment path may still yield nonzero repayment components.
+Front-end acceptance of zero cash amounts is a separate business rule.
 
-6200 同时传递产品、币种账簿、交易方式、贷款状态、钞汇类别、透支上限、错账标志及资金流向条件，故不能只用金额恒等式替代账务规则。手续费另走收费入口和记账，不能自行从存入金额里扣掉一个假设费率。
+Section 6200 also passes product, currency ledger, transaction mode, loan status,
+cash/remittance category, overdraft limit, correction flag and fund-flow
+conditions. The amount identity cannot replace accounting rules. Fees have their
+own entry and postings; do not invent a rate and deduct it from deposit amount.
 
-## 账务规则的实际来源
+## Actual source of accounting rules
 
-GCCBAAR:150 起调用 GSYSSART，按业务系统名、交易/核心程序标识和条件代码取得 ART；随后调用 GSYSSSMT 和必要的 GSYSSSMP，决定核算规则及机构。GSYSSART 使用 CTQ-ART-ADDR 指向的 TSYSSART 表并搜索规则，不能从 KSADEP0 的调用语句推导完整科目配置。源目录包含查询代码；当前还没有取得目标运行环境装载的 SA0/KSADEP0 条件规则内容。
+GCCBAAR:150 onward calls GSYSSART to obtain ART using business system name,
+transaction/core-program identity and condition codes. It then invokes GSYSSSMT
+and, where required, GSYSSSMP to select accounting rules and institutions.
+GSYSSART searches TSYSSART through CTQ-ART-ADDR. KSADEP0 call statements do not
+reveal complete account mappings. Query code existed in the source directory,
+but the target environment's loaded SA0/KSADEP0 condition-rule contents were
+unavailable.
 
-## 后续实施原则
+## Implementation principles
 
-P3 先将已确认的金额分类和恒等式写在 SPP，查询账务配置形成具体分录计划，APP/PHY 落实日志、幂等、版本保护和共同提交。若使用 demo 配置，必须标明它是展示配置，并分别记录“源金额分类”和“demo 科目映射”的证据等级；不能声称科目与原银行配置等价。
+P3 first expresses confirmed amount classification/identities in SPP, then
+queries accounting configuration to form concrete postings. APP/PHY provide
+logging, idempotency, revision protection and joint commit. Demo configuration
+must be labeled as such, with separate evidence levels for source amount
+classification and demo account mapping. It cannot be claimed equivalent to
+original bank configuration.
 
-验收要同时检查账户及债务变更、分录平衡、手续费独立处理、原成交分量保存、失败恢复和重复/并发。原账务配置或原 COBOL 黄金值缺失不妨碍验证 SPP 表达及明确的 demo 行为，但会限制等价结论。
+Acceptance checks account/debt changes, balanced postings, independent fees,
+retained original trade components, failure recovery, duplicates and concurrency.
+Missing original accounting configuration or COBOL golden values does not prevent
+verification of SPP expressiveness and explicit demo behavior, but limits
+equivalence claims.
 
-## 已执行的展示计划
+## Executed demonstration plan
 
-prepareDepositPostings 将六类金额分配到八个固定槽位：借方现金、借方存款负债减少、贷方存款负债增加、贷方透支本金、贷方透支息、贷方催收透支息，以及手续费的借方现金和贷方费用收入。后两项独立于存入金额分配。零金额槽位保留，便于检查各分量及原事实。
+`prepareDepositPostings` maps six amount components into eight fixed slots:
+cash debit, deposit-liability-decrease debit, deposit-liability-increase credit,
+overdraft-principal credit, overdraft-interest credit, collection-overdraft-interest
+credit, and fee cash debit/fee-income credit. The last two are independent of
+deposit amount allocation. Zero-amount slots remain to expose components and
+original facts.
 
-SPP 先校验金额分量与汇总一致及资金分配守恒，再校验槽位、科目和方向，最后计算并检查借贷平衡。科目均使用 DEMO 前缀，属于明确展示契约，不是从银行 ART 表取得的配置。相关生成场景由 DepositPostingTest 的六项测试执行，最近回归为 demo 57 项全部通过，见实施路径。
+SPP first checks component/total consistency and conserved fund allocation, then
+slots/accounts/directions, and finally calculates/checks balanced debits and
+credits. Account names use the DEMO prefix: an explicit demonstration contract,
+not configuration obtained from bank ART. Six DepositPostingTest tests executed
+the generated scenarios. The latest regression recorded then had all 57 demo
+tests passing; see [implementation path](implementation-path.md).
 
-## 冲正分录候选
+## Reversal posting candidates
 
-当前 prepareRecordedDepositReversalPostings 从实际 demo 原账簿与原成交载荷双重核对，反转六项核心借贷方向，收费两项接受显式退费金额。它不重算原收费，不猜测生产 ART，也不更新账簿。SPP 表达资格、分量及方向，APP/PHY 只查询和分配结果。用户仍须确定 demo 的跨日/退费政策后，才能连接完整新冲正共同提交，详见 reversal-financial-plan.md。
+At that stage `prepareRecordedDepositReversalPostings` cross-checked the actual
+demo original ledger and original trade payload, reversed the six core debit/
+credit directions, and accepted explicit refund amounts for the two fee slots.
+It neither recalculated original fees, guessed production ART nor updated the
+ledger. SPP expressed eligibility, components and directions; APP/PHY only queried
+and allocated results.
+
+The historical design still awaited cross-date/refund-policy decisions before
+connecting a complete new reversal joint commit; see
+[financial reversal plan](reversal-financial-plan.md). Later decisions selected
+XBOD cash rules, recorded in [cash reversal source contract](cash-reversal-source.md).
+The earlier pending decision is not a renewed request to choose policy.
+
+This English version preserves evidence from revision `417a41f`, not newly
+executed tests or a promise that optional replay is supplied by the basic SDK.

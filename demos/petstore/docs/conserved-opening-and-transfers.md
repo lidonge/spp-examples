@@ -1,7 +1,32 @@
 # Zero opening and conserved transfers
 
-开户、角色维护及演示库启动只建立零余额/零库存记录，不产生资金或货物。买家充值是独立场景：第三方结算账户减少，买家钱包增加；第三方结算账户从零开始，调用 bounds 不设下限。库存入库也是独立场景：供应来源余额减少，可售库存增加，供应来源不设下限。负值记录外部来源累计净转出，不代表凭空产生资源。量子库中双方变化始终守恒。
+Account opening, role maintenance and demo database startup create only zero-balance
+or zero-stock records; they do not create funds or goods. Buyer funding is a separate
+scenario: the third-party settlement account decreases and the buyer wallet increases.
+The settlement account starts at zero, with no lower limit in the call's `bounds`.
+Stock receipt is also separate: the supply-source balance decreases and saleable
+stock increases, with no lower limit on the source. A negative source balance records
+cumulative net transfers from outside the system, not resources created from nothing.
+The paired changes in the quantum store remain conserved.
 
-SPP 描述 SettlementAccount、StockSupply、WalletFundingAgreement、StockReceiptAgreement 及各自场景；APP 给角色定义主键、暴露入口，PHY 沿用统一量子系统。网页提供独立充值和逐商品入库按钮，不在注册后隐式充值。Java 验收通过组合生成场景准备原有 5000 余额及每商品 10 库存，不实现业务公式。
+SPP describes `SettlementAccount`, `StockSupply`, `WalletFundingAgreement`,
+`StockReceiptAgreement` and their scenarios. APP defines role keys and exposes entry
+points; PHY retains the unified quantum system. The web UI offers separate funding
+and per-product stock-receipt buttons, without automatic funding after registration.
+Java acceptance tests compose generated scenarios to prepare the original balance
+of 5,000 and stock of 10 units per product; they do not implement business formulas.
 
-实施路径：先建模/零开户、明确双边量子转账和调用上下限，再完善零事实的框架存储建立机制（不得隐藏非零入账），随后更新网页和验收，执行 develop 全套及 testing 三 JVM 网页链路。比较传统方案：初始化赋余额/库存难以追溯来源；本方案把开户与交易分离，统一量子守恒和上下限，代价是演示需显式充值、入库步骤，分库零记录创建与失败重试现由通用技术待办机制封装，详见 [技术恢复](quantum-opening-recovery.md)。
+The recorded implementation path starts with modeling and zero-value opening,
+explicit two-sided quantum transfers and call bounds, followed by the framework's
+zero-fact storage creation mechanism without hidden nonzero credits. The UI and
+acceptance tests are then updated, followed by the complete `develop` suite and the
+three-JVM `testing` web flow. This is not a claim of new test runs during translation.
+
+Assigning initial balances or stock directly obscures their origin. This design
+separates opening from transactions and applies consistent conservation and bounds,
+at the cost of explicit funding and stock-receipt steps in the demo. Cross-database
+zero-record creation and failure retries are encapsulated by a generic technical
+task mechanism; see [technical recovery](quantum-opening-recovery.md).
+
+English translation of the document at examples revision `417a41f`; business
+identifiers and the original implementation scope are unchanged.

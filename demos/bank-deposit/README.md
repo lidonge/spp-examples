@@ -44,4 +44,4 @@ mvn -pl :xbod-deposit-demo -am test -Dtest='Xbod*Test' -Dsurefire.failIfNoSpecif
 
 `tools/web-acceptance.cjs` uses Playwright against an isolated database to exercise opening, exact-decimal USD deposit, rejected input, reversal preview, submitted reversal, receipt inquiry and mobile layout. See [the web workbench record](docs/web-workbench.md), [latest refactoring verification](docs/latest-refactoring-verification.md), and [completion audit](docs/completion-audit.md) for previously established capabilities and remaining limits. Historical counts refer to their cited source revisions.
 
-[English book](../../book/en/README.md) · [English presentation policy](../../book/references/english-demo-presentation.md) · [Chinese README](README.zh-CN.md)
+[English book](../../book/en/README.md) · [English presentation policy](../../book/references/english-demo-presentation.md)

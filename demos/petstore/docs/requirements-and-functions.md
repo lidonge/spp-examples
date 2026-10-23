@@ -1,91 +1,195 @@
-# Petstore 需求与功能
+# Petstore requirements and functions
 
-目标是以完整宠物用品商店展示 SPP 的业务描述能力。中文网页与 Java 自动验收调用同一套生成服务；业务只由 SPP、APP、PHY 实现，不手写生产 Java。既有 petstore、银行和 business-showcase 样例不在本轮迁移范围。
+Demonstrate SPP business expressiveness through a complete pet-supply shop.
+The web UI (originally Chinese) and Java acceptance invoke the same generated
+services. Production business uses only SPP/APP/PHY, without handwritten Java.
+The earlier petstore, bank and business-showcase examples were outside this
+original migration phase. Historical compile-only statements below describe
+revision `417a41f`, not every later verification run.
 
-## 业务范围
+## Business scope
 
-|功能|规则|验收目标|
-|---|---|---|
-|商品|分类浏览、在售商品、库存展示|分类筛选、无匹配、下架|
-|会员|注册、资料与普通/VIP等级；零余额开户，独立由第三方结算账户转入演示资金|重复注册、非法资料|
-|购物车|加入、设数量、移除、清空，数量为正整数|多商品、空车、下架、缺货|
-|报价|逐行金额；VIP九折；优惠后满100免运费，否则8；业务四舍五入到分|普通/VIP、小数、临界值|
-|下单|服务端价格、预占库存、订单成交快照、清空购物车|多行全成或全败，拒绝伪造价格|
-|付款|钱包向卖家支付全款|余额不足、金额守恒|
-|履约|付款后发货，发货后收货|状态资格、预占转售出|
-|取消|未付款释放预占；已付款未发货释放并退款|保留后续交易；发货后不能直接取消|
-|退货|已收货可申请；确认退货后售出转可售并全额退款|明确申请理由、状态转换|
-|办理凭证|回执及订单历史，查询已提交事实|提交结果不确定时查回执、重启读回|
-|中文网页|点击完整生命周期，展示服务端金额与状态|真实接口与页面交互|
+| Function | Rules | Acceptance targets |
+| --- | --- | --- |
+| Products | Browse categories, available products, stock | Category filter, no match, withdrawal |
+| Membership | Registration/profile/NORMAL or VIP; zero opening, independent demo funding from settlement account | Duplicate registration, invalid details |
+| Cart | Add/set/remove/clear positive integer quantities | Multiple products, empty cart, withdrawn/insufficient stock |
+| Quote | Line amounts; VIP 10% discount; free shipping at discounted subtotal 100, otherwise 8; explicit rounding to cents | NORMAL/VIP, fractions, boundaries |
+| Order | Server prices, stock reservation, settled snapshots, cart clearing | All lines succeed/fail together; reject forged prices |
+| Payment | Full wallet-to-merchant transfer | Insufficient balance, conserved funds |
+| Fulfillment | Ship after payment, receive after shipment | State eligibility, reserved-to-sold stock |
+| Cancellation | Unpaid releases stock; paid/unshipped releases/refunds | Preserve later trades; shipped orders cannot directly cancel |
+| Return | Request after receipt; confirmed return restores available stock and refunds fully | Explicit reason, state transitions |
+| Credentials | Receipts/order history query committed facts | Query after uncertain commit, read after restart |
+| Web UI | Click through lifecycle, display server amounts/states | Real interfaces and interaction |
 
-钱包是演示资金，不接入银行卡。认证、支付网关、税务、多仓、多币种、外部履约及生产部署不在承诺范围。取消和退货是新业务交易；回滚是 APP/PHY 对失败事务的技术撤销。
+Wallet funds are demonstrations, not bank-card integration. Authentication,
+payment gateways, taxes, multiple warehouses/currencies, external fulfillment
+and production deployment are excluded. Cancellation/return are new business
+trades; rollback is APP/PHY technical undo of a failed transaction.
 
-## 建模要求
+## Modeling requirements
 
-客户域拥有Person实体（自然人或组织），产品域拥有Product。Product扮演Goods，Person扮演Buyer和Merchant；Merchant在take中新增店名、商号和收款余额。Goods扮演CartLine、OrderLine与StockLine，Buyer扮演Cart；整体扮演映射保留参与者关系。Receipt是实际办理凭证。库存域独立拥有StockLine角色，不需要自造实体；销售域组织购物及订单。不存在StockBook汇总状态，库存合计按需统计。
+Customer owns Person (individual/organization); product owns Product.
+Product plays Goods; Person plays Buyer/Merchant. Merchant adds shop/trading name
+and received balance through take. Goods plays CartLine/OrderLine/StockLine;
+Buyer plays Cart. Whole-participant mappings retain relationships.
+Receipt is an actual credential. Inventory independently owns StockLine without
+inventing an entity; sales organizes shopping/orders. There is no StockBook
+aggregate state; totals are calculated when needed.
 
-每份 Contract 对应明确场景。ShopOrder 直接包含 Buyer 和 Goods 明细，不以 customerId/itemId 代替参与者关系；各后续合约记录原订单、当事人及本次约定。下单使用 ShopOrder，不重复包 PurchaseAgreement；报价补全未成交 ShopOrder，不另建 QuotationAgreement。查询用显式参与者集合，不制造集合或结果合约。
+Each Contract corresponds to a specific scenario. ShopOrder directly contains
+Buyer and Goods lines, not customerId/itemId substitutes. Later contracts retain
+original order, parties and current agreement. Ordering uses ShopOrder without
+PurchaseAgreement; quote hydrates an unsettled ShopOrder without QuotationAgreement.
+Queries use explicit participant collections, not wrapper/result contracts.
 
-SPP 不含无业务意义的 id、storeId、version、requestId。会员号、商品编号、订单号、回执号必须说明业务用途。平台主键、外键投影、版本、防重和数据库定位由 APP/PHY 实现。完整边界见 [业务模型边界](../../../book/references/spp-business-model-boundary.md)。
+SPP has no meaningless id/storeId/version/requestId fields. Membership/product/
+order/receipt numbers need business-purpose descriptions. APP/PHY own platform
+keys, foreign projections, revisions, duplicate protection and database location.
+See [business model boundaries](../../../book/references/spp-business-model-boundary.md).
 
-## 服务与场景要求
+## Services and scenarios
 
-商店各变更动作、报价、读取、门店开设均独立声明；客户、产品及库存域也有自己的开立/修订场景。场景不能调用场景，入口只携带实际参与的角色、实体、合约及集合。场景不能构造参与者；查询原地补全入口，动态明细由原子服务创建。服务无业务返回。
+Every shop change, quote, read and opening has its own declaration; providers
+have their own opening/revision scenarios. Scenarios cannot call scenarios.
+Inputs include only participating roles/entities/contracts/collections.
+Scenarios cannot construct participants; queries hydrate input instances, atomics
+create dynamic details. Services have no business return values.
 
-业务资格 check 显式出现在场景，缺省失败结束当前 block 而不回滚；需要撤销时写 checkXXX,breakTransction;。计算不藏校验；calculate 只能组合 calculate，普通原子服务不能互调。量子服务只声明加减，调用处以bounds约定成交上下限；生成代码传递范围，成交实现控制边界，越界撤销绑定事务。有限业务状态及会员等级采用枚举。
+Eligibility checks are explicit in scenarios. Default failure ends the current
+block without rollback; explicit checkXXX,breakTransction requests rollback.
+Calculations hide no checks. Calculate may compose calculate only; ordinary
+atomics cannot call each other. Quantum services declare increments/decrements,
+with caller bounds defining settlement limits. Generated calls pass limits and
+settlement enforces them, rolling back the bound transaction on violation.
+Finite business states and membership tiers use enums.
 
-所有数据库变更场景显式声明 transaction，默认 REQUIRED，REQUIRES_NEW 按当前支持矩阵使用，NESTED 和未支持组合编译报错。SPP 不选择事务实现模式。库存 available/reserved/sold 与钱包/收入是量子属性；数量缺省为int、金额缺省为BigDecimal规格，PHY允许重定义；业务只写公式及明确舍入。
+Every database-changing scenario explicitly declares transaction, default REQUIRED.
+REQUIRES_NEW follows the supported matrix; NESTED/unsupported combinations are
+compile errors for the selected unsupported configuration. SPP does not select
+realization mode. Stock available/reserved/sold and wallet/income are quantum;
+quantities default to int, monetary representation to BigDecimal specifications,
+overridable in PHY. Business supplies formulas and explicit rounding.
 
-标准 CRUD 直接按 `find/insert/update/delete + 类型名` 调用，不声明空原子服务。跨域标准调用根据 Reference 和唯一显式 take 自动解析，例如 `insertPerson(customer)` 和 `updatePerson(customer)` 维护主体，而 `insertBuyer/updateBuyer` 单独维护角色。复杂查询与业务服务保留显式定义。
+Standard CRUD is invoked as find/insert/update/delete + type, without empty
+atomic declarations. Reference and a unique explicit take resolve cross-domain
+standard calls: insertPerson(customer)/updatePerson(customer) maintain subjects,
+insertBuyer/updateBuyer separately maintain roles. Complex queries/business
+services remain explicit.
 
-## 应用与验收边界
+## Application and acceptance boundaries
 
-APP声明仓储、平台版本、防重、网页入口及四域同JVM部署；客户、产品和商店分别声明启动服务。PHY 将记录与量子资源绑定同一 H2/JDBC 后端。库存量子读取不加普通资源锁，量子实现负责并发成交；前端并行读取不同事实不构成一致快照。
+APP declares repositories, platform revisions, optional duplicate protection,
+web entries and four-domain same-JVM deployment; customer/product/shop define
+startup services. PHY binds records/quantum resources to H2/JDBC.
+Quantum stock reads do not lock ordinary resources; quantum realization handles
+concurrent settlement. Frontend parallel reads are not a consistent snapshot.
 
-Java 测试仅在 src/test/java 准备输入、组合生成场景、断言和注入故障，不补写业务。测试源码覆盖生命周期、拒绝、边界、防重、并发、失败与重启。本轮按用户要求只生成、编译，不运行回归；覆盖目标与历史 PASS 不能当作本轮运行证据。
+Java tests under src/test/java only prepare input, compose generated scenarios,
+assert and inject faults. Coverage targets lifecycle, rejection, boundaries,
+duplicates, concurrency, failures and restart. The original instruction was
+generation/compilation only, not regression execution. Coverage targets and old
+PASS counts were not execution evidence for that phase.
 
-## 独立域与集中部署
+Real customer/product/inventory/petshop domains bind same-kind atomics through APP.
+Shared PHY backend/resource/connection supports joint-commit intent; one-click
+registration registers subject and opens Buyer without calling a provider
+scenario. See [boundaries](domain-boundaries.md) and [implementation](multidomain-implementation.md).
+Source/generation had completed at that checkpoint, runtime acceptance had not.
 
-真实customer/product/inventory/petshop域通过APP绑定同类别原子服务，PHY同后端/资源/事务连接配置支持共同提交意图。一键注册保留登记主体并开立买家角色，不调用提供方场景。[域边界](domain-boundaries.md)及[多域实施路径](multidomain-implementation.md)说明所有权和证据。源码和生成已完成，运行行为未验收。
+Later refinements lock ordinary in-transaction reads, including mixed participants
+when ordinary attributes change, not quantum-only work. findStockLine does not
+lock quantum facts; lockStock was removed. addCartItem admission moved outside
+the write transaction. APP chooses database/TCC/dedicated quantum services,
+PHY integrates them. Shared-JDBC evidence is not evidence for every mode.
+See [transaction reads](../../../book/references/spp-transaction-reads.md).
 
-本轮补充：普通参与者的事务内查询自动生成锁定；混合参与者也修改普通属性时锁定，只有量子变化时不加锁。库存findStockLine不锁定量子事实，lockStock已移除；addCartItem资格查询移出写事务。量子属性逻辑统一归量子域，数据库/TCC/专用量子服务由APP选择、PHY接入，不能把共同JDBC示例当作所有模式的运行证据。参见[事务读取与量子域](../../../book/references/spp-transaction-reads.md)。
+Changing/read-only scenarios narrow transactions using reliable optimistic
+baselines: queries/checks/calculation before, atomic conditional writes inside.
+Admission-only reads are not commit conditions; quantum settlement does not
+advance ordinary revisions. Reservation retains acceptance after second-stage
+stock failure; payment illustrates nested REQUIRED logical boundaries.
+Non-LOCAL commits quantum work first and recovers across modes with Saga.
+The recorded develop setup uses LOCAL joint ordinary/quantum commit.
+See [audit](transaction-boundary-audit.md) and [plan](transaction-evolution-plan.md).
 
-各域变更与只读场景已按可靠乐观基线缩小事务：普通查询、校验与计算在事务前，事务内原子条件写入；只读准入不成为提交条件，量子成交不推进普通修订标记。预约展示两个顺序事务，预占失败保留已受理合约；付款展示嵌套REQUIRED逻辑边界；非LOCAL策略下量子阶段先成交，跨模式失败采用Saga恢复；本轮develop使用LOCAL共同提交量子与普通更新。详见[事务审计](transaction-boundary-audit.md)和[实施计划](transaction-evolution-plan.md)。
+### Simplified queries and business identifiers
 
+Order listing names key Buyer as the condition participant, with a supplied
+order collection. The unique APP order→buyer foreign key and Buyer primary key
+derive the query without positional repository configuration. Complex queries
+still demonstrate APP customization. Customer/order/line/reservation/receipt
+number generation uses auto ... prefix ... in owning APP tables; the business
+model retains these meaningful numbers.
 
-### 查询及业务编号声明简化
+## Environments, numbers and source presentation
 
-订单列表查询以 `key Buyer` 明确买家为条件参与者，订单结果集合由入口提供；根据 APP 中唯一订单→买家外键和买家主键推导，无须 positional repository 配置。复杂查询继续展示 APP 定制能力。客户编号、订单号、明细号、预约号和回执号的自动生成策略在所属 APP 表中声明 `auto ... prefix ...`，业务模型仍保留这些具有业务含义的编号。
+- APP environment selects deployed domains; develop uses readable LOCAL policy.
+  PHY selects environment parameters and rechecks resource identity after runtime
+  parameter resolution. LOCAL jointly commits ordinary/quantum work; unsupported
+  distributed capabilities reject configuration.
+- Quantum attributes/modified properties are collected automatically, without
+  repeated APP lists. XA requires a real Seata XA datasource proxy, not AT labeled
+  XA. External coordinator/database execution requires separate acceptance.
+- Model numeric types are defaults. PHY demonstrates global exact representations
+  and local field overrides. Business rounding is explicit; storage capacity does
+  not redefine mathematical rules.
+- Localized text is split by language, referenced by PHY resource directory.
+  Business constant names remain stable.
+- Default participant names/argument-free calls use full type matching, including
+  Goods versus Goods[]. Repeated full types retain aliases. SPP collection
+  references stay Goods[]; Java uses valid internal identifiers.
+- SPP/APP/PHY/enum comments were removed in favor of separate explanations.
+  That phase generated/compiled/statically checked without running regression.
 
-
-## 本轮环境、数字与源码展示
-
-- APP按environment选择本进程部署域，develop使用可读LOCAL策略；PHY参数按环境选择，并在启动解析运行时参数后重新核验资源身份。LOCAL共同提交包含量子及普通更新，分布式能力缺失时拒绝配置。
-- 量子属性与服务修改属性自动收集，APP不重复清单。XA选择真实Seata XA数据源代理，不能以AT代理冒充XA；外部协调器和真实数据库仍需单独运行验收。
-- 模型数字类型仅为缺省表示，PHY展示精确规格全局替换与字段局部覆盖；业务舍入明确，容量限制不改变业务数学规则。
-- 文案按语言分文件，PHY引用资源目录；业务常量名保持稳定。
-- 默认参与者名和无参数调用统一应用；单个Goods与Goods[]按完整类型匹配，只有重复完整类型保留别名。SPP集合引用保留Goods[]，Java内部才改用合法标识符。
-- SPP、APP、PHY与枚举移除源码注释，说明集中在独立文档中；只做源码生成、编译和静态核对，不执行回归测试。
-
-相较传统方案，部署与物理表示变化由APP/PHY集中控制，业务场景不会重复DTO别名、量子字段清单和国际化加载代码。代价是编译器与框架需要核验资源及协议能力；配置可解析不代表分布式链路已经可运行。
+Compared with traditional implementations, APP/PHY centralize deployment and
+representation without repeated DTO aliases, quantum lists or localization
+loading in scenarios. Compiler/runtime must validate resource/protocol capability;
+parsable configuration does not prove a working distributed deployment.
 
 ## Zero opening and conserved external transfers
 
-开户只建立零钱包；商品库存、第三方结算账户、库存供应来源均从零开始。充值和入库是独立场景，量子服务执行双边增减，来源调用 bounds 不设下限，接收方要求不小于零。网页提供独立入口；测试组合生成场景获取演示余额/库存，不手写业务 Java。具体需求、实施顺序与传统初始化赋值方案的比较见 [设计说明](conserved-opening-and-transfers.md)。
+Opening creates a zero wallet. Product stock, settlement and supply accounts also
+start at zero. Funding/receipt are separate scenarios with two-sided quantum
+changes. Source bounds have no lower limit; recipient bounds require nonnegative
+values. UI/tests compose generated scenarios, not handwritten business Java.
+See [design and comparison](conserved-opening-and-transfers.md).
 
-## 商品资料与成交明细分离
+## Product facts versus settled order lines
 
-商品名称和销售单价可以变化。旧订单明细必须保留本次成交确定的名称、单价及金额，付款、履约等后续操作不能用当前目录覆盖成交明细；新订单使用最新商品事实。
+Product name/price may change, but old lines retain settled name, unit price and
+amount. Payment/fulfillment cannot overwrite them from current catalogue facts;
+new orders use latest facts.
 
-SPP 中 `OrderLine` 由 `Goods` 扮演，名称、成交单价通过 `take` 映射。APP 在明细表声明 `snapshot(OrderLine.name, OrderLine.unitPrice)`，商品名称声明 `current(Goods.name)`；其余普通映射属性默认使用当前值。快照不反向保存到商品，角色仍直接关联商品参与者。
+OrderLine is played by Goods through take. APP declares
+snapshot(OrderLine.name, OrderLine.unitPrice) on line storage and current(Goods.name)
+for product name. Other ordinary mapped attributes default current. Snapshots
+never reverse-save into goods; roles still directly relate to product participants.
 
-产品域 `reviseProduct` 更新产品名称，商店域 `reviseShopGoodsPrice` 更新本域商品销售单价。两者各有业务合约与最小事务边界。自动验收组合生成场景：下单、改名、调价、重新读取旧订单、付款、新下单，检查历史值保留与新成交采用新值。配置范围及与传统复制字段方案的比较见[角色映射存储说明](../../../book/references/role-mapped-storage.md)。
+Product's reviseProduct changes names; shop's reviseShopGoodsPrice changes sales
+price. Each has a business contract/minimal transaction. Acceptance composes
+order, rename, reprice, reread old order, payment and new order, checking old/new
+facts. See [role-mapped storage](../../../book/references/role-mapped-storage.md).
 
+## Reservation failure disposition
 
-## 预约失败处置
+Accept first, reserve second. Insufficient stock retains the request and records
+rejection. Framework handles quantum undo; fail saves business disposition in
+an independent transaction. Built-in ResultInfo is scenario-only, not an input.
+Unknown commit, failed recovery or failed disposition cannot be called success.
+See [reservation failure handling](reservation-failure-handling.md).
 
-先受理、后预占；库存不足时保留原申请并记录拒绝原因。技术量子撤销由框架负责，业务处置用 fail 中的独立事务保存。系统 ResultInfo 仅供场景使用，不要求入口声明。未知提交、恢复失败或处置失败不得宣称成功，详见[预约失败处置](reservation-failure-handling.md)。
+## Technical-service demonstration
 
-## 技术服务演示需求
+APP matches all services, scenarios or named services; PHY binds implementation/
+parameters. Business SPP adds no logging or technical participants.
+The example observes shop scenario/query/check/calculate/ordinary-update/quantum
+calls and timings. Interceptors see technical metadata only; after is not commit,
+and ordinary business rejection is not a technical exception.
+See [technical services](technical-services.md) and
+[syntax design](../../../book/references/app-technical-services.md).
 
-APP 声明可按全服务、场景或指定服务匹配技术服务，PHY 绑定实现及参数；SPP 业务源码不添加日志或技术参与者。示例统一记录商店域场景、查询、校验、计算、普通更新及量子服务的调用和耗时。拦截器只观察技术元信息，after 不代表事务提交，正常业务拒绝不变成技术异常。见[技术服务样例](technical-services.md)及[语法设计](../../../book/references/app-technical-services.md)。
+The basic SDK warns when optional official tracing/request coordination is absent.
+That absence does not disable persistence, business checks or basic optimistic
+concurrency; it also must not be described as equivalent replay protection.

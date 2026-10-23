@@ -1,57 +1,130 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes implementation and acceptance before the
+> refactoring, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 决策记录
+# Decision record
 
-## 已确定
+## Established decisions
 
-- 创建独立 demo，先完善文档再按阶段实现。
-- 验证四个重点：计算边界、银行规则库、端到端记账一致性、冲正与重复/跨日。
-- 业务数字不关注存储精度，业务舍入显式表达；常见数字类型内置适配，PHY 允许显式扩展。
-- 共享服务部署选择归 APP；原银行源码只读。
+- Create an independent demo; complete documentation before phased implementation.
+- Validate four areas: calculation boundaries, banking rule library, end-to-end
+  posting consistency, and reversal including duplicates/cross-date handling.
+- Business numbers do not choose storage precision. Express business rounding
+  explicitly; common numeric types have built-in adaptations and PHY allows
+  explicit extensions.
+- APP owns shared-service deployment choices. Original bank source is read-only.
 
-## 本轮已确认
+## Decisions confirmed for this phase
 
-| 问题 | 建议 | 对实施的影响 |
+| Question | Selected recommendation | Implementation impact |
 | --- | --- | --- |
-| 遗留数字行为迁移目标 | 业务语义优先，未确认截断保留差异记录 | 决定三位利息等边界是否逐位兼容；确认前只实现已确认计算域 |
-| 首批交易 | 一般现金存入、普通/呆账透支存入及对应冲正 | 转账若纳入需增加来源账户与资格、共同事务契约 |
+| Migration target for legacy numeric behavior | Prioritize business semantics; record unconfirmed truncation differences | Determines digit-for-digit compatibility for boundaries such as three-decimal interest; implement only confirmed calculation domains until clarified |
+| First transactions | General cash deposits, ordinary/bad-debt overdraft deposits and corresponding reversals | Adding transfers would require source-account identity/eligibility and a joint transaction contract |
 
-用户已选择上述两项建议：业务语义优先；首批现金存入、透支偿还与对应冲正。具体舍入和币种规则仍须追踪来源，不能从这个选择推导任意业务政策。
+The user selected both recommendations. Specific rounding and currency rules
+still require source traceability; this choice does not imply arbitrary policy.
 
-## 结合源码再讨论
+## Topics to revisit with source evidence
 
-授权是重试整笔请求还是基于计划续接，需先检查现有运行框架并给出版本重验方案。产品/收费/会计配置，以及原 COBOL 黄金结果的取得方式，将在相关阶段拿到具体源码和案例后讨论。未获得原运行时结果时可以使用源码推导与明确的 demo 配置推进，但证据等级保持不变。
+Whether authorization retries the entire request or resumes a plan first
+requires inspection of the runtime and a version-revalidation design. Product,
+fee and accounting configuration, and obtaining original COBOL golden results,
+are to be discussed with concrete source and cases at the relevant phase.
+Source-derived expectations and explicit demo configuration permit progress
+without the original runtime, but do not increase the evidence level.
 
-## 冲正自动化方向
+## Direction for reversal automation
 
-用户已确认概念分工：回滚为技术恢复，量子性事务提供确定回滚；Saga 已提交节点依靠业务冲正/补偿恢复；冲正为新的业务交易，多数可采用默认反交易；补偿由业务明确提供，系统不能自动推导。详见 [语义及实现讨论](rollback-reversal-compensation.md)。当时具体实现契约未确定，暂缓泛化反交易机制。分类明确后，demo 已独立验证金融逆分量、分录及 JDBC 组件提交；非量子依赖和未确认业务政策仍不推断。Goal 保持活动。
+The confirmed conceptual split is: rollback is technical recovery; quantum
+transactions provide deterministic rollback within their supported boundary.
+Committed Saga stages recover through business reversal/compensation. Reversal
+is a new business transaction, often using a default inverse transaction.
+Compensation must be explicitly supplied by business policy and cannot be
+inferred automatically. See the [semantics discussion](rollback-reversal-compensation.md).
+The implementation contract was not settled at this stage, so generalized
+inverse-transaction work was deferred. The demo separately verified financial
+inverse components, postings and JDBC component commits; non-quantum dependencies
+and unconfirmed policy were not inferred. The historical goal remained active.
 
-用户提出冲正是否可由技术层自动实现。设计方向是尽可能自动记录和执行反向变更，但先区别失败回滚与成功后的业务冲正：前者恢复未成功交易，后者是有资格、日期及原交易依据的新业务操作。
+The user asked whether the technical layer could automate reversal. The design
+direction is to record and execute inverse changes where possible, while
+distinguishing failed-transaction rollback from reversal after success. The
+former restores an unsuccessful transaction; the latter is a new operation with
+eligibility, dates and original-trade evidence.
 
-SPP 可在业务层声明可逆更新关系、原成交分量、冲正条件和特殊计算，框架负责记录、调度、幂等及反向执行。当前尚未确认已有运行库能完整承接该声明，P4 必须先做能力检查，不能把设计方向写成已实现能力。
+SPP may declare reversible update relationships, original settled components,
+reversal conditions and special calculations. The framework records, schedules,
+coordinates idempotency and executes inverses. Whether the runtime could fully
+support these declarations had not been confirmed. P4 must inspect capability
+first; a design direction is not an implemented guarantee.
 
-已有技术基础：`DefaultTransactionManager.committedQuantumBoundaryPayload()` 可导出已提交量子边界，`reverseCommittedQuantumBoundary(payload)` 经物理适配器执行反向操作。它说明框架已有部分反交易机制；尚未证明能覆盖本 demo 的账户债务分量、计息、收费、授权与业务冲正资格，需在 P3/P4 用具体案例确认。
+Existing technical groundwork included
+`DefaultTransactionManager.committedQuantumBoundaryPayload()` to export committed
+quantum boundaries and `reverseCommittedQuantumBoundary(payload)` to execute
+inverses through physical adapters. This established partial framework support,
+not coverage of this demo's debt components, interest, fees, authorization or
+reversal eligibility. P3/P4 required concrete verification.
 
-在 XBOD 中优先验证 KBN 原偿还分量能否驱动自动恢复。不可直接恢复账户旧快照覆盖后续交易；反向分量须应用于当前状态，并验证资格、并发及重复冲正。跨日计息、费用和已经发生的外部效果按明确业务契约处理，不能从一次赋值推导其逆操作。
+For XBOD, first validate whether original KBN repayment components can drive
+recovery. Do not restore old account snapshots over later transactions. Apply
+inverse components to current state and verify eligibility, concurrency and
+duplicate reversal. Cross-date interest, fees and external effects require
+explicit business contracts; their inverses cannot be inferred from one assignment.
 
-## 普通赋值与状态的默认反交易：继续讨论
+## Default inverse for ordinary assignments/state: discussion pending
 
-用户未确认“当前仍是原成交版本且资格通过即还原原值”的建议，选择继续讨论。版本条件只能防止覆盖后续变化，不能定义业务撤销含义。相关新增实现继续等待讨论结论；候选操作类型、成交事实及当前适配器差异见 [默认反交易草案](default-reversal-design.md)。
+The user did not approve restoring an old value merely because the current
+version still matches the original trade and eligibility passes. Version checks
+prevent overwriting later changes but do not define business cancellation.
+Further implementation awaited discussion. Candidate operation types, settled
+facts and adapter differences are in the [default reversal draft](default-reversal-design.md).
 
-## 量子类与非量子类反交易：已确认分类
+## Quantum versus non-quantum inverse: confirmed classification
 
-用户明确：量子类的逆操作不具有覆盖性，可以提供确定反交易；存入之后又消费，不妨碍仅撤销原存入分量。非量子类必须确认不会覆盖其他已经发生的操作；开户后有存款，开户不能执行反交易。该分类替代按赋值/增减或单纯版本一致进行默认还原的建议。
+The user clarified that quantum inverses do not overwrite later changes and can
+provide deterministic inverse transactions: spending after a deposit does not
+prevent reversing only that deposit component. Non-quantum inverses must establish
+that they do not overwrite other completed operations. An account with subsequent
+deposits cannot have its opening reversed. This replaces suggestions based only
+on assignment/increment distinctions or matching versions.
 
-非量子判断须包含跨操作、跨对象的业务依赖，不能只查原字段是否有后续修改。现有 JDBC 反向边界的原 after 校验无法满足允许后续独立量子更新的语义，这项差异和具体验收已加入草案。分类已确定，依赖记录及执行契约继续讨论。
+Non-quantum decisions require cross-operation and cross-object business
+dependencies, not just checking whether the original field changed. The existing
+JDBC inverse boundary's original-after-value check could not support independent
+later quantum updates. That difference and concrete acceptance were added to the
+draft. Classification was settled; dependency recording/execution still needed
+discussion.
 
-## 现金冲正规则：已确认沿用 XBOD
+## Cash reversal rules: follow XBOD
 
-用户先明确“跨日冲正 xbod 原本是什么规则就用什么规则”，随后明确“就是现金冲正按原 xbod 规则”。现金冲正的日期、日累计、积数、资格、收费和原记录处理以有效源码为准；不再要求用户在自行设计的跨日和退费候选方案之间选择。原代码注释不作为生效规则。
+The user first required the original XBOD cross-date reversal rules, then
+confirmed that cash reversal as a whole follows XBOD. Dates, daily totals,
+accrual products, eligibility, fees and original-record handling follow active
+source. Do not ask the user to choose newly invented cross-date/refund policies.
+Comments in original code are not active rules.
 
-KSAFEE0 5500 从原 KBN 恢复原收费金额，而非按冲正日重新询价。当前选定柜台现金收费路径据此退原实际费用。跨日账户处理见 [现金冲正源码契约](cash-reversal-source.md)。这次决定也意味着正式现金入口优先沿用 XBOD 的透支敞口恢复公式；既有通用非覆盖金融逆分量测试保留为独立能力，不作为原银行规则等价证明。
+KSAFEE0 section 5500 restores actual original fees from KBN instead of repricing
+on the reversal date. The selected teller cash-fee path therefore refunds the
+actual original charge. See the [cash reversal source contract](cash-reversal-source.md)
+for cross-date account handling. The formal cash entry also prioritizes XBOD's
+overdraft-exposure restoration formula. Existing generic non-overwriting inverse
+component tests remain independent capability checks, not bank-rule equivalence.
 
-仍需明确标注银行配置 fixture、未执行原 COBOL、外围额度/登记等未接入范围；这些限制不转化为让用户重新决定已经存在的现金业务规则。
+Keep explicit the bank-configuration fixtures, unexecuted original COBOL and
+unintegrated peripheral limits/registration. These limitations do not require
+the user to redesign already existing cash business rules.
 
-## 2026-10-08 纯源语言约束：用户明确要求
+## Historical 2026-10-08 source-only requirement
 
-只允许 SPP、APP、PHY，所有 Java 必须由生成链路产生，不得手写任何 Java。事务完整边界和模式必须由 SPP 明确表达，不能隐藏在 Java 提交代码。语法不足先指出并完善，不增加手写实现作为绕行方案。当前不合规责任与迁移条件见 [纯源语言核查](source-language-only.md)。该要求取代早期手写部署、查询、提交和演示入口选择。
+At that stage the user required only SPP, APP and PHY, with all Java generated:
+no handwritten Java. Complete transaction boundaries and mode had to be visible
+in SPP, not hidden in Java commit code. Syntax gaps had to be identified and
+fixed rather than bypassed with handwritten implementations. See the
+[source-only audit](source-language-only.md) for the historical noncompliance
+inventory and migration conditions. This superseded earlier handwritten
+deployment, query, commit and demo-entry choices.
+
+The later applicable demo instructions permit Java tests to prepare inputs,
+compose generated services, assert results and inject technical faults.
+Handwritten production business Java remains prohibited. The historical blanket
+test prohibition above is not the current contribution rule.

@@ -1,27 +1,47 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 旧冲正存储测试的源验收接替
+# Source acceptance replacing legacy reversal-store tests
 
-状态：下表源责任已在完整增量 verify 中全部实际通过（978 项 JUnit、74 个 APP 根入口，日志 /tmp/spp-prepared-reversal-corrected-source-validation.log）。已删除 JdbcDepositReversalStoreTest 的 16 个旧方法；随后 clean verify 已通过962项JUnit及74入口，旧测试和嵌套class均已清除（/tmp/spp-reversal-store-retirement-clean-validation.log）。旧 Store 主 Java 仍由其他旧测试使用，需要随剩余责任迁移再删除。
+Historical status: all source responsibilities below passed incremental verify
+(978 JUnit tests and 74 APP root entries; log
+`/tmp/spp-prepared-reversal-corrected-source-validation.log`).
+The 16 old methods in JdbcDepositReversalStoreTest were deleted. Subsequent clean
+verify passed 962 JUnit tests and 74 entries, removing old test/nested classes
+(log `/tmp/spp-reversal-store-retirement-clean-validation.log`).
+Other legacy tests still used the old Store production Java, which awaited
+retirement with those remaining responsibilities.
 
-| 旧测试责任 | 源证据 |
-|---|---|
-| 新反交易、账户/分录/关联/审计共同提交；保留原交易和后续存款 | 99j现金冲正、99zm/99zma各提交点；原及后续成交/分录独立查询 |
-| 已成交重放不再次反向；当前有后续业务 | 99zn跨JVM重启；99zub准备结果重放，在冲正后实际再存入25仍保持当前225/原成交200 |
-| 不同冲正身份不得再次撤销同一原交易 | 99j拒绝；99zo/99zoa/99zob真实不同身份并发 |
-| 准备后账户过期，失败无关联/分录，原身份按新状态重试 | 99zua实际另存入5，拒绝旧候选；重新准备最终205及后续成交/分录保持 |
-| 关联、账户、中途分录和提交前故障回滚 | 99zm/99zmb真实服务/JDBC故障；99zt第4条分录冲突确认前3条撤回 |
-| 同/不同身份真实并发只一次反向提交 | 99zo/99zoa/99zob，两执行线程都准备后共同释放到提交 |
-| 提交已成功但响应失败，可查询原成交并重放 | 99zmb afterCommit真实连接故障及查询/重试 |
-| 准备后原凭证变化不得成交 | 99zu用声明式持久更新将原settled.version改99；事务内锁定复核，余额/关联/分录/量子均保持，再恢复夹具重试 |
-| 改请求内容复用已成交身份拒绝 | 99zub新增overnightMode2改变与原凭证改变两种独立拒绝；审计五条、成交一笔、重放两次 |
-| 主审计/失败审计不可用保持主异常且回滚反交易 | 99zr双故障，source failure facts记录附加错误码 |
-| 重放审计失败不否认已知成交、不重复反向 | 99zr真实成交后才启用双审计故障，查询及稳定身份重试 |
-| 文件数据库关闭重启仍保留交易/实际分录/身份 | 99zn两个独立JVM，文件H2的原/后续/冲正和历史读回 |
-| 同身份但原凭证不同属于身份拒绝 | 99zub准备原事实改99，报DEPOSIT_REQUEST_ID_REUSED，原成交和后续业务完全保持 |
-| commit实际执行前抛异常，结果未知，查询后可原身份重试 | 99zmb commitBefore实际连接边界、无持久成交，unknown审计及重试 |
-| commit实际执行后抛异常，结果未知，查询已有成交 | 99zmb commitAfter实际连接边界、完整持久成交，查询/重放不再次扣减 |
+| Old responsibility | Source evidence |
+| --- | --- |
+| Joint commit of new inverse trade, account/postings/link/audit; retain original and later deposits | 99j cash reversal and 99zm/99zma commit points; independent queries of original/later trades and postings |
+| Completed replay does not reverse again, even with later business | 99zn cross-JVM restart; 99zub prepared-result replay after an actual later deposit of 25, retaining current 225/original trade 200 |
+| Different reversal identities cannot reverse the same original twice | 99j rejection; 99zo/99zoa/99zob actual different-identity concurrency |
+| Account becomes stale after preparation: no failed link/postings; retry original identity from new state | 99zua actually deposits another 5 and rejects the stale candidate; fresh preparation yields 205 while retaining later trade/postings |
+| Rollback of link/account/partial-posting/pre-commit faults | 99zm/99zmb actual service/JDBC faults; 99zt fourth-posting collision confirms removal of first three |
+| Same/different identity concurrency commits one reversal | 99zo/99zoa/99zob release both execution threads to commit only after both prepared |
+| Commit succeeds but response fails: query original result/replay | 99zmb afterCommit actual connection fault, query/retry |
+| Original document changes after preparation: no settlement | 99zu declaratively persists original settled.version=99; locked revalidation inside transaction preserves balance/link/postings/quantum facts, then fixture is restored for retry |
+| Changed request cannot reuse a settled identity | 99zub independently changes overnightMode2 and original document; five audit entries, one trade, two replays |
+| Primary/failure audit unavailable: preserve primary exception and roll back inverse | 99zr dual faults; source failure facts retain additional error code |
+| Replay-audit failure does not deny known settlement or reverse again | 99zr enables dual audit faults only after actual trade; query and stable-identity retry |
+| File close/restart preserves trade, actual postings and identity | 99zn two independent JVMs read original/later/reversal trades and history from file H2 |
+| Same identity with different original document is identity rejection | 99zub changes prepared original fact to 99, returns DEPOSIT_REQUEST_ID_REUSED, preserves original trade and later business |
+| Exception before actual commit: unknown result, query then retry original identity | 99zmb commitBefore at actual connection boundary, no durable trade, unknown audit and retry |
+| Exception after actual commit: unknown result, query existing trade | 99zmb commitAfter at actual connection boundary, complete durable trade, query/replay without another deduction |
 
-过期计划的源提交返回持久版本冲突码 PERSISTENCE_VERSION_CONFLICT；旧Java组件返回 DEPOSIT_VERSION_CONFLICT。两者均拒绝过期计划并保证整笔回滚，现有源并发/查询路径明确使用前者；不得通过修改通用异常消息模拟银行专属错误。新源现金入口沿用XBOD业务资格和现金跨日规则，旧无配置金融组件的fixture不作为新的现金业务政策。
+Stale-plan source commits return PERSISTENCE_VERSION_CONFLICT; old Java components
+returned DEPOSIT_VERSION_CONFLICT. Both reject stale plans and guarantee complete
+rollback within the verified boundary. Source concurrency/query paths explicitly
+use the former; do not alter generic exception messages to simulate bank-specific
+errors. New source cash entries follow XBOD eligibility and cross-date rules.
+Fixtures from old unconfigured financial components do not define new cash policy.
 
-源场景与旧Java类使用的存储结构不同：完整源事务中的原事实校验和唯一冲正关联由声明、查询与版本更新共同实现。这里接替的是列出的行为责任，不宣称复刻旧Java内部SQL表名、回调或私有数据包装。
+Source scenarios and old Java classes use different storage layouts. Declarations,
+queries and version updates jointly implement original-fact checks and unique
+reversal links inside full source transactions. What replaces the old tests is
+the listed behavioral responsibility, not replication of private Java SQL table
+names, callbacks or wrappers.
+
+Evidence is preserved from revision `417a41f`, not rerun for translation.

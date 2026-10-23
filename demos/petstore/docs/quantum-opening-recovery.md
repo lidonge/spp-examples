@@ -1,29 +1,88 @@
-# 分库零记录创建的技术恢复
+# Technical recovery for cross-database zero-record creation
 
-业务入口是一个 insertBuyer。量子属性属于 Buyer 模型，但零记录的实际位置由 APP/PHY 决定；业务场景不分拆普通插入与量子记录创建。普通维护只建立零记录，非零资金变动仍调用守恒量子服务。
+The business entry is one `insertBuyer`. Quantum attributes belong to Buyer, but
+APP/PHY determine where their zero records live. Business scenarios do not split
+ordinary insertion from quantum-record creation. Ordinary maintenance creates
+only zero records; nonzero fund changes still use conserved quantum services.
 
-## 实现
+## Implementation
 
-生成 CRUD 已统一使用 JdbcObjectRepository。本轮完善此通用运行时，无需在 Petstore 增加业务 Java 或改写 SPP 场景。
+Generated CRUD uniformly uses JdbcObjectRepository. The generic runtime handles
+this behavior without Petstore business Java or rewritten SPP scenarios.
 
-同一 DataSource 的普通表与量子表沿用共同本地事务。不同 DataSource 时，本地先插入普通快照、写 APP 角色表，再将零记录创建任务写入 `<snapshot_table>_quantum_openings`；这三者由同一个本地事务提交。事务回滚撤销待办，远端没有任何创建请求。保存点回滚亦不会发送已撤销任务。
+Ordinary and quantum tables sharing one DataSource retain a joint local
+transaction. For different DataSources, insert the local ordinary snapshot, write
+the APP role table and enqueue zero-record creation in
+`<snapshot_table>_quantum_openings`. All three commit in one local transaction.
+Rollback removes the task before any remote creation request; savepoint rollback
+also prevents dispatch of rolled-back tasks.
 
-JdbcTransactionScope 在实际提交并解绑、关闭本地连接后执行技术回调。回调读取已提交待办，确认本地拥有者存在，以幂等的 missing-only 操作在独立技术事务中建立远端零记录，然后删除待办；不借用查询调用者已有的量子事务，避免其回滚时丢失已经清除待办的零记录。多个量子属性分别记录任务，已完成部分可以独立安全重放。任务未完成时，当前拥有者事务内读取自己的新参与者可将待建事实视为零；事务外读取先完成技术恢复，不把缺失记录包装成完整查询成功。
+JdbcTransactionScope runs technical callbacks after actual commit, unbinding and
+closing the local connection. A callback reads committed tasks, confirms the
+local owner exists, creates remote zero records with idempotent missing-only
+operations in an independent technical transaction, then removes the task. It
+does not borrow a querying caller's quantum transaction, whose later rollback
+could otherwise remove a zero record after its task had been deleted.
 
-提交之后量子库暂不可用，回调抛出 QUANTUM_OPENING_RECOVERY_PENDING，保留本地角色与持久待办。该错误由 APP/PHY 技术路径处理；此服务内部的零记录补齐不要求 SPP 定义业务反交易，场景其他已成交服务仍遵从既有事务恢复规则。下一次启动连接仓储、参与者查询或调用 JdbcObjectRepository.recoverQuantumOpenings() 会重试。没有依赖内存任务、定时器或自动创建后台线程。服务完整成功返回要求技术回调完成；技术错误不等于所有本地写入已回滚。
+Each quantum attribute has a separate task, allowing safely replayable partial
+completion. Before completion, the owning transaction may read its newly created
+participant's pending facts as zero. Reads outside that transaction first finish
+technical recovery; missing records are not disguised as complete query success.
 
-远端已经创建但响应丢失、或删除待办失败，重试均不重置已有量子值。只建零记录，不产生资金交易流水。即使本地提交响应丢失，任务与角色要么一起不存在，要么一起持久存在；重启读取实际数据库事实恢复，不猜测提交结果。
+If the quantum database is unavailable after commit, the callback throws
+QUANTUM_OPENING_RECOVERY_PENDING, retaining local role and durable task. APP/PHY
+technical handling owns this error. Completing zero records inside this service
+does not require an SPP business inverse; other already committed scenario
+services still follow existing transaction recovery rules. Recovery retries when
+startup connects the repository, a participant is queried, or
+JdbcObjectRepository.recoverQuantumOpenings() is called. It does not depend on
+in-memory jobs, timers or automatically created background threads.
 
-## 范围与代价
+Full service success requires callback completion. A technical error does not
+mean every local write rolled back. If remote creation succeeds but its response
+is lost, or task deletion fails, retry never resets an existing quantum value.
+Zero creation produces no financial transaction entries. Even with a lost local
+commit response, role and task either both remain absent or both persist.
+Restart queries real database facts rather than guessing the commit outcome.
 
-当前接入内置 JDBC 普通仓储和 JDBC 量子库。它提供可恢复的跨库创建，不宣称分库同时提交；数据库持久介质损坏、旧版本孤立零记录治理，以及其他提供方协议不在本轮自动修复范围。调用者持有并自行提交的 JDBC 连接需要在提交后驱动技术恢复，框架不能替外部所有者判断提交结果。
+## Scope and cost
 
-传统实现常将这类故障推给业务补偿，或仅依靠内存回调；本实现把待办与本地角色一起持久化，恢复责任留在 APP/PHY。代价是新增技术表和一次远端创建往返，分库中断时需要恢复完成后才能提供完整参与者。
+The built-in ordinary JDBC repository and JDBC quantum store support this
+recoverable cross-database creation, not simultaneous cross-database commit.
+Damaged persistent media, orphan-zero cleanup from older versions and other
+provider protocols are outside automatic repair scope. An externally owned JDBC
+connection requires its caller to drive technical recovery after committing;
+the framework cannot infer that owner's commit result.
 
-## 验证
+Traditional approaches often assign this failure to business compensation or
+use only in-memory callbacks. Here the task persists with the local role and
+recovery stays in APP/PHY. The cost is a technical table and remote creation
+round trip; interruption requires recovery before a complete participant can
+be supplied.
 
-QuantumOpeningRecoveryTest 验证本地回滚无远端记录、远端创建确实晚于本地提交、量子库故障后重启恢复、远端响应丢失后不覆盖成交值、本地提交响应丢失后重启恢复、同库共同回滚、保存点回滚不发送任务、外部连接提交后恢复，以及技术重放不受无关量子事务回滚影响。DatabaseInitializationTest 保持启动 missing-only 兼容。
+## Historical verification
 
-框架最终全套回归 589 项通过，失败/错误/跳过均为 0，包含 8 个新恢复测试；日志 `/tmp/spp-opening-appframe.log`。testing 三 JVM 初次完整网页与重启通过，钱包、各 SKU 库存和每笔流水的守恒核对通过，证据 `/tmp/spp-bootstrap-testing-8jone6s4/`。最终技术事务隔离改动重新打包（`/tmp/spp-opening-testing-package.log` BUILD SUCCESS）后，testing 三 JVM 完整网页及商店重启再次通过，浏览器 exit=0；最终证据 `/tmp/spp-bootstrap-testing-64239ev0/`。测试进程均已停止，未修改现有常驻服务与数据库。
+QuantumOpeningRecoveryTest checks local rollback without remote records, remote
+creation only after local commit, restart recovery after quantum-store failure,
+lost remote response without overwriting settled values, lost local commit
+response followed by restart, same-database joint rollback, savepoint rollback
+without dispatch, post-commit recovery for external connections, and technical
+replay isolated from unrelated quantum-transaction rollback.
+DatabaseInitializationTest preserves startup missing-only compatibility.
 
-最终 testing 重启后只读账本核对也通过：资金合计、逐 SKU 库存合计、逐交易流水增减均守恒，日志 `/tmp/spp-bootstrap-testing-64239ev0/ledger-audit.log`。
+The recorded full framework regression passed 589 tests with zero failures,
+errors or skips, including eight new recovery tests; log
+`/tmp/spp-opening-appframe.log`. The first testing three-JVM full web/restart flow
+passed wallet, per-SKU stock and per-transaction conservation checks; evidence
+`/tmp/spp-bootstrap-testing-8jone6s4/`.
+
+After the final technical-transaction isolation change, packaging succeeded
+(`/tmp/spp-opening-testing-package.log`). The testing three-JVM full web flow and
+shop restart passed again with browser exit 0; final evidence
+`/tmp/spp-bootstrap-testing-64239ev0/`. Test processes were stopped without
+changing existing resident services/databases. A final read-only ledger audit
+after restart also passed total funds, per-SKU totals and each transaction's
+conserved deltas: `/tmp/spp-bootstrap-testing-64239ev0/ledger-audit.log`.
+
+These are historical results preserved from revision `417a41f`, not tests rerun
+for this English translation.

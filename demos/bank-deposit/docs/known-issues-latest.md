@@ -1,76 +1,82 @@
-# 本轮重构已知问题与待决策
+# Refactoring: known issues and pending decisions
 
-## KI-R01：还本还息内部账户与非资金量子事实（已关闭）
+This ledger records the refactoring's historical evidence and remaining scope. Test counts below are historical, not new results of the English translation. Request coordination and invocation tracing require the optional enhanced providers; the basic profile does not promise those features.
 
-2026-10-13 用户明确：偿还利息必须增加银行利息收入内部户，不能把欠息减少直接当作资金流向。此前用“负贡献”解释缺口以及因此阻塞目标的判断撤回。
+## KI-R01: repayment internal accounts and non-cash quantum facts (closed)
 
-例：现金存入 100、还息 10、余额增加 90，真实资金变化是现金结算户 -100、客户余额 +90、银行利息收入内部户 +10，合计零。欠息另外减少 10，是清偿事实，不再重复计入这个资金守恒组。还本和催收利息也需各自真实账务对方，不能只保存分录而不更新账户事实。
+On 2026-10-13, the user clarified that interest repayment must increase the bank's internal interest-income account. Reducing interest owed is not itself a cash destination. The previous explanation using a “negative contribution,” and the resulting decision to block the goal, were withdrawn.
 
-旧实现缺少真实银行内部户更新，且显式守恒列表同时限制量子记录。当前已新增三个内部账户角色、独立零资金开户场景、真实存入及冲正更新和原成交账户引用；生成器记录所有实际量子更新，APP 属性列表只选资金守恒组，未列入组的欠款与敞口仍保留量子边界、落库、回填和反交易。
+For cash deposited of 100, interest repaid of 10, and balance increased by 90, actual cash movements are settlement account -100, customer balance +90, and bank interest-income account +10: total zero. Interest owed separately decreases by 10 as a discharge fact and must not be counted again in that cash-conservation group. Principal and collection-interest repayment also require real accounting counterparties, not merely journal entries without account updates.
 
-实施要求：
+The old implementation lacked real bank-internal-account updates and used the explicit conservation list to restrict quantum recording too. The refactoring added three internal-account Roles, independent zero-funded opening scenarios, actual deposit/reversal updates, and original settlement account references. The generator records all actual quantum updates. APP's property list selects only the cash-conservation group; debt and exposure outside that group retain quantum boundaries, persistence, backfill, and inverse transactions.
 
-1. 补齐真实内部账户参与者、查询、存储、调用处 bounds 与原交易记录；冲正使用原成交账户及金额，不能按当前路由重选。
-2. 资金守恒组只核对真实资金流；欠款和额度仍保留已定义的量子一致性，不擅自降为普通属性。
-3. 完善通用语义，使量子持久化、边界、回填覆盖全部更新属性，而资金守恒按业务约定的组核对；本轮沿用已有 APP 显式属性列表，银行公式仍全部在 SPP。
-4. 两环境验收真实还息、还本、混合清偿及冲正、内部户边界失败和系统反交易。
+Implementation requirements:
 
-LOCAL 联合回归 1,166 项及最终 testing 的 XBOD 33 项全部通过，覆盖混合清偿、内部户查询、跨日冲正、内部户边界失败和后续普通保存失败时的资金及欠款反向恢复。此实现缺口关闭；普通 Saga 补偿仍见 KI-R04。核对中修复了历史核心向量遗漏 `.005` 等小数的提取问题，并将 PHY 默认容量改为 BigDecimal(25, 6)，保留已约定的业务精确结果。此项不用于阻塞整个目标。
+1. Add actual internal-account participants, queries, storage, call-site bounds, and original transaction records. Reversal uses original settled accounts and amounts rather than selecting routes again.
+2. Check actual cash flows in the conservation group. Debt and limits retain their defined quantum consistency, not ordinary-property semantics.
+3. Generic semantics must cover every updated property for quantum persistence, boundaries, and backfill, while checking conservation by the business-declared group. Retain the existing explicit APP property list; all bank formulas remain in SPP.
+4. Verify actual interest/principal/mixed repayment and reversal, internal-account bound failures, and system inverse transactions in both environments.
 
-## KI-R02：历史技术恢复覆盖迁移
+The historical combined LOCAL regression passed 1,166 tests, and final testing-profile XBOD passed 33. Coverage included mixed repayment, internal-account queries, cross-day reversal, internal-account bound failures, and inverse restoration of cash/debt after subsequent ordinary-save failure. This implementation gap was closed; ordinary Saga compensation remains KI-R04. The audit also fixed extraction of historical core-vector decimals such as .005 and changed PHY default capacity to BigDecimal(25, 6), preserving agreed exact business results. This issue no longer blocked the overall goal.
 
-旧 86 个 APP examples 混有生产场景组合、测试夹具、技术重试和异常实现。旧源完整保留作对照；新版已有独立 Java 验收，不能把历史成功数直接带入新版。提交未知、恢复重启、远程故障以及高并发条目仍需按新版运行协议逐项迁移。
+## KI-R02: migrating historical technical recovery coverage
 
-## KI-R03：真实银行外部事实
+The old 86 APP examples mixed production-scenario composition, fixtures, technical retries, and exception implementations. Retired source remains for comparison. The new version has independent Java acceptance tests; historical success counts cannot simply be carried forward. Unknown commits, recovery restart, remote faults, and high concurrency require migration against the new runtime protocol.
 
-产品限额、费率、科目、柜员权限与授权事实的提供方仍是演示范围。基础科目八槽只是原 demo 的平衡分录规则，不能宣称恢复了未提供的 ART 配置。真实银行接入应通过 APP 服务绑定与 PHY 部署，不能将界面传入的资格资料当作可信生产事实。
+Progress: three independent JVMs covered normal exit/restart, original transaction queries, continued reversal, and persisted journal entries. Forced process exit after confirmed settlement followed by restart/reversal was also added. Crashes during commit, unknown commit outcomes, network faults, and high concurrency require separate verification. See the [historical entry ledger](legacy-entry-migration.md).
 
-## KI-R04：分库 Saga 普通已提交阶段的业务补偿
+Concurrency progress: simultaneous deposits into independent accounts and competing new reversals of one original settlement passed in both configurations. Different requests competing on the same account, and reread/retry after stale-fact conflict, also passed in both. Remote same-serial concurrent waiting, heavy load, and actual network faults remain separate obligations.
 
-同一存入场景在 develop 的 LOCAL 中，普通保存故障使量子与普通变化共同回滚；testing 的统一量子库模式下，量子阶段先提交，普通 Saga 更新可能已有阶段成交。框架可以反向恢复量子资金，但不能自动撤销已提交的积数和账户明细更新。
+Commit-fault progress: LOCAL deposit and reversal gained four-stage JDBC fault injection, reporting definite rollback, unknown commit, or definite settlement, with independent cash/contract/journal checks. Automatic outcome discovery and retry after unknown commit, actual disconnection/process interruption, and testing-profile multistage failures were not equivalently migrated.
 
-本轮 fail 在恢复不完整时记录 RECONCILIATION_REQUIRED；系统返回 RECOVERY_REQUIRED、handled=false，并保留原失败，不把记录业务处置等同恢复成功。测试验证这些真实结果。普通阶段的反交易与业务补偿仍需独立规则设计，不能擅自覆盖后续业务。此项与全项目既有“补偿需专门讨论”保持一致。
+## KI-R03: real external bank facts
 
-KI-R04 的冲正实证：反向分录保存失败时，分库资金已由系统恢复为原成交余额，但普通 Saga 已保存“原交易已冲正”和新的冲正合约。系统明确标记待核对，不允许业务继续按已完成冲正处理；如何撤销这些已提交普通事实或组织业务补偿仍需约定。LOCAL 下同一故障全部回滚，已经验证可重新办理。
+Providers of product limits, rates, accounts, teller privileges, and authorization facts remain demonstration implementations. The basic eight-slot accounting scheme is the original demo's balanced-entry rule, not recovery of unavailable ART configuration. Production integration belongs in APP service bindings and PHY deployment. UI-supplied qualification data is not trusted production evidence.
 
-KI-R02 进展：已补齐三个独立 JVM 的正常退出重启、原交易查询、继续冲正与分录持久化；已补成交确认后强制退出进程、重启继续冲正；提交过程中崩溃、提交未知、网络故障与高并发仍需分别验证。逐入口状态见 [历史入口台账](legacy-entry-migration.md)。
+## KI-R04: business compensation for committed ordinary Saga stages across stores
 
-KI-R02 并发进展：独立账户同时存入，以及同一原成交两个新冲正请求竞争，已在两配置通过。同一账户不同请求竞争、旧事实冲突后重新查询重试也已在两配置通过；远程相同流水号并发等待、高负载与真实网络故障仍需分别核对。
+In develop's LOCAL deposit scenario, ordinary-save failure rolls back quantum and ordinary changes together. Under testing's unified quantum-store mode, the quantum stage commits first and some ordinary Saga stages may already have settled. The framework can inversely restore quantum cash, but cannot automatically undo committed accrual bases or account details.
 
-## KI-R05：执行中远程请求的返回策略
+When recovery is incomplete, this refactoring's fail path records RECONCILIATION_REQUIRED. The system returns RECOVERY_REQUIRED with handled=false and retains the original failure. Recording business disposition is not successful recovery. Tests check those actual outcomes. Ordinary-stage inverse transactions and compensation need independent business rules that preserve subsequent activity. This follows the project's standing requirement to discuss compensation separately.
 
-现行幂等 API 对 RUNNING 请求返回技术状态 REQUEST_IN_PROGRESS，防止重新执行业务；原请求完成后重试返回其原结果。已验证不能将它称为“同步等待原结果”。是否增加 APP/PHY 的有界等待策略、等待超时如何返回，尚未约定，本轮不在 SPP 或业务 Java 中补写等待/重试逻辑。测试中的一次完成后重放只是技术协议验收。
+Reversal evidence: after inverse-entry save failure, the system restored cross-store funds to original settled balances, but ordinary Saga stages had already saved “original transaction reversed” and a new reversal contract. The system explicitly requires reconciliation rather than allowing treatment as a completed reversal. Undoing those committed ordinary facts or arranging compensation remains to be agreed. The same LOCAL fault rolled back completely and was verified retryable.
 
-## KI-R06：跨多个参与者的界面防重事实（已关闭）
+Additional evidence: after reversal reads the original contract, another update changes it; the reversal's later update triggers PERSISTENCE_VERSION_CONFLICT. In testing, quantum inverse recovery restores cash and preserves the external contract update, but earlier ordinary stages may already have committed. Report RECOVERY_REQUIRED/handled=false rather than retrying as if everything rolled back. XbodStaleReversalTest covers this; acceptance documentation records the difference and logs.
 
-原 APP duplicate 的 facts 只能配置单个参与者或属性路径，无法覆盖同时包含金额、费用和授权资料的表单。本轮支持 `facts(path1, path2, ...)`，银行存入配置核对五个参与者；冲正继续核对执行参数。技术指纹由框架生成，无需新增巨型 SPP 合约。
+## KI-R05: responses to running remote requests
 
-语言校验、生成、可空事实内容冲突、单路径协议兼容及远程元数据有专项测试。真实 HTTP 仅更改费用参与者时返回内容冲突，资金未再次更新。2026-10-13 联合回归共 1,158 项全部通过，此项关闭；不因此关闭其他银行业务与恢复限制。
+The enhanced idempotency API returns REQUEST_IN_PROGRESS for RUNNING requests, preventing business reexecution. Retrying after completion returns the original result. This is not synchronous waiting for the original result. Whether to add bounded APP/PHY waiting and what to return on timeout remain undecided. This refactoring did not add waiting/retry logic to SPP or business Java. The test's single replay after completion verifies a technical protocol only.
 
-## KI-R07：待授权申请持久化与续办
+## KI-R06: UI duplicate facts across participants (closed)
 
-旧 authorizationCashExample / pendingCurrentAccountCashExample / pendingRestartSetupExampleRun 除了校验授权等级，还保存待授权申请，在新证据到来后按原申请身份续办并记录完整历史。新版已经保留授权等级、PENDING_AUTHORIZATION 评估和场景显式 check，但尚未建立独立的授权申请合约及续办场景；不能用 49 组准入向量证明这一持久化生命周期已迁移。
+APP duplicate facts originally accepted only one participant or property path, insufficient for forms combining amounts, fees, and authorization. Support for `facts(path1, path2, ...)` was added; bank deposit checks five participants, while reversal continues to check execution arguments. The framework generates the technical fingerprint without a giant new SPP Contract.
 
-待明确的边界是：由独立银行授权域保存和确认申请，还是 demo 自建授权申请场景。无论选择哪种，都不能将原业务重试循环、技术 id/attemptId 和 try/catch 放回 SPP，也不能把改变授权事实后复用同一远程流水号当成合法幂等重放。本项保留为业务流程扩展待决策，继续完成其余已确定迁移。
+Focused tests cover language validation, generation, nullable-fact content conflicts, single-path compatibility, and remote metadata. A real HTTP request changing only the fee participant returns a content conflict without updating funds again. Historical combined regression on 2026-10-13 passed 1,158 tests, closing this issue but not other bank/recovery limitations. This protocol requires the optional enhanced coordination provider.
 
-## KI-R08：失败记录关联的成交时快照（当前 JDBC 实现已修复）
+## KI-R07: persisting and resuming pending authorization
 
-最初 CashFailureRecord.deposit/reversal 被默认查询当作实时合约引用：存入合约尚未提交时出现 PARTICIPANT_ASSOCIATION_NOT_FOUND；已有冲正合约的实时补全会覆盖原失败 code。后来还发现快照列空值回退旧 CLOB，以及快照内部量子余额被实时余额覆盖的问题。
+Old authorizationCashExample / pendingCurrentAccountCashExample / pendingRestartSetupExampleRun checked authorization levels, persisted pending applications, resumed under the same application identity when new evidence arrived, and recorded full history. The new version retained authorization levels, PENDING_AUTHORIZATION evaluation, and explicit scenario checks, but had not introduced an independent authorization-application Contract and resumption scenario. The 49 admission vectors do not prove migration of that persistent lifecycle.
 
-现已扩展 APP snapshot 支持显式实体/角色/合约关联及集合，CASH_FAILURES 的 deposit/reversal 使用整个参与者的 CLOB JSON 快照。存储保留完整事实，默认关联查询和量子事实补全均不进入快照子树；更新为 null 清除旧值。普通实时关联仍按原规则查询。
+The pending boundary decision is whether a separate bank authorization domain stores/confirms applications or the demo supplies its own application scenario. Neither choice permits restoring business retry loops, technical id/attemptId, or try/catch to SPP. Changing authorization facts and reusing the same remote serial is not a legitimate idempotent replay. This remains a business-flow extension decision while other agreed migration continues.
 
-验证证据：develop clean 联合回归 1,209 项通过；随后量子历史快照修复、JDBC 快照及 testing 交易/积数专项 15 项通过。失败处置重查核对 code、reason、serviceName、resourceName、phase、transactionOutcome、recoveryStatus；量子历史专项确认快照余额保持 10、实时关联读取 99。完整执行记录见 latest-refactoring-verification。
+## KI-R08: settlement-time snapshots in failure records (fixed for current JDBC)
 
-部署限制：旧展开列表结构不会自动迁移成 CLOB，需要独立迁移；自定义仓储/MyBatis 实现须接入 JSON 类型处理，不能宣称所有第三方持久化自动兼容。当前 demo 使用生成的 JDBC 路径，测试数据库为新建表。
+Initially, default queries treated CashFailureRecord.deposit/reversal as live Contract references. An uncommitted deposit caused PARTICIPANT_ASSOCIATION_NOT_FOUND, while live enrichment of an existing reversal could overwrite the original failure code. Later findings included null snapshot columns falling back to old CLOB values and live quantum balances overwriting historical snapshot balances.
 
-## KI-R09：所有调用与业务拒绝的持久化技术审计
+APP snapshot support was extended to explicit Entity/Role/Contract associations and collections. CASH_FAILURES deposit/reversal stores whole-participant CLOB JSON snapshots. Storage preserves complete facts; default association queries and quantum-fact enrichment do not enter snapshot subtrees. Updating to null clears old values. Ordinary live associations retain their original query behavior.
 
-原 demo 将成功、前置业务拒绝及重放审计都编写为 SPP 更新与异常流程。新版 APP invocationTrace 已记录调用，事务 fail 保存 CashFailureRecord，但前置 check 失败不会进入事务 fail，技术日志也不等同独立持久化审计表。若需保留旧逐次调用审计，应在 APP 技术服务协议下明确审计故障是否阻断业务、保存位置及保留时间，不能把旧审计 try/catch 搬回业务场景。当前已验证失败处理记录不可写时保留原交易失败、二次故障信息及真实资金状态；该能力不代表所有调用持久化审计已实现。此项待约定，不阻塞其余迁移。
+Historical evidence: develop clean combined regression passed 1,209 tests. Subsequent quantum-history, JDBC snapshot, and testing-profile transaction/accrual checks passed 15 focused tests. Reread failure disposition checked code, reason, serviceName, resourceName, phase, transactionOutcome, and recoveryStatus. Quantum-history coverage retained snapshot balance 10 while the live association read 99. See latest-refactoring-verification for the execution record.
 
-KI-R02 提交故障进展：LOCAL 存入与冲正已新增四阶段 JDBC 故障注入，返回确定回滚/提交未知/确定成交，并独立验证资金和合约/分录。提交未知后的自动查证重试、真实断网/进程中断以及 testing 多阶段故障仍未等价迁移。
+Deployment limitation: old expanded-column schemas do not automatically migrate to CLOBs. Custom repositories/MyBatis implementations need JSON type handling; compatibility cannot be claimed for every third-party persistence layer. The demo uses generated JDBC and fresh test tables.
 
-KI-R04 新实证：冲正读取原合约后，原合约被更新，更新该原合约时触发 PERSISTENCE_VERSION_CONFLICT。testing 下资金由量子反交易恢复且外部原合约更新保留，但此前普通阶段可能已提交；必须报告 RECOVERY_REQUIRED/handled=false，不能直接重试并当作全回滚。XbodStaleReversalTest 已覆盖该行为，原始差异和日志见验收文档。
+## KI-R09: persistent technical audit for all calls and business rejections
 
-## KI-R10：旧通用反向候选与现金冲正规则的区别
+The old demo implemented success, precondition rejection, and replay audit through SPP updates and exception flows. The refactoring's APP invocationTrace records calls, and transaction fail saves CashFailureRecord, but a precondition check failure never enters transaction fail. Technical logs are not an independent persistent audit table. Preserving per-call audit requires an APP technical-service contract defining whether audit failure blocks business, storage location, and retention. Do not move old audit try/catch back into business scenarios.
 
-当前新增 previewCashReversal 支持无写入的现金冲正试算，两环境各两项通过。旧探索入口的可选部分退费、通用敞口反向及业务负余额候选不全部等价于现金冲正：现金按原手续费退回，敞口按已确认 XBOD principalPaid 规则恢复。保留旧源及逐入口差异，不扩展现金场景来模拟不同业务。未来如需通用反向试算，应另行约定场景及费用决定参与者；不能由框架自行决定业务退费。
+Tests verify that failure-record persistence errors preserve the original transaction failure, secondary-fault information, and actual cash state. This does not implement persistent auditing of every call. The contract remains undecided and does not block other migration. Basic builds without the optional trace provider do not provide invocationTrace logging.
+
+## KI-R10: old generic inverse candidates versus cash reversal rules
+
+The added previewCashReversal supports read-only cash-reversal estimation; two tests passed in each environment. Old exploratory entries for optional partial fee refunds, generic exposure inversion, and business-negative-balance candidates are not all equivalent to cash reversal. Cash refunds original fees; exposure follows the agreed XBOD principalPaid rule. Retain retired source and entry-level differences rather than stretching cash scenarios to mimic other business operations.
+
+Future generic inverse estimation needs separately agreed scenarios and fee-decision participants. The framework must not choose business refunds itself.

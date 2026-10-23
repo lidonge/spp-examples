@@ -1,38 +1,81 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes implementation and acceptance before the
+> refactoring, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 审计与失败结果
+# Audit and failure outcomes
 
-## 尝试记录与成交记录
+## Attempt records and completed trades
 
-deposit_trade 保存成功的业务成交事实，deposit_audit 按递增序号追加每次尝试的事件，二者不互相替代。一次尝试有独立 attemptId，同一个业务请求可以经历待授权、升级授权、成交及重复查询。审计按原请求标识查询，保存账户身份、事件、错误代码、相关输入或计划载荷及数据库时间，不用后一次结果覆盖先前失败。
+`deposit_trade` stores successful business trades. `deposit_audit` appends events
+for each attempt with increasing sequence numbers. Neither replaces the other.
+Each attempt has its own `attemptId`; one business request can pass through
+pending authorization, elevated authorization, settlement and repeat queries.
+Audit queries use the original request identifier. Records retain account
+identity, event, error code, relevant input or plan payload, and database time.
+A later result does not overwrite an earlier failure.
 
-deposit_request 保存首次请求内容，用于待授权续接及请求标识防复用；它属于请求身份/审计元数据，不是账户、债务或分录的成交。拒绝或回滚后可保留这些技术元数据，业务状态没有因此恢复出一笔成交。
+`deposit_request` retains the first request contents for resuming authorization
+and preventing request-identifier reuse. It is request identity/audit metadata,
+not a settled account, debt or posting. This technical metadata may survive
+rejection or rollback without thereby restoring a business trade.
 
-## 事件与提交边界
+## Events and commit boundaries
 
-| 事件 | 含义 | 保存边界 |
+| Event | Meaning | Persistence boundary |
 | --- | --- | --- |
-| PendingAuthorization | 业务授权门槛未满足，没有执行业务更新 | APP 单独追加审计 |
-| Rejected | 当前请求被拒绝，代码及当次输入保留 | APP 或冲突处理单独追加审计 |
-| PreparationFailed | 查询、输入转换或准备阶段发生异常 | APP 单独追加审计 |
-| Committed | 本次新成交及其分录、账户状态成功提交 | 成功审计与业务记录在同一个本地事务内 |
-| Replayed | 相同请求返回已有成交，没有再次更新账户 | 查询/重放尝试追加审计 |
-| RolledBack | 本次尝试在提交前失败，局部事务已确认回滚 | 回滚后通过新连接独立追加审计 |
-| CommitOutcomeUnknown | commit 调用发生异常，或无法确认局部回滚 | 保存异常；结果须查询成交依据，不能直接当作未成交 |
-| CommittedResponseFailed | 已确认 commit 返回成功，随后返回过程发生异常 | 原成功审计保留，另追加当次返回失败事件 |
+| PendingAuthorization | Business authorization threshold not met; no business updates executed | APP appends audit separately |
+| Rejected | Current request rejected; code and that attempt's input retained | APP or conflict handling appends audit separately |
+| PreparationFailed | Exception during query, input conversion or preparation | APP appends audit separately |
+| Committed | New trade, postings and account state committed successfully | Success audit shares the business records' local transaction |
+| Replayed | Same request returns an existing trade without updating the account again | Query/replay attempt appends audit |
+| RolledBack | Attempt failed before commit and local rollback is confirmed | Independent audit through a new connection after rollback |
+| CommitOutcomeUnknown | Commit threw, or local rollback cannot be confirmed | Preserve the exception; query trade evidence instead of assuming no trade occurred |
+| CommittedResponseFailed | Commit returned successfully, then response handling failed | Preserve success audit and append this response-failure event |
 
-所有失败事件描述的是该次 attemptId，不撤销或改写以前已成功的 deposit_trade；尤其不能将后一次失败尝试理解为原成交被回滚。业务冲正仍需新的业务身份和关联原成交的逻辑。
+Every failure event describes its own `attemptId`. It neither cancels nor
+rewrites an earlier successful `deposit_trade`. In particular, a failed later
+attempt does not mean the original trade was rolled back. Business reversal
+still requires a new business identity and logic linking the original trade.
 
-提交前，store 在同一个 JDBC 事务内插入 Committed 审计。它与账户、债务、资格、分录和成交记录共同成功或共同回滚。成功审计写入失败会阻止本次新成交提交，避免有成交但没有同边界的成功证据。
+Before commit, the store inserts the Committed audit inside the same JDBC
+transaction. Account, debt, qualification, postings, trade and audit all commit
+or roll back together. Failure to write the success audit prevents the new trade
+from committing, avoiding a trade without success evidence at the same boundary.
 
-失败后，store 先处理回滚，再独立保存失败审计，不通过提交原连接留下审计。如果失败审计本身也无法写入，保留原异常并将审计异常加入 suppressed，不吞掉原错误，也不把失败改成成功。审计存储不可用时不能承诺失败事件已持久化；调用方能够观察这个异常。准备阶段的异常亦遵循保留原异常的原则。
+After failure, the store handles rollback first, then persists failure audit
+independently. It does not commit the original connection merely to retain audit.
+If failure audit also cannot be written, preserve the original exception and
+attach the audit exception as suppressed. Do not swallow the original error or
+turn failure into success. When audit storage is unavailable, persistence of a
+failure event cannot be promised; the caller can observe the exception.
+Preparation failures follow the same original-exception preservation rule.
 
-## 验证范围
+## Historical verification scope
 
-JdbcDepositStoreTest 使用真实 H2 业务事务与独立审计连接，覆盖部分分录失败后留审计且无业务结果、重试的独立历史、成功后的返回失败、commit 调用抛异常，以及审计表不可用。NormalCashDepositTest 检查业务拒绝、收费查询失败、待授权及重放的审计内容。
+`JdbcDepositStoreTest` used real H2 business transactions and a separate audit
+connection to cover audit without business results after partial posting failure,
+independent retry history, response failure after success, a throwing commit,
+and an unavailable audit table. `NormalCashDepositTest` checked audit contents
+for business rejection, fee-query failure, pending authorization and replay.
 
-commit 异常通过 JDBC 代理注入，返回失败通过 afterCommit 回调注入；这些是明确的进程内故障模型，不是实际网络断线或数据库崩溃实测。技术回滚证据仍限于当前本地 JDBC 事务。跨资源、量子协调器、Saga 和业务补偿尚须分别验证，不能由审计事件名称推导它们已实现。
+Commit exceptions were injected through a JDBC proxy; response failure through
+an `afterCommit` callback. These are explicit in-process fault models, not real
+network-disconnection or database-crash tests. Technical rollback evidence is
+limited to the local JDBC transaction. Cross-resource transactions, quantum
+coordination, Saga and business compensation need separate verification; their
+implementation cannot be inferred from audit-event names.
 
-## Saga 金融组件恢复事件
+## Saga financial-component recovery events
 
-金融组件现已通过原生 Saga 策略绑定显式业务恢复，持久事件由 SagaLogRecorder/JdbcSagaLogStore 保存，与 deposit_audit 的局部业务审计分别查询。LOCAL_COMMITTED、RECOVERY_REQUESTED/DONE/FAILED 以及 RECOVERY_RESULT_QUERY_REQUIRED 不能替代原成交/反交易记录查询。完成日志失败可能发生在 R1 已成交之后；不能根据该失败再生成新的冲正。范围、稳定身份及恢复测试见 [Saga 恢复](saga-recovery.md)，没有自动 pending 扫描或完整银行 Saga 的证据。
+At this historical stage, the financial component bound explicit business
+recovery through the native Saga strategy. `SagaLogRecorder`/`JdbcSagaLogStore`
+persisted events, queried separately from local business audit in `deposit_audit`.
+`LOCAL_COMMITTED`, `RECOVERY_REQUESTED/DONE/FAILED` and
+`RECOVERY_RESULT_QUERY_REQUIRED` do not replace queries of original trade and
+reversal records. Completion logging may fail after R1 has settled; that failure
+must not cause a new reversal to be generated. See [Saga recovery](saga-recovery.md)
+for scope, stable identities and recovery tests. There was no evidence of an
+automatic pending scanner or a complete banking Saga.
+
+This English edition preserves the historical claims from revision `417a41f`;
+translation is not a new execution of those tests.

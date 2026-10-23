@@ -6,7 +6,10 @@ The production website is <https://us.servpp.top/>. Its public English pages inc
 
 The main navigation links to <https://platform.servpp.top/login> and the independent
 Apache-2.0 basic SDK source at <https://github.com/lidonge/spp-basic>. The homepage
-also links to the existing <https://github.com/lidonge/spp-examples> repository.
+Source navigation links directly to <https://github.com/lidonge/spp-basic/tree/main/examples>.
+The existing `/sources/` browser and source-file URLs remain available for book
+references and direct links. Requirement HOME-SOURCE-20261023-v1 changes only
+the homepage navigation destination; `check_site.py` verifies that destination.
 Neither source repository requires a platform account. The examples repository's
 MIT code license does not relicense its reserved-rights book.
 
@@ -16,7 +19,8 @@ The homepage currently states that public registration is not open. Update that
 statement and its site-check assertion only after the platform's real registration
 acceptance and enablement, not merely after adding a navigation link.
 
-The site checker allows only these two approved GitHub repository destinations;
+The site checker allows only these two approved GitHub repositories and the exact
+basic-repository examples directory;
 private compiler history and commercial repositories remain unpublished.
 
 ## Inputs and generated output
@@ -71,6 +75,13 @@ Use Google Search Console to add and verify the URL-prefix property `https://us.
 After building the site, `python tools/prepare-chinese-print.py` prepares a temporary Chinese print view. Serve `website/dist` at port 18977 and run `NODE_PATH=/path/to/node_modules node tools/export-book-pdf.cjs` with Playwright and Chrome available. This updates the two publications in `book/exports/`, including copyright notices. Remove `website/dist/pdf-zh/` afterward; it is a print helper, not a Chinese website entry.
 
 ## Tutorial and SDK manuals
+
+Public demo Markdown must be English, including nested historical records,
+READMEs and contribution instructions. `tools/check_english_demo_docs.py` checks
+this boundary before website generation writes output. The public-source checker
+also enforces it, so `tools/deploy-website.sh` refuses deployment when Chinese
+demo documentation remains. Generated build directories are excluded; the
+reserved-rights book retains its separate language and licensing policies.
 
 The guide links to `/tutorial/`, `/sdk/user-guide/` and
 `/sdk/technical-services/`. `build_manuals.py` renders the pinned Markdown and

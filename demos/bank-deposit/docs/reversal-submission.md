@@ -1,57 +1,137 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 冲正计划的 JDBC 共同提交
+# Joint JDBC commit of a reversal plan
 
-> 实现约束更新：下文的手写 Java store/Prepared/Receipt 是待删除的历史实现和迁移对照，不是当前允许的实现方式。完整现金共同提交现在由93文件的 SPP `transaction quantum` 描述，APP声明持久化和版本条件，PHY绑定同一存储资源。准备/提交源分层及原成交事实复核的接入与验证状态见 [原交易事实复核](participant-facts-and-locked-read.md)；纯源最终验收尚未完成。
+> The handwritten Java store/Prepared/Receipt below are historical implementations
+> awaiting retirement, not currently permitted production business code. At the
+> recorded migration stage, source file 93 expressed full cash commit through SPP
+> transaction quantum, APP declared persistence/version conditions and PHY bound
+> shared resources. See [original-fact revalidation](participant-facts-and-locked-read.md)
+> for preparation/commit layering and verification; final source-only acceptance
+> was still pending at that checkpoint.
 
-> 当前现金政策已确认沿用 XBOD，见 [源码契约](cash-reversal-source.md)。下文较早阶段的通用金融组件及显式退费输入不是正式现金入口默认政策。
+> Cash policy was subsequently confirmed to follow XBOD; see the
+> [source contract](cash-reversal-source.md). The earlier generic financial
+> component and explicit refund input below are not the formal cash entry's defaults.
 
-## 实施边界
+## Implementation boundary
 
-JdbcDepositReversalStore 落实已经由业务层给出的计划，不自行决定冲正资格、跨日积数、日累计、退费或补偿。Prepared 含成功原成交 Receipt、当前版本及金额/事实快照、拟更新快照、原分量、反向金额、显式退费决定、反向分录和业务依据。完整现金冲正入口尚未连接；本阶段验证金融分量的物理提交，不能作为整笔银行冲正已经完成的结论。
+JdbcDepositReversalStore executes a business-supplied plan, not eligibility,
+cross-date accrual, daily-total, refund or compensation policy. Prepared contains
+the successful original Receipt, current revision/amount/fact snapshots, proposed
+snapshot, original components, inverse amounts, explicit refund decision, inverse
+postings and business evidence. At this stage the full cash reversal entry was
+not connected. Financial-component persistence was not complete bank reversal.
 
-prepareDepositReversalAccountUpdate 在 SPP 中将反向金额计划形成独立账户快照，冻结、授权和贷款状态来自当前账户。虽然 JDBC 使用 SET 保存快照，业务含义仍是对当前金额逆转原 delta；条件更新保护的是该当前快照，不能恢复原成交之前的旧账户覆盖后续业务。
+SPP prepareDepositReversalAccountUpdate turns inverse amounts into an independent
+account snapshot, retaining current frozen/authorized amounts and loan status.
+JDBC SET persists the snapshot, but the business meaning is reversal of original
+delta against current amounts. Conditional updates protect that current snapshot;
+they do not restore pre-trade account state over later business.
 
-测试使用无产品/积数事实的明确金融组件 fixture：初始 200，原存入 10，后续存入 20，当前 230；冲正原分量得到 220。原费和显式退费均为零。它没有为真实现金入口默默选择保留积数或零退费政策。
+The explicit financial-component fixture has no product/accrual facts: initial
+200, original deposit 10, later deposit 20, current 230, original inverse yields
+220. Original/refund fees are zero. This does not silently choose retained accrual
+or zero refund for real cash transactions.
 
-## 记录和身份
+## Records and identities
 
-原存入成交 deposit_trade 和其 deposit_ledger 保留。新成交写 deposit_reversal，原交易外键及唯一约束确保一笔原成交至多关联一笔已提交的冲正；反向分录写 deposit_reversal_ledger。两个业务日志格式分开，避免将普通 DepositPlan 的正向含义强行用于反向成交。实际核对账簿时须同时查询两类分录，不能只查询原存入账簿认为冲正没有记账。
+Original deposit_trade and deposit_ledger remain. New trades go to
+deposit_reversal; an original-trade foreign key and unique constraint permit at
+most one committed reversal per original. Inverse postings go to
+deposit_reversal_ledger. Separate log formats avoid forcing forward DepositPlan
+semantics onto inverses. Actual accounting queries must include both ledgers,
+not infer missing reversal postings from the original ledger alone.
 
-冲正请求具有独立标识，使用共用 deposit_request 表保留身份，内容按操作种类、原成交标识、稳定请求内容编码。身份保留独立于业务提交，失败重试不能换请求内容。业务键必须由 APP 根据完整业务请求生成；当前物理测试的固定键只属于测试契约。重复提交以已存请求身份及原 Receipt 为依据，不要求当前账户仍处于冲正成交版本。
+Reversal requests have independent IDs retained in shared deposit_request.
+Identity contents encode operation kind, original trade ID and stable request
+contents. Identity retention is separate from business commit; failed retries
+cannot change contents. APP must derive business keys from the full request;
+fixed keys in physical tests are only test contracts. Repeat submission uses
+stored identity/original Receipt, not a requirement that the current account
+still have the reversal's settled revision.
 
-Receipt 和 reversalOf(originalId) 可查询已提交结果。不同冲正标识竞争同一原交易时只允许一个成交；另一个返回 ORIGINAL_DEPOSIT_ALREADY_REVERSED。保留原记录不等于删除原业务事实，新冲正及原成交始终可关联审计。
+Receipt and reversalOf(originalId) query committed results. Different reversal
+IDs racing on one original permit only one commit; the other returns
+ORIGINAL_DEPOSIT_ALREADY_REVERSED. Preserving original records does not erase
+business facts; original and inverse remain auditable through their link.
 
-## 执行边界
+## Execution boundary
 
-1. 保留请求身份，开始本地 JDBC 事务。
-2. 若冲正标识已有成交，核对身份后返回原结果并保存重放审计。
-3. 锁定成功原成交记录，核对账户身份、原成交版本及载荷与准备依据一致，查询是否已被冲正。
-4. 保存冲正记录及原交易关联；按当前版本、金额及 AccountFacts 快照条件更新账户。
-5. 保存反向分录和成功审计，在同一事务提交。
+1. Retain request identity and start a local JDBC transaction.
+2. If the reversal ID already settled, validate identity, return original result
+   and save replay audit.
+3. Lock successful original trade; verify account identity, original version and
+   payload against preparation evidence; check whether already reversed.
+4. Save reversal/link and conditionally update the account against current
+   version, amounts and AccountFacts snapshot.
+5. Save inverse postings and success audit in the same commit.
 
-原成交锁串行化对同一原交易的冲正竞争，唯一约束提供额外保障；它不锁定所有后续业务依赖。不同普通交易更新账户仍由版本及快照条件检出，失败后重新查询及重新执行业务检查。非量子依赖、外部政策资源的版本和完整业务资格必须由未来正式入口提供，不能靠这一原成交锁代替。
+Original-trade locking serializes competing reversals, with unique constraints
+as additional protection. It does not lock every later business dependency.
+Versions/snapshot conditions detect competing ordinary account updates; after
+failure, query again and rerun business checks. Non-quantum dependencies, external
+policy-resource revisions and complete eligibility belong to the formal entry,
+not this original-trade lock alone.
 
-## 失败及证据
+## Failures and evidence
 
-提交前故障回滚本次账户、冲正关联和反向分录，仅保留请求身份及独立失败审计；原成交及后续成交不被撤销。提交返回异常不能假定未成交；可按独立标识查询结果。已知提交成功后的返回失败为 CommittedResponseFailed，不自动补偿。
+Pre-commit faults roll back this account update, reversal link and inverse
+postings, retaining only request identity and independent failure audit.
+Original/later trades remain. A commit exception does not establish absence of
+settlement; query by independent reversal ID. Response failure after known
+successful commit is CommittedResponseFailed, not automatic compensation.
 
-JdbcDepositReversalStoreTest 使用真实生成的正向/反向计划和 H2，验证共同提交、后续业务后重放、不同冲正身份拒绝、版本冲突重新准备、原关联/账户/部分分录/提交前故障、相同及不同身份的并发、成功后应答失败及原 Receipt 改变时拒绝。重新建立适配器只证明同一数据库中可读取，不是数据库进程崩溃恢复。
+JdbcDepositReversalStoreTest used actual generated forward/inverse plans and H2
+for joint commit, replay after later business, different-ID rejection, stale-plan
+repreparation, link/account/partial-posting/pre-commit faults, same/different-ID
+concurrency, post-success response failure and changed-original-Receipt rejection.
+Recreating an adapter proves reads from the same database, not database-crash recovery.
 
-本阶段仍不证明完整现金冲正、跨日政策、量子协调器或 Saga 恢复已完成。恢复、业务冲正及补偿的边界继续按已确认设计分别验证。
+This phase did not establish complete cash reversal, cross-date policy, quantum
+coordination or Saga recovery. Recovery, reversal and compensation remain separate
+acceptance responsibilities.
 
-重放已经确定原冲正成交，重放审计失败不能把这笔业务重新分类成未确定成交，也不应重新执行反向更新。物理层用 ReversalReplayAuditFailed 区分该尝试。成功审计不可用时，新反交易的共同提交被阻止；失败审计也不可用时，保留原异常并附加审计异常，不能声称审计必然写入成功。此限制与存入提交一致。
+A known settled reversal remains known if replay audit fails. Do not reclassify
+it as commit-uncertain or repeat the inverse. Physical layer ReversalReplayAuditFailed
+distinguishes this attempt. Unavailable success audit prevents a new inverse
+commit. If failure audit is also unavailable, retain the primary exception and
+attach the audit exception; persistence of audit cannot be promised. Deposit commit
+has the same limitation.
 
-新增测试还覆盖已成交冲正的请求内容改变、成功审计缺失导致整笔回滚，以及已成交重放时审计缺失仍保持可查询原结果。DROP TABLE 用于明确注入 demo 审计资源不可用，恢复表后验证同一请求重试，不是生产审计维护方案或真实网络故障。
+Added tests covered changed contents on a settled reversal ID, full rollback for
+missing success audit, and queryable original results despite missing replay
+audit. DROP TABLE explicitly injected unavailable demo audit storage; restoring
+the table permitted same-request retry. This is not production audit maintenance
+or a real-network fault.
 
-## 文件持久化与实际反向账簿
+## File persistence and actual inverse ledger
 
-ledger(reversalId) 从 deposit_reversal_ledger 查询实际保存的槽位、科目、方向和精确金额，结果不是由成交载荷重新生成。文件数据库测试正常 SHUTDOWN 后重新打开，核对原 Receipt、新冲正及关联、当前账户、实际八条分录与成交载荷一致、借贷平衡、成功审计及稳定请求身份；之后再存入并重放冲正，余额仍保留后续业务。此证据为正常关闭重开，不是进程崩溃实测。
+ledger(reversalId) reads actual persisted slots, accounts, directions and exact
+amounts from deposit_reversal_ledger, not reconstructed trade payload.
+A file-database test used normal SHUTDOWN/reopen to check original Receipt,
+inverse/link, current account, eight actual postings matching payload, balanced
+debits/credits, success audit and stable request identity. A later deposit followed
+by reversal replay retained later business. This is orderly reopen, not crash testing.
 
-同一请求若更换原 Receipt，属于 Rejected 身份错误，与重放审计失败分开；两者都不会再次更新金额。核心资格的独立规则及当前事实查询见 bank-qualification.md，完整入口尚需在提交前连接并按版本重验。
+Changing original Receipt on the same request is a Rejected identity error,
+distinct from replay-audit failure. Neither repeats monetary updates.
+See [bank qualification](bank-qualification.md) for independent core rules/current
+facts; the full entry still needed pre-commit integration and version revalidation.
 
-## 提交结果不确定的两种执行证据
+## Two commit-uncertain outcomes
 
-通过 JDBC 代理分别注入 commit 在实际提交之前抛 SQLException，以及真实数据库已经提交后才抛 SQLException。两者都保存 CommitOutcomeUnknown，并要求查询独立冲正标识。第一种查询无成交、无反向账簿且账户保持 230，可同标识重新提交一次得到 220；第二种已有成功审计、成交及八条反向分录，重试仅返回原 Receipt，账户保持 220。失败事件不会覆盖同一次尝试中已持久化的成功事件。
+JDBC proxies separately injected SQLException before actual commit and after the
+database had committed. Both saved CommitOutcomeUnknown and required querying
+the independent reversal ID. In the first case no trade/inverse ledger existed
+and the account stayed 230; one same-ID resubmission produced 220.
+In the second, success audit, trade and eight inverse postings already existed;
+retry returned the original Receipt and the account stayed 220. Failure events
+did not overwrite persisted success events from the same attempt.
 
-这是明确的进程内故障注入，不是实际网络或数据库崩溃实测；不能因为错误代码 08006 就提高证据等级。原存入及后续成交在两种场景均保留。
+These are in-process injections, not actual network/database crashes. Error code
+08006 does not raise the evidence level. Original and later deposits survived
+both cases. All claims here are preserved from revision `417a41f`, not rerun
+for this English translation or guarantees of optional basic-SDK replay.

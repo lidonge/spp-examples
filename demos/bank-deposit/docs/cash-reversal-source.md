@@ -1,21 +1,40 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes pre-refactoring implementation/acceptance,
+> not current source or test results. See [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# XBOD 现金冲正源码契约
+# XBOD cash-reversal source contract
 
-用户已确定现金冲正沿用 XBOD，有效源路径优先于此前跨日/退费候选方案。以下行号对应 GB18030 解码后保持原行序的源码，原仓库只读。
+The user selected XBOD cash reversal. Active source paths take precedence over
+earlier proposed cross-date/refund policies. Line numbers refer to GB18030-decoded
+source with original line ordering preserved; the original repository is read-only.
 
-| 处理 | 原程序及行号 | 迁移规则 |
+| Operation | Original program/lines | Migrated rule |
 | --- | --- | --- |
-| 原最近交易日 | KSADEP0 1990、2812–2823 | 保存成交前日期。当前明细序号仍等于原成交序号时恢复该日期，否则设冲正营业日；24 小时模式 `2` 强制设冲正营业日 |
-| 明细序号 | KSADEP0 2745–2748 | 当前序号增加本次新增冲正明细数量，不能还原原序号 |
-| 日现金累计 | KSADEP0 2864–2872 | 从当前日累计减原金额，小于零置零；没有额外“原交易同日”条件，跨日也执行 |
-| 普通积数 | KSADEP0 2724–2731 | 当前普通积数减原 KBN-ADD-PRDT，不足报 EN097；不是撤销全部原计息，也不重算后续历史 |
-| 实际积数 | KSADEP0 2780–2784 | 调整后普通积数减当前透支积数 |
-| 透支天数 | KSADEP0 2803–2810 | 恢复原天数的代码已注释；当前天数保留，不能因原日志存在字段就自动恢复 |
-| 机构额度 | KSADEP0 2644–2648 | 仅原交易日期等于当前营业日且当前明细序号等于原成交序号时逆转 |
-| 费用 | KSAFEE0 129–135、324–330、332–354 | 非正常交易分支读取原 KBN 的实际收费，再进入共同记账；选定柜台现金路径退原实际收费，不重新查费率 |
-| 透支敞口 | KSADEP0 2800–2802 | 当前敞口加原偿还本金；与通用金融逆分量的实际敞口差值公式分开，正式现金入口采用源公式 |
+| Last transaction date | KSADEP0 1990, 2812–2823 | Save the pre-trade date. Restore it if the current detail sequence still equals the original trade sequence; otherwise use reversal business date. 24-hour mode `2` always uses reversal business date |
+| Detail sequence | KSADEP0 2745–2748 | Increase current sequence by newly added reversal details; do not restore the original sequence |
+| Daily cash total | KSADEP0 2864–2872 | Subtract original amount from current daily total, flooring at zero. No extra same-original-date condition; also runs across dates |
+| Ordinary product | KSADEP0 2724–2731 | Subtract original KBN-ADD-PRDT from current ordinary product; insufficient product gives EN097. Neither undo all original accrual nor recompute later history |
+| Actual product | KSADEP0 2780–2784 | Adjusted ordinary product minus current overdraft product |
+| Overdraft days | KSADEP0 2803–2810 | Original-day restoration code is commented out; retain current days. Presence of a log field does not authorize automatic restoration |
+| Institution limit | KSADEP0 2644–2648 | Reverse only when original trade date equals current business date and current detail sequence equals original trade sequence |
+| Fees | KSAFEE0 129–135, 324–330, 332–354 | Non-normal branch reads actual original fee from KBN before shared posting. Selected teller cash path refunds the actual charge without repricing |
+| Overdraft exposure | KSADEP0 2800–2802 | Current exposure plus original principal repaid. Keep separate from the generic financial inverse's actual exposure-delta formula; formal cash entry uses the source formula |
 
-已新增 SPP `selectXbodCashReversalFee` 和 `calculateXbodCashReversalMetadata`，独立计划覆盖费用、日期、明细、累计、积数及额度条件。计划计算不写数据库。普通现金输入限定当日起息，所以其原追溯积数调整为零；未来允许追溯起息时必须记录真实 KBN 调整，不能拿全部原普通积数增量代替。
+SPP `selectXbodCashReversalFee` and `calculateXbodCashReversalMetadata` were added.
+Independent plans cover fee, dates, details, totals, accrual products and limit
+conditions without database writes. Ordinary cash inputs allow only same-day
+value dates, so original backdated-product adjustment is zero. Future backdated
+value-date support must record actual KBN adjustment, not substitute the entire
+original ordinary-product increment.
 
-新增 CashDepositReversal 入口连接当前资格、原费、元数据及反向分录的本地共同提交，端到端验证进行中。当前账户模型覆盖选定存款金额、资格、日累计和积数，不包含资本金专用额度、最低余额、当日透支现金额及原凭证明细打印字段；这些外围字段不宣称已迁移。外围机构额度适配、原凭证及银行实际 ART 配置没有接入；源码推导和 demo 测试不代表已执行原 COBOL 或取得银行黄金结果。
+At this recorded stage the new `CashDepositReversal` entry connected current
+eligibility, original fees, metadata and inverse postings in a local joint commit;
+end-to-end verification was in progress. The account model covered selected
+deposit amounts, eligibility, daily totals and accrual products. Capital-specific
+limits, minimum balance, same-day overdraft cash amount and original document/
+detail-print fields were excluded, not claimed migrated.
+
+Peripheral institution-limit adapters, original documents and actual bank ART
+configuration were not integrated. Source derivation and demo tests do not mean
+original COBOL was executed or bank golden results were obtained. This English
+edition preserves the historical scope from revision `417a41f`.

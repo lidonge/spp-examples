@@ -53,4 +53,5 @@ Tests cover generated scenarios, insufficient inventory/funds, conserved quantum
 - [Technical-service interception](docs/technical-services.md), [language gaps](docs/language-gaps.md), [business model boundaries](../../book/references/spp-business-model-boundary.md).
 - [English book](../../book/en/README.md), [English presentation policy](../../book/references/english-demo-presentation.md).
 
-Supporting engineering records retain their original language. [Chinese README](README.zh-CN.md) is retained as an archival entry point.
+Public engineering records use one authoritative English version; historical
+verification claims are explicitly distinguished from current acceptance.

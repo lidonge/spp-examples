@@ -1,29 +1,53 @@
-# 业务常量与国际化
+# Business constants and localization
 
-商品名称、分类和描述由业务常量指代；SPP 可以给出缺省值，不在计算服务中散布展示字符串。商品编号、会员号、订单号等识别事实保持稳定，不随语言切换。金额、数量等数学常量可以命名，其值不因文案语言改变。
+Product names, categories and descriptions are represented by business constants.
+SPP can supply defaults instead of scattering display strings through calculation
+services. Identifiers such as product, member and order numbers remain stable
+when the display language changes. Named numeric constants do not change with
+the language of the surrounding text.
+
+The following illustrative snippet uses an English default:
 
 ```spp
-const String CAT_NAME = "英短蓝猫";
-// 业务计算引用名称，而不是写死不同语言的字符串。
+const String CAT_NAME = "British Shorthair";
 product.name = CAT_NAME;
 ```
 
-APP 决定提供哪些语言及缺省语言：
+APP chooses the default and supported locales:
 
 ```app
-i18n { defaultLocale "zh-CN"; supportedLocales "zh-CN", "en-US"; }
+i18n { defaultLocale "en-US"; supportedLocales "en-US", "en-GB"; }
 ```
 
-PHY 按原有常量名提供表示：
+PHY supplies a localized representation under the same constant name:
 
 ```phy
 phy {
-    constants "en-US" { CAT_NAME = "British Shorthair"; }
+    constants "en-GB" { CAT_NAME = "British Shorthair cat"; }
 }
 ```
 
-编译器核对常量唯一性、缺省值类型、语言清单、翻译名称及字符串类型。未翻译的常量使用缺省值；未知请求语言使用 APP 缺省语言。数字业务常量不接受语言覆盖，避免语言选择改变金额或数量规则。当前常量初值为字面量，尚不支持常量间表达式依赖。
+The compiler checks constant uniqueness, default-value types, the locale list,
+translation names and string types. Untranslated constants use their defaults;
+unknown request locales use APP's default locale. Numeric business constants
+cannot have locale overrides: choosing a language must not change amount or
+quantity rules. Initial values are literals; expression dependencies between
+constants are not supported in this recorded design.
 
-通用网页承载读取生成的常量目录，从 Accept-Language 取得语言并在请求结束后恢复原上下文，语言不是 SPP 业务参数。中文界面保留，商品文案可选择中文或英文；商品浏览服务重算命名常量表示，已经保存的价格和库存不在该服务中更新。客户自填姓名、地址不会按展示文案翻译。
+The generic web host reads the generated constant catalog, derives the locale
+from `Accept-Language`, and restores the previous context after the request.
+Locale is not an SPP business parameter. The existing Chinese UI and optional
+Chinese/English product resources are separate from this English documentation.
+Product browsing recalculates named text constants, not persisted prices or stock.
+Customer-entered names and addresses are not translated as display copy.
 
-多域时常量以域名与常量名共同定位，目录按域生成；应用级承载加载所有部署域目录。商品文案常量及计算现由产品域拥有，商店通过APP绑定计算服务，仅补全文案事实。当前建设状态及静态编译证据见多域实施路径，不能把单域编译当作跨域国际化运行证据。
+Across domains, the domain name and constant name identify a value. Catalogs are
+generated per domain; the application host loads all deployed domain catalogs.
+The product domain owns product text constants and calculations. The shop invokes
+the calculation through APP binding to populate text facts only. See the
+[multi-domain implementation record](multidomain-implementation.md) for its scope;
+single-domain compilation is not proof of cross-domain localization at runtime.
+
+English adaptation of revision `417a41f`. The illustrative locale pair above was
+changed to English variants; business identifiers and localization rules are
+unchanged. No new runtime verification is claimed by this translation.

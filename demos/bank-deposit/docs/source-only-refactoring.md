@@ -1,578 +1,509 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes earlier implementation/acceptance, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md). Old sources were moved to legacy-source/.
 
-# 纯源语言重构实施记录
+# Source-language-only refactoring implementation record
 
-2026-10-08 已启动重构 goal。验收依据为 AGENTS.md、source-language-only.md 和用户的新要求。旧的 P1–P4 行为证据作为迁移参考，不能替代纯源语言验收。
+The refactoring goal started on 2026-10-08, governed by AGENTS.md, source-language-only.md and the user's new requirements. Earlier P1–P4 evidence is a migration reference, not a substitute for source-only acceptance.
 
-## 分阶段交付
+## Phased delivery
 
-| 阶段 | 交付 | 状态 |
-|---|---|---|
-| R1 | SPP 显式事务模式、编译检查、生成与运行一致性；禁止隐式切换协调器 | 已实现；回归通过 |
-| R2 | 完整存入和冲正业务场景、校验作用域、待授权结果与条件服务执行 | 条件语法、生成与准备路由已加入，完整执行仍待迁移 |
-| R3 | 通用查询/更新生成、账户与成交/分录/原关联/审计共同资源、版本与幂等 | 首批仓储写入声明及版本检查已实现，完整交易迁移待完成 |
-| R4 | 日期能力、模型构造、自动启动与声明式数据/验收 | 日期和模型构造已加入；启动及声明式验收待实施 |
-| R5 | 移除全部 demo 手写 Java，干净生成并完成交易与故障回归 | 待实施 |
+| Phase | Deliverable | Status at this checkpoint |
+| --- | --- | --- |
+| R1 | Explicit SPP transaction modes, compile checks, generation/runtime consistency; no implicit coordinator switching | Implemented; regression passed |
+| R2 | Complete deposit/reversal scenarios, check scopes, authorization-pending outcomes and conditional service execution | Condition syntax, generation and preparation routing added; full execution still to migrate |
+| R3 | Generic query/update generation; shared resources for accounts, settlements, entries, original links and audit; revisions/idempotency | Initial repository-write declarations/revision checks implemented; full transaction migration pending |
+| R4 | Dates, model construction, automatic startup and declarative data/acceptance | Dates/model construction added; startup/declarative acceptance pending |
+| R5 | Remove all handwritten demo Java; clean generation and transaction/fault regression | Pending |
 
-顺序按依赖调整，但不能通过减少原三类存入、对应冲正或故障验收范围来消除缺口。
+Dependencies may change sequencing, but scope cannot shrink by removing any of the original three deposit types, corresponding reversals or fault acceptance.
 
-## R1 的具体实现
+## R1 implementation
 
-在现有事务组上支持 `transaction at/tcc/saga/quantum { ... }`。SPP 模式进入模型和生成代码；APP 对更新服务的绑定不能与其冲突。空的显式事务组报错。运行时在执行任何动作前验证实际服务模式，显式非 Saga 组不会被安装的 Saga 协调器接管。旧工程允许省略模式，迁移后的 demo 要求显式写出。
+Existing transaction groups gained transaction at/tcc/saga/quantum { ... }. SPP modes enter models/generated code; APP update bindings cannot conflict. Empty explicit groups are errors. Runtime checks actual service modes before executing actions; an installed Saga coordinator cannot take over explicit non-Saga groups. Older projects may omit modes; the migrated demo was required to state them explicitly.
 
-银行金额组已改为 `transaction quantum`，但这仍只是金额组。完整存款和冲正中的账户、成交、分录、原关联、审计的业务边界及物理提交尚未迁移；当前 14 个实现和 21 个测试的手写 Java 都仍是待移除违规项。
+Bank amount groups switched to transaction quantum, but remained amount groups only. Full deposit/reversal boundaries and physical commits for accounts, settlements, entries, original links and audit were not migrated. Fourteen handwritten implementations and 21 handwritten test files remained violations awaiting removal.
 
-对应通用语法文档：[SPP 事务模式](../../../book/references/spp-transaction-mode.md)。本轮没有新增或修改 demo Java。
+Generic syntax: [SPP transaction modes](../../../book/references/spp-transaction-mode.md). No demo Java was added/modified in this round.
 
-## R2 的首批能力
+## Initial R2 capabilities
 
-场景支持带明确作用域的 `if/else/else if`；条件类型及引用检查复用业务表达式，不允许条件副作用。选中的分支可包含显式事务，未选中的分支不启动服务或事务。所有分支仍参与编译检查。新增 `cboddeposit-85-deposit-route.spp` 从可选银行资格及积数事实选择四种已有准备场景，并加入 APP 本地部署声明。
+Scenarios gained explicitly scoped if/else/else if. Condition typing/reference checks reuse business expressions and prohibit side effects. Selected branches may contain explicit transactions; unselected branches start neither services nor transactions. Every branch remains compile-checked. New cboddeposit-85-deposit-route.spp selects four existing preparation scenarios from optional bank eligibility/accrual facts, with APP local deployment declarations.
 
-已在公共生成器测试中实际编译生成 Java，验证成功提交、未授权分支跳过事务、其他拒绝分支，以及执行失败的恢复；测试不是 demo 手写实现。原 Java 入口及授权异常处理仍未移除，完整持久化执行将在后续阶段迁移。语法文档见 [场景条件](../../../book/references/spp-scenario-conditions.md)。
+Public generator tests actually compiled generated Java and verified successful commit, transaction skipping for unauthorized branches, other rejection branches and recovery after execution faults. These are framework tests, not handwritten demo implementations. Original Java entry/authorization exception handling remained; full persisted execution would migrate later. See [scenario conditions](../../../book/references/spp-scenario-conditions.md).
 
-## 回归记录
+## Regression record
 
-首次 R1 框架回归：lang 260、appframe 450、generator 91，共 801 项通过。加入场景条件及源路由后的 `mvn -pl :xbod-deposit-demo -am test`：lang 263、appframe 450、generator 92、demo 143，共 948 项通过，无失败、错误或跳过。补充 else-if 后再次执行同一命令：lang 264、appframe 450、generator 92、demo 143，共 949 项通过，无失败、错误或跳过。
+Initial R1 framework regression passed lang 260, appframe 450, generator 91: **801 total**. After scenario conditions/source routing, `mvn -pl :xbod-deposit-demo -am test` passed lang 263, appframe 450, generator 92, demo 143: **948**, zero failures/errors/skips. After else-if, the same command passed lang 264, appframe 450, generator 92, demo 143: **949**, zero failures/errors/skips.
 
-这些是语法扩展与旧行为保留证据；并非“纯源语言 demo 已完成”。当前 goal 保持 active，未进入 R5 最终验收。
+These establish syntax expansion and preservation of old behavior, not completion of the source-only demo. The goal remained active, before final R5 acceptance.
 
-## R3 的首批能力
+## Initial R3 capabilities
 
-新增通用 APP `persist(insert/update/upsert, argument(...))` 和 `compareVersion(...)`，生成服务内的仓储写入及版本捕获。仓储只加入显式事务，不自行开启或提交；支持新增唯一性、更新存在性和锁定后的版本比较。一维集合可整体加入调用者事务，集合版本检查暂时明确拒绝。
+Generic APP persist(insert/update/upsert, argument(...)) and compareVersion(...) generate repository writes/revision capture within services. Repositories only join explicit transactions; they do not start/commit their own. They support insertion uniqueness, update existence and version comparison after locking. One-dimensional collections join the caller's transaction as a whole; collection revision checks were explicitly unsupported.
 
-显式绑定到同一个 localJdbc 后端且连接配置一致的仓储与量子日志复用 DataSource；查询复用当前连接，能读到本事务写入。Saga 外层不包住所有局部节点的 JDBC 提交。语义及限制见 [APP 仓储写入](../../../book/references/app-persistence.md)。
+Repositories/quantum journals explicitly bound to the same localJdbc backend with identical connection settings share a DataSource. Queries reuse the current connection and see in-transaction writes. An outer Saga does not wrap all local nodes' JDBC commits. See [APP persistence](../../../book/references/app-persistence.md) for semantics/limits.
 
-这一阶段扩展公共编译器、模板和运行库，没有新增 demo 手写 Java。银行完整执行入口、统一资源配置、幂等回放、声明式验收和旧 Java 删除仍未完成，不能宣称 R3 或纯源语言 demo 已验收。
+This extends the public compiler/templates/runtime without new handwritten demo Java. Complete bank entries, unified resource settings, idempotent replay, declarative acceptance and old-Java removal remained unfinished; R3/source-only acceptance was not claimed.
 
-R3 首批能力回归：`mvn -pl :xbod-deposit-demo -am test` 全部通过，lang 269、appframe 459、generator 93、demo 143，共 964 项，失败/错误/跳过均为 0。新增验证包含实际生成服务编译、调用及幂等回放不重复写入。日志 `/tmp/spp-source-only-phase3-final.log` 是本地运行证据，测试代码及源声明为可重跑依据。
+Initial R3 regression: `mvn -pl :xbod-deposit-demo -am test` passed lang 269, appframe 459, generator 93, demo 143: **964 total**, zero failures/errors/skips. New checks compile/call actual generated services and verify idempotent replay does not duplicate writes. /tmp/spp-source-only-phase3-final.log is local execution evidence; tests/source declarations provide reproducibility.
 
-## R3 银行记录与边界迁移
+## R3 bank records and boundary migration
 
-新增 `cboddeposit-91-cash-storage-model.spp`、`cboddeposit-92-cash-deposit-records.spp` 与 `cboddeposit-93-cash-reversal-records.spp`，定义持久化账户、存入成交、现金冲正成交、分录、原成交冲正关联和审计角色；新增查询服务及 APP persist/compareVersion 绑定。原 Java 的账户事实与成交包装转为源语言字段，成交前后事实显式使用 copy 独立复制。
+New cboddeposit-91-cash-storage-model.spp, cboddeposit-92-cash-deposit-records.spp and cboddeposit-93-cash-reversal-records.spp define persisted accounts, deposit settlements, cash reversals, entries, original-to-reversal links and audit roles. Queries and APP persist/compareVersion bindings were added. Former Java account facts/settlement wrappers became source fields, with explicit copy for independent before/after facts.
 
-`commitCashDepositRecords` 和 `commitCashReversalRecords` 分别声明完整共同提交，包含账户 CAS、成交、分录、关联、金额守恒服务、准备余额与量子余额一致性检查、成功审计。冲正关联独立版本检查防止两笔冲正同时使用同一原成交。PHY 的 cashRecords 仓储、cashLedger 和两种事务资源显式绑定到 cashDatabase 后端。账户及现金对手角色使用 accountId 主键声明，避免多账户共享默认量子标识。
+commitCashDepositRecords and commitCashReversalRecords each declare complete joint commit: account CAS, settlements, entries, associations, amount conservation, prepared-versus-quantum balance checks and success audit. Independent revision checks on reversal links prevent two reversals using the same original settlement. PHY cashRecords repositories, cashLedger and both transaction resources explicitly bind cashDatabase. Accounts/cash counterparties declare accountId keys, preventing different accounts sharing a default quantum identity.
 
-同时修复跨文件原子服务的声明合并：先调用、后定义的服务保留参数、返回及实现。新增参与者 copy 的通用类型校验、生成及运行支持，集合与嵌套事实不相互覆盖。原银行规则与跨日现金冲正计算保持已有源实现。
+Cross-file atomic declaration merging was also fixed: services called before definition retain parameters, returns and implementation. Generic participant-copy typing/generation/runtime support keeps collections/nested facts independent. Existing bank rules/cross-day cash reversal calculations remain source implementations.
 
-这些源服务已通过生成和 Java 编译，旧的 Java 入口仍在使用旧存储。尚需迁移真实入口及其查询顺序、可选事实、上下文构造、重复请求与待授权后继续执行，再由声明式案例证明新边界的完整行为；不能将旧 Java 测试通过当作这些新场景的银行端到端验收。
+These services generated/compiled, but old Java entries still used old storage. Real entries and query ordering, optional facts, context construction, duplicate requests and post-authorization continuation still needed migration. Declarative cases must establish full new-boundary behavior; passing old Java tests is not bank end-to-end acceptance of new scenarios.
 
-下一步缺口：构造计算上下文及默认集合、通用日期解析绑定、费率配置查询、来源于源语言的幂等生命周期（待授权不能被当作已成交缓存）、失败审计及声明式案例运行。继续按 R2–R5 完成，14 个 main 和 21 个 test 手写文件仍待删除。
+Remaining gaps: calculation contexts/default collections, generic date parsing, rate queries, source-defined idempotent lifecycle (authorization-pending must not cache as settled), failure audit and declarative cases. R2–R5 continued; 14 main/21 test handwritten files still awaited deletion.
 
-银行记录、身份声明与复制能力回归：`mvn -pl :xbod-deposit-demo -am test` 通过，lang 273、appframe 461、generator 94、demo 143，共 971 项，失败/错误/跳过均为 0。存款及冲正提交源分别位于 92 和 93 文件，共享模型/身份/复制位于 91；生成结果放在 target，没有手工修改。日志 `/tmp/spp-bank-records-final.log`。这证明生成、编译及旧行为保留；新银行场景的完整入口与故障验收仍待声明式案例实现。
+Bank records/identity/copy regression: `mvn -pl :xbod-deposit-demo -am test` passed lang 273, appframe 461, generator 94, demo 143: **971**, zero failures/errors/skips. Deposit/reversal commits live in files 92/93; shared model/identity/copy in 91. Generated output stays in target and was not manually edited. Log: /tmp/spp-bank-records-final.log. This proves generation/compilation/old behavior preservation; complete new entries/fault acceptance still required declarative cases.
 
+## R4 calculation contexts and basic calendar
 
-## R4 计算上下文与基础日历
+New new Type() constructs only declared current-domain models. Generation/semantic validation reject arbitrary Java classes and mismatched types. Generic Gregorian date validity, year/month/day and epoch-day functions adapt numbers through PHY. Allowed date ranges/error codes stay in SPP decodeBankDate, not bank-specific runtime code. Generator tests actually compile/execute construction/calendar calculations with BigInteger physical fields.
 
-新增 `new Type()`，仅构造当前域声明的数据模型；生成器和语义检查禁止任意 Java 类及错配类型。新增通用 Gregorian 日期有效性、年/月/日和 epoch-day 函数，数字通过 PHY 适配。日期允许范围及错误码保留在 SPP 的 decodeBankDate 中，没有移入银行专属运行实现。生成器测试实际编译及执行 BigInteger 物理字段的构造和日期计算。
+cboddeposit-96-deposit-work.spp initializes calculation contexts in source, independently copies account/accrual facts and constructs nested date/period/agreement models. Rates become an SPP scenario: prepare customer/fee-item keys, query stored rates, check and assign. APP supplies composite-key repository bindings. Old rate/date Java had not been deleted and old entries could still use it, so its regression does not prove new source queries end-to-end.
 
-`cboddeposit-96-deposit-work.spp` 在源语言中初始化计算上下文、独立复制账户和积数事实，并构造嵌套日期、期间及协定模型。费率改为 SPP 场景：准备客户/费目查询键、查询费率记录、校验及赋值；APP 负责 composite-key 仓储绑定。尚未删除旧费率及日期 Java，旧入口仍可能使用旧实现，不能以其回归证明新源查询已经端到端验收。
+Typed scenario calls return their own response objects consistently with raw execute. Request-call responses remain call-local variables. The generator converts service parameter arrays/model Lists consistently and preserves null optional collections, allowing calls without accrual facts to reach SPP branches.
 
-场景类型化调用返回自己的响应对象，与原始 execute 调用一致。请求调用的响应保存在调用局部变量中。生成器统一服务参数数组与模型 List 的转换，可选集合保持 null；这使没有积数事实的调用能到达 SPP 条件分支。
+Full regression /tmp/spp-work-calendar-response.log: `mvn -pl :xbod-deposit-demo -am test` passed. This remains expanded-generation/old-behavior evidence. Actual entries, request identity/authorization retries, business handling of missing records, failure audit, declarative acceptance and removal of all handwritten demo Java remained. See [participant construction and calendar](../../../book/references/spp-participant-construction.md).
 
-完整回归日志 `/tmp/spp-work-calendar-response.log`：`mvn -pl :xbod-deposit-demo -am test` 通过。此记录仍是扩展生成链路与旧行为保留证据；真实交易入口、请求身份及待授权重试、缺失记录的业务处理、失败审计、声明式验收、所有 demo 手写 Java 删除继续待完成。通用语义见 [参与者构造与日历](../../../book/references/spp-participant-construction.md)。
+Additional /tmp/spp-collection-construction-tests.log: framework generator tests actually generate/compile complete scenarios/atomics and invoke nullable/nested collections, checking List/array conversion, independent copies, independent per-call responses and typed/raw response consistency. Semantic tests allow nullable model numbers but reject numeric-constant/null comparison. Four selected tests passed, zero failures/errors/skips, all in public framework modules with no new demo Java.
 
-补充验证 `/tmp/spp-collection-construction-tests.log`：框架生成器实际生成并编译完整场景与原子服务，调用可空集合及嵌套集合，确认模型 List/服务数组转换、独立复制、每次调用的独立响应，以及类型化和原始调用响应一致。语义测试确认模型数字可校验 null、数字常量不能与 null 比较。指定测试 4 项通过，无失败、错误或跳过；测试位于公共框架模块，没有新增 demo Java。
+## R2 deposit-attempt execution scenario
 
+cboddeposit-97-deposit-execution.spp defines commands, execution context and executeCashDepositAttempt. Source exposes account queries, initialization, optional bank eligibility, cash-path/admission checks, four preparation routes, settlement/eight-entry assembly, balance deltas and complete commit. Approved attempts call file 92's shared quantum boundary. Authorization-pending attempts write audit only in a separate explicit quantum boundary, skipping accounts, settlements, entries and funds. Callers supply each attemptId; bank-specific handwritten Java does not generate it.
 
-## R2 存入尝试执行场景
+One-dimensional participant collection initialization/local array declarations allow source construction of eight entries with explicit slots. No bank data/slot logic enters the generic runtime.
 
-`cboddeposit-97-deposit-execution.spp` 定义命令、执行上下文及 executeCashDepositAttempt。账户查询、上下文初始化、可选银行资格、现金路径和准入、四种准备路由、成交与八条分录装配、余额增量及完整提交均在业务源可见。批准时调用 92 文件的共同量子边界；待授权时只在单独显式量子边界写审计，跳过账户、成交、分录及金额修改。每次审计的 attemptId 必须由调用者提供，不在银行手写 Java 中生成。
+This is a single attempt. Request identity, settled replay and rejection/transaction-failure audit still need explicit wrapping. Corresponding reversal entries/declarative execution must complete before replacing old entries. New queries/commits/full scenarios require source-only bank end-to-end acceptance; old Java baselines cannot substitute.
 
-补充一维参与者集合初始化及局部数组声明，用于源语言构造八条分录并逐条赋槽位；没有将银行数据或槽位逻辑加入公共运行库。
+Deposit-attempt/collection regression /tmp/spp-deposit-attempt.log: `mvn -pl :xbod-deposit-demo -am test` passed lang 277, appframe 465, generator 96, demo 143: **981**, zero failures/errors/skips. This proves generation/compilation and baseline preservation, not new source-only end-to-end behavior. Additional local-collection initialization/model-List-to-local-array checks are separately recorded.
 
-这是单次尝试场景，尚需显式包裹请求身份、已成交回放及拒绝/事务失败审计，完成对应冲正入口与声明式运行后才能替换旧入口。源查询、提交及新的完整场景仍需声明式银行端到端验收，旧 Java 基线不能替代该验收。
+Focused /tmp/spp-array-construction-final.log: six participant-construction semantic/generated-execution and scenario collection-passing tests passed. Coverage includes empty collections, null elements, wrong element types, scalar/collection mismatches, invalid primitive-numeric local initialization, and copying a model List snapshot to a local array then back to the model. All are generic framework tests; no handwritten demo Java was added.
 
+## R3 optional-query missing-record semantics
 
-存入尝试场景与集合构造回归 `/tmp/spp-deposit-attempt.log`：`mvn -pl :xbod-deposit-demo -am test` 全部通过，lang 277、appframe 465、generator 96、demo 143，共 981 项，无失败、错误或跳过。该结果证明新增源场景可生成编译并保留旧基线，尚不证明新银行入口的纯源语言端到端行为。后续针对局部集合初始化、模型集合复制为局部数组的补充检查另记专项运行结果。
+APP gained single-record optional, preserved in generated query metadata. Missing records return empty query results while preserving keys; connection/deserialization faults are not swallowed. Required queries still report absence. Services must use newly constructed query objects to distinguish missing facts, not reuse previously loaded data. Generation, semantic checks and both local repositories implement this capability.
 
-专项 `/tmp/spp-array-construction-final.log`：参与者构造语义及实际生成执行、场景集合传参共 6 项通过。覆盖空集合、null 元素、错误元素类型、标量/集合错配、原始数值局部集合错误初始化，以及模型 List 快照转成局部数组后再赋回模型。均为通用框架测试，demo 没有新增手写 Java。
+Deposit-rate queries became optional, with SPP applyStoredDepositFeeRate explicitly returning DEPOSIT_FEE_RATE_NOT_FOUND when absent. This also supports missing-record queries needed for request registration/settled replay, but request lifecycle/concurrent registration remained incomplete; idempotency migration was not claimed.
 
-## R3 可选查询缺失语义
+Full generation/compilation/existing tests passed in /tmp/spp-optional-query.log. Focused /tmp/spp-optional-query-specific.log and /tmp/spp-optional-query-semantics.log passed 4 tests covering scalar constraints, rejection of duplicate modifiers/no repository/collection targets, actual H2 present/missing records, typed/request calls, required-query missing rejection and preserved storage faults. No demo Java was added. Old Java still required deletion and new entries still required declarative end-to-end acceptance.
 
-APP 新增单记录 `optional` 修饰，生成的仓储查询元数据保留此声明。没有记录时返回空查询结果、保持查询键，不吞连接或反序列化等故障；必需查询仍报不存在。查询服务必须使用新构造的查询对象来区分缺失事实，不能复用上次已加载的数据。生成、语义检查及两种本地仓储已实现该通用能力。
+## R2/R3 request identity, authorization-pending retry and settlement replay
 
-存款费率查询改为 optional，缺失费率由 SPP 的 applyStoredDepositFeeRate 明确报 DEPOSIT_FEE_RATE_NOT_FOUND。这同时提供请求登记与已成交回放所需的缺失查询基础，但尚未完成请求生命周期和并发登记；不能据此宣称幂等已迁移。
+New cboddeposit-98-deposit-lifecycle.spp defines executeCashDeposit. An explicit quantum boundary retains the first request record, reloads it and validates identity: account, numerically equal amount, currency, date, cash channel and fee context. Authorization evidence, current policy and demo posting configuration are not original Entry identity. Settled requests copy original settlement, before/after facts, plan, fees, accrual and notices, separately commit Replayed audit, and neither reload accounts nor apply current admission policy. Unsettled requests call file 97's attempt scenario and may supply additional authorization.
 
-回归 `/tmp/spp-optional-query.log`：完整生成编译和原有测试通过。专项 `/tmp/spp-optional-query-specific.log`、`/tmp/spp-optional-query-semantics.log` 共 4 项通过，覆盖标量约束、重复修饰/无仓储/集合目标拒绝，实际 H2 存储的存在与缺失、类型化和请求调用、必需查询拒绝缺失以及存储故障保留。没有新增 demo 手写 Java。旧银行 Java 基线仍须最终删除，新银行入口仍须声明式端到端验收。
+Explicit APP idempotency business lets the deposit scenario manage its lifecycle; generation retains tracing without caching an authorization-pending response. Generic persist(insertIfAbsent) preserves existing requests. JDBC handles unique-key races within the caller transaction without independently opening/committing the full business transaction. Identity/replay policy stays in SPP; no bank Java was added.
 
-## R2/R3 请求身份、待授权重试与成交回放
+This was not final acceptance: rejection/transaction-failure audit, corresponding cash reversal, source cases and startup still required migration. Declarative bank cases must prove authorization continuation on the same request, changed-payload rejection, original replay across days/later account changes, and races. Generic tests establish storage/generation mechanisms only; old bank Java tests cannot substitute.
 
-新增 `cboddeposit-98-deposit-lifecycle.spp`。executeCashDeposit 使用显式量子边界保留首次请求记录、重新加载并校验身份。身份比较包括账户、数值相等的金额、币种、日期、现金渠道及费上下文；授权证据、当日政策和演示分录配置不组成原 Entry 身份。已成交时复制原成交及其原/成交事实、计划、费用、积数和通知，单独提交 Replayed 审计，不重新加载账户或运行现行准入政策；未成交调用 97 的尝试场景，允许补充授权证据。
+Request lifecycle regression /tmp/spp-deposit-lifecycle-final.log: full `mvn -pl :xbod-deposit-demo -am test` passed. New framework evidence covers concurrent insertIfAbsent reading the same original record, duplicate insertion preserving the record and neighboring writes in the same boundary, outer-failure recovery, and business-managed scenarios continuing execution with identical trace numbers while retaining traces. Generator tests compile/call scenarios with unique request headers/idempotency business; a second call updates participants again and returns an independent response. New bank entries/APP/PHY bindings generate/compile, but source-only bank case execution remained unimplemented. The old 143-test baseline was not a substitute.
 
-APP 显式 `idempotency business` 让存款场景自行管理生命周期，生成层保留追踪而不缓存一次待授权返回。新增通用 persist(insertIfAbsent)，不会覆盖已有请求；JDBC 在调用者事务内处理唯一键竞争，不另行开启或提交整笔业务。业务身份和回放政策全部留在 SPP，没有新增银行 Java。
+## R2 cash reversal reading, calculation and replay entries
 
-这仍不是最终验收：拒绝/事务失败审计、对应现金冲正入口、源案例及运行启动必须继续迁移。尤其需要声明式银行案例证明同请求待授权后继续执行、异载荷拒绝、跨日/后续账户修改后的原成交回放及并发竞争。通用框架测试仅验证存储与生成机制，旧银行 Java 测试仍不是该证明。
+New cboddeposit-99-reversal-execution.spp constructs reversal work, eight original/reverse entries and records. Return-value bindings read original settlement/actual persisted entries. Entries are assembled by slot, checked for omissions/duplicates, then verified against settlement evidence by existing services. The current account is read once; file 93's CAS commit checks its revision, retaining intervening-change detection. Core eligibility, cash-path rules, fee refunds, current accrual, details and cross-day policy continue using original XBOD services, not generic balance restoration.
 
+New cboddeposit-99b-reversal-lifecycle.spp defines executeCashReversal: query original reversal settlement and compare reversal number/original transaction/overnightMode2 identity. Replay copies original evidence and separately commits ReversalReplayed audit without recalculating the current account. First execution performs complete preparation/explicit joint commit. Original-settlement association and account revisions remain checked in the shared quantum boundary to prevent duplicate reversal.
 
-请求生命周期回归 `/tmp/spp-deposit-lifecycle-final.log`：`mvn -pl :xbod-deposit-demo -am test` 完整通过。新增框架证据包括 insertIfAbsent 并发调用读取同一原记录、重复新增不覆盖并保留同边界的前后写入、外层失败恢复，以及业务管理场景相同追踪号仍继续执行并保留追踪。生成器实际编译、调用带唯一请求头和 idempotency business 的场景，第二次调用继续更新参与者并返回独立响应。银行新入口及其 APP/PHY 绑定可生成并编译，但纯源语言银行案例运行仍未实现，旧 143 项基线仍不能替代它。
+Generic participant.attribute = service(arguments); binds exactly one business return value, checking object type, collection dimension and target property. Generation extracts declared fields without exposing Java response wrappers to business. Optional rate queries/deposit replay also use exact return values; absence is null, not inferred from query-key fields. See [scenario result binding](../../../book/references/spp-scenario-results.md).
 
-## R2 现金冲正读取、计算与回放入口
+This establishes source expressiveness for cash reversal's read/calculation order. Rejection/failure audit, recovery, declarative execution and old-Java removal remained. Compiled new entries/passing old tests do not establish new bank end-to-end acceptance.
 
-新增 `cboddeposit-99-reversal-execution.spp`，构造冲正工作模型、八条原/反向分录及记录。通过返回值绑定读取原成交和实际持久化分录；按槽位装配实际分录并检查缺失/重复，再由已有服务核对成交证据。当前账户只读取一次，其版本由 93 的 CAS 提交校验，保留期间变化检测。核心账户资格、现金路径、费用返还、当前积数状态、明细及跨日规则继续使用原 XBOD 源服务，不改成通用余额还原。
+Reversal-entry/result-binding regression: `mvn -pl :xbod-deposit-demo -am test` passed in /tmp/spp-reversal-lifecycle-final.log: lang 283, appframe 470, generator 97, demo 143, **993 total**, zero failures/errors/skips. Three focused tests in /tmp/spp-scene-results-tests.log cover rejection of wrong types/dimensions/multiple returns/unknown targets/by-value parameters, plus compiled/executed scalar, collection, nullable results, groups, branches and transactions. Generated output includes reversal attempts/replay without manual edits. Old unmigrated bank tests remain in that result; source-only end-to-end cases/Java deletion were unfinished.
 
-新增 `cboddeposit-99b-reversal-lifecycle.spp`。executeCashReversal 先查询原冲正成交，核对冲正号/原交易号/overnightMode2 身份；成交回放只复制原证据并提交 ReversalReplayed 审计，不重算当前账户。首次调用进入完整准备及显式共同提交。原成交关联版本与账户版本继续在共同量子边界检查，不能重复撤销同一原成交。
+## R2 failure audit and original-error propagation
 
-通用语法新增 `participant.attribute = service(arguments);`，仅绑定恰有一个业务返回值，检查对象类型、集合维度及目标属性。生成器提取声明字段，业务不感知 Java 响应包装。费率可选查询及存款回放也改用准确返回值，缺失时直接为空，不依赖查询键内字段推测存在性。语义与限制见 [场景返回值绑定](../../../book/references/spp-scenario-results.md)。
+Generic scenario try/catch/rethrow was added historically. Catch binds original failure to a source-declared role/contract with String code. SPP chooses handling services, independent transactions and whether to throw the original failure. Framework code does not hide audit boundaries; handling failure preserves the primary exception and attaches the secondary error. See [scenario failure handling](../../../book/references/spp-scenario-failures.md).
 
-这证明源语言可以表达现金冲正的读取与计算顺序；拒绝/失败审计、故障恢复、声明式案例运行及旧 Java 删除仍待完成。不能以新入口编译和旧测试通过替代其银行端到端验收。
+Deposit/reversal entries explicitly wrap unchecked execution scenarios. On failure they call file 99c's audit-assembly atomics, write within an independent transaction quantum, then rethrow the original. Audit requires a complete attempt identity; missing identity still returns the original error rather than inventing a bank identifier. New calls clear prior work-context failure/results so retry cannot read stale state.
 
+cboddeposit-99c-failure-audit.spp records rejection/failure events and available evidence by preparation/commit/replay stage. CommitFailed/ReversalCommitFailed describe observed stages, not a physical final verdict of rollback or unknown commit. Original RolledBack/CommitOutcomeUnknown/CommittedResponseFailed evidence still needed generic commit-outcome support/declarative faults; catching a source error alone cannot determine final state.
 
-现金冲正入口与返回值绑定回归：`mvn -pl :xbod-deposit-demo -am test` 在 `/tmp/spp-reversal-lifecycle-final.log` 全部通过，lang 283、appframe 470、generator 97、demo 143，共 993 项，无失败、错误或跳过。专项 `/tmp/spp-scene-results-tests.log` 3 项通过，包含类型/维度/多返回值/未知目标/按值参数拒绝，以及实际编译执行的标量、集合、可空结果、组、分支和事务。完整生成目录包含冲正尝试与回放，不手工修改产物。本结果仍包括未迁移的旧银行测试，纯源语言端到端案例和 Java 删除尚未完成。
+Three framework checks passed in /tmp/spp-scenario-failures-tests.log: scope/fact typing, actual generated Java compilation/execution, rollback before independent audit commit, and preservation of primary exceptions with secondary audit failures. No bank Java was added/modified.
 
-## R2 失败审计与原错误传播
+Additional request-entry verification changes generic scenario failure traces to FAILED rather than mislabeling rollback/unconfirmed outcomes COMPENSATED; real Saga recovery records remain coordinator-owned. In /tmp/spp-trace-failure-test.log, an actual compiled generated entry suffering both business and trace-storage failures returns the same primary exception with attached trace error. This is a public generator test, not demo Java.
 
-新增通用场景 try/catch 与重新抛出。catch 将原失败绑定到源声明的角色/合约事实；类型必须有 String code。SPP 决定调用哪些处理服务、声明哪些独立事务及是否 throw 原失败。框架不隐藏审计边界，处理本身失败时保留原异常并附加处理错误。语义见 [场景失败处理](../../../book/references/spp-scenario-failures.md)。
+Full failure-audit/request-propagation regression /tmp/spp-bank-failure-final.log: `mvn -pl :xbod-deposit-demo -am test` passed lang 285, appframe 470, generator 98, demo 143, **996**, zero failures/errors/skips. Source wrappers, catch bindings, explicit audit boundaries and rethrows generate/compile. Source cases still had to prove persisted new-bank behavior after faults, with physical commit evidence, automatic startup and deletion of all old Java; the goal remained active.
 
-存款和冲正主入口显式包装 unchecked 执行场景。失败后分别调用 99c 的审计装配原子服务，并在独立 transaction quantum 中写入，再重新抛出原错误。尝试标识完整时才写入；缺失尝试标识仍返回原错误，不能凭空构造一个银行身份。工作上下文在新调用开始清除上次失败及结果，防止重试读取旧状态。
+## APP example-entry migration (in progress)
 
-`cboddeposit-99c-failure-audit.spp` 根据准备、提交或回放阶段记录拒绝/失败事件及已有证据。CommitFailed/ReversalCommitFailed 描述观察到的失败阶段，不代表物理“已回滚”或“提交结果未知”的最终判定。原实现的 RolledBack/CommitOutcomeUnknown/CommittedResponseFailed 证据仍须通过通用提交结果支持与声明式故障案例迁移；不能仅根据源场景捕获错误推断最终状态。
+Generic APP examples { run scenarioName; } declarations, semantic checks, generated entry catalogues and a framework runner were added. Bank inputs, independent expectations and steps live in cboddeposit-99d-source-examples.spp. Ordinary same-branch deposit declares an account-initialization quantum transaction, calls the real source lifecycle, then queries accounts/eight debit-credit records. The runner contains no bank logic and adds no implicit scenario-wide transaction.
 
-公共专项 `/tmp/spp-scenario-failures-tests.log` 3 项通过：作用域及事实类型检查、实际生成 Java 编译执行、先回滚后独立审计提交、审计失败仍保留原异常并附加原因。没有新增或修改银行 Java。
+The first actual result follows; generation/compilation success is not end-to-end proof for other cases. Cross-branch rates, overdraft, authorization, reversal, faults and concurrency continued migrating. Handwritten main/test code still remained; the demo was not yet source-only.
 
-补充请求入口验证：通用生成场景失败追踪改为 FAILED，避免将纯回滚或尚未确认的结果统一标成 COMPENSATED；真正 Saga 恢复记录继续由协调器产生。`/tmp/spp-trace-failure-test.log` 中，实际生成并编译的请求入口遇到业务失败与追踪存储同时失败，仍返回同一个原异常并附加追踪错误。该测试在公共生成器模块，未编写 demo Java。
+### First actual source acceptance result
 
+GeneratedExampleRunner ordinaryCashExample actually passed, outputting PASS ordinaryCashExample and APP examples: 1 passed, 0 failed. It did not call old NormalCashDeposit/JdbcDepositStore bank entries. Inputs, transaction boundaries, execution order, queries and assertions came from file 99d SPP and APP/PHY.
 
-失败审计与请求错误传播完整回归 `/tmp/spp-bank-failure-final.log`：`mvn -pl :xbod-deposit-demo -am test` 全部通过，lang 285、appframe 470、generator 98、demo 143，共 996 项，失败/错误/跳过均为 0。银行源包装、catch 事实绑定、显式审计边界及重新抛出均可生成编译。后续必须用源案例证明新银行路径及故障后的持久状态，并补充物理提交结果证据、自动启动与全部旧 Java 删除；当前 goal 仍 active。
+Real loading exposed/fixed three generic issues: dependency-ordered subscenario registration; no transaction proxy that breaks concrete call types around scenarios without physical resource bindings; and transaction snapshots supporting arrays, null elements, primitive arrays and nested array length changes. Framework tests cover entry selection/failure exit, catalogue order, dependencies/cycle rejection and array rollback.
 
-## APP 样例入口迁移（进行中）
+Scope: ordinary same-branch cash deposit. Independent expectations: balance/interest base 700, daily cash total 600, detail count 11, account revision 1, eight records and debit/credit totals 600. This did not prove cross-branch fees, overdraft, authorization continuation, reversal, commit classification, fault injection or concurrency.
 
-新增通用 APP `examples { run 场景名; }` 声明、语义检查、入口目录生成和框架运行器。银行样例的输入、独立预期值与执行步骤在 `cboddeposit-99d-source-examples.spp` 中；普通同分行现金存入样例声明账户初始化的量子事务，调用真实源存款生命周期，再查询账户与八条借贷记录校验。运行器不提供银行逻辑，也不对整个场景添加隐式事务。
+Final verification: `mvn -pl :xbod-deposit-demo -am package` passed lang 287, appframe 477, generator 99, demo 143, **1006 tests**. The generated entry then passed independently using README's classpath. Demo 143 still includes old handwritten tests and is migration regression only. Clean acceptance after deleting old Java had not happened.
 
-本阶段首个真实运行结果见下文，不能将生成编译成功当作其他案例端到端通过。跨分行费率、透支、授权、冲正、失败与并发样例继续迁移。现存手写主程序和测试尚未删除，整个 demo 仍未达到纯源语言验收。
+## Evidence correction: empty catch produced empty methods (2026-10-08)
 
-### 首个真实源验收结果
+New fault entries required proof that the specified fault actually fired, exposing a generator defect: empty catch {} had a null execution list; rendering threw a null-pointer exception, template reflection swallowed it, and an empty scenario method was emitted. Earlier PASS results for replayCashExample, missingFeeCashExample, pendingCurrentAccountCashExample and crossDayCashReversalExample executed no business and are withdrawn. Historical six/nine/ten/twelve/fifteen/sixteen-entry all-pass claims below are not evidence for those four entries. Other entries must use the corrected unified rerun.
 
-`GeneratedExampleRunner ordinaryCashExample` 已实际执行通过，输出 `PASS ordinaryCashExample` 与 `APP examples: 1 passed, 0 failed`。运行没有调用旧版 NormalCashDeposit/JdbcDepositStore 等银行 Java 入口；其业务输入构造、事务边界、执行顺序、查询和断言来自 99d SPP 文件及 APP/PHY 绑定。
+The fix treats empty branches as empty lists and directly renders/checks business methods before template output; rendering exceptions must fail generation. Public generator regression uses generic models to verify execution of independent assertions after empty catch and refusal to write scenario files on rendering errors. File 99n's fault-not-hit check correctly rejected the empty method before the fix; that rejection is not a passing acceptance. All source entries were being rerun; final results follow separately.
 
-这次真实加载也暴露并修复了三项通用问题：生成场景按子场景依赖排序注册；没有物理资源绑定的场景不套入破坏具体调用类型的事务代理；事务对象快照支持数组、空元素、原始类型数组和嵌套数组长度变更。通用测试覆盖入口选取/失败退出、目录顺序、场景依赖与循环拒绝、数组回滚。
+## Declarative deposit-lifecycle acceptance (in progress)
 
-样例范围为同分行普通现金存入，独立预期值为余额与计息基数 700、当日现金累计 600、明细数 11、账户版本 1、八条记录且借贷均为 600。尚不能以此声明跨分行收费、透支、授权续接、冲正、提交结果分类、失败注入或并发验收通过。
+cboddeposit-99e-debt-examples.spp, cboddeposit-99f-authorization-examples.spp and cboddeposit-99g-replay-examples.spp add five entries: ordinary overdraft, bad debt, write-off, authorization continuation and original-request retry. They call actual executeCashDeposit, query accounts/settlements/entries/independent audit, and use SPP checks with independent expectations:
 
-最终验证：`mvn -pl :xbod-deposit-demo -am package` 成功，lang 287、appframe 477、generator 99、demo 143，共 1006 项测试均通过。随后按 README 的类路径重新运行生成入口，普通现金存入样例独立通过。这里的 demo 143 项仍含旧手写测试，只作为迁移过程的回归证据。尚未进行删除旧 Java 后的干净构建验收。
+- With interest 30, collection interest 40 and principal 100 owed, deposit 50: ordinary accounts repay interest then collection interest; bad-debt/write-off accounts repay principal first. All three balances move -170→-120 and entries total 50 on both sides.
+- Deposit 1500 initially needs level-B authorization, with no account/entry/settlement changes. After the limit falls 1000→500, old B evidence is insufficient; level A permits commit, balance 1600/daily cash 1500. Each attempt has a separate audit identity.
+- After depositing 600 then 100, next-day retry of the first under stricter policy returns original result 700 while actual account stays 800/revision 2, without duplicate posting. Changing the original amount to 601 must reject with separate failure audit and unchanged account.
 
+The actual source runs below recorded these expectations, subject to the evidence correction above. They did not cover technical faults, concurrency, unknown outcomes, complete reversal or all historical branches.
 
-## 验收证据更正：空 catch 导致空方法（2026-10-08）
+The five new entries plus the earlier ordinary entry reported APP examples: 6 passed, 0 failed, with no handwritten Java business/assertions. File 99h then added cross-branch rate lookup/minimum fee/entries and independent missing-rate audit; 99i rechecks current balance limits after intervening transactions during authorization waiting. Those three entries joined the subsequent run.
 
-本次新增故障入口要求“指定故障确实触发”，因此发现了生成器缺陷：空 `catch {}` 的执行列表为 null，渲染抛出空指针异常；模板反射吞掉异常，生成空场景方法。此前 replayCashExample、missingFeeCashExample、pendingCurrentAccountCashExample、crossDayCashReversalExample 的 PASS 没有实际执行业务，相关通过结论撤回。下文历史中的六/九/十/十二/十五/十六入口全通过，不能作为这些四个入口的验收证据。其他入口应以修复后的统一重跑为准。
+Nine source entries reported APP examples: 9 passed, 0 failed; `mvn -pl :xbod-deposit-demo -am package` passed all 1006 regressions. Maven verify gained automatic APP example execution, validated against generated catalogues/runtime classpath. Nine entries are not simple replacements for nine old tests: each includes multiple actual transactions/queries/independent assertions. Remaining old tests/main programs still required complete migration.
 
-修复将空分支按空列表处理，并在模板输出之前直接渲染、检查业务方法；渲染异常必须使生成失败。公共生成器回归使用通用业务模型，验证空 catch 后继续执行独立断言，以及渲染异常不能写出场景文件。99n 的故障未命中检查在修复前按预期拒绝空方法，不能把它计作通过。目前正在重新运行所有源入口，最终结果另行记录。
+Automatic integration evidence: `mvn -pl :xbod-deposit-demo -am verify -DskipTests` succeeded; logs entered source-language-examples and reported each of nine entries PASS. Previously regressed JUnit was skipped, not source-entry execution; this was not just generation/packaging. See source-example-coverage.md for individual coverage/remaining obligations. The goal stayed active; cash reversal, faults/revision conflicts/concurrency, commit evidence and old-Java deletion remained.
 
-## 存款生命周期声明式验收（进行中）
+## Complete cash-reversal source acceptance (in progress)
 
-`cboddeposit-99e-debt-examples.spp`、`cboddeposit-99f-authorization-examples.spp`、`cboddeposit-99g-replay-examples.spp` 新增普通透支、坏账、核销、授权续接和原请求重试五个入口。使用真实 `executeCashDeposit` 源生命周期，查询账户、成交、分录和独立审计，并以 SPP 校验服务给出独立预期：
+File 99j adds crossDayCashReversalExample. SPP fixtures explicitly construct eligibility, teller, rates, ordinary/overdraft accrual and five agreement tiers, then execute two deposits and reverse the first. Independent expectations: opening balance 100; first 600 yields balance 700/accrual 100; next-day 100 yields balance 800/accrual 800; reversing the first leaves balance 200 and accrual 800, preserves the later deposit, refunds original fee 2, and produces eight reverse records with debit/credit totals 602. Daily cash resets under XBOD rules, detail count becomes 13 and current date remains next day.
 
-- 同样的债务事实（利息 30、催收利息 40、本金 100）存入 50：普通账户先还利息，再还催收利息；坏账和核销账户先还本金。三类账户实际余额均从 -170 变为 -120，分录均借贷 50。
-- 存入 1500 初需 B 级授权且不更新账户、不产生分录和成交；限额从 1000 降为 500 后，原 B 级证据仍不能执行；获得 A 级后才提交，余额 1600，累计现金 1500。每次尝试具有独立审计身份。
-- 首笔存入 600 后再存入 100，次日以更严政策重试首笔返回原成交结果（700），实际账户保持后续结果（800、版本 2），不重复记账。把原请求金额改为 601 应拒绝并保留独立失败审计，账户不变。
+The example retries the reversal next day: revision stays 3, records do not duplicate and original reversal business date returns. A different reversal number for the same original must yield ORIGINAL_DEPOSIT_ALREADY_REVERSED with separate rejection audit. `mvn -pl :xbod-deposit-demo -am verify -DskipTests` reported all ten entries including reversal PASS, subject to the empty-method correction above. This does not replace overdraft/fractional reversal or technical-failure/concurrency obligations.
 
-上述预期已通过下文的真实源入口运行验证。尚不覆盖技术失败注入、并发、提交结果不确定、完整冲正和旧测试的全部分支。
+Same-day/Mode2 source paths were added in 99k: without later settlements, balance returns to 100, revision 2/accrual 100, fee refund 2. Same-day restores the institution-limit flag and pre-original date 20261006; cross-day Mode2 does not restore that flag and forces date 20261008. Full Maven verify/source execution was in progress.
 
+Full `mvn -pl :xbod-deposit-demo -am verify` reported all 1006 existing tests and twelve source entries passing, subject to the correction above. Fixtures were then strengthened to distinguish restoring the pre-original date from retaining the current date. All entries were being rerun so unchanged dates could not masquerade as restoration evidence. Old handwritten Java remained; the goal had not reached its source-only end state.
 
-五个新入口和上一轮普通入口已真实运行，输出 `APP examples: 6 passed, 0 failed`，银行业务与断言没有手写 Java。随后补 99h 跨分行费率查询/最低费用/分录及费率缺失的独立审计，99i 授权等待期间发生后续交易后重新检查当前余额限额。上述后续三个入口已加入下面的最终运行验证。
 
+Final strengthened-date evidence: `mvn -pl :xbod-deposit-demo -am verify -DskipTests` reported twelve source entries passing. Same-day reversal restores pre-original transaction date 20261006 from original settlement date 20261007; Mode2 forces 20261008 with the same prior date. Cross-day reversal with later transactions retains current date/later balance/accrual. This verifies source metadata's institution-limit-restoration flag, not an institution-limit ledger outside the demo. The earlier empty-method correction governs these historical claims.
 
-九个源入口最终全部真实通过，输出 `APP examples: 9 passed, 0 failed`；`mvn -pl :xbod-deposit-demo -am package` 回归 1006 项全部通过。新增 Maven `verify` 阶段自动执行全部 APP 样例，已验证其与生成目录及运行时类路径的集成。九个入口不是九个旧测试的简单替代：每个场景包含多次实际交易、查询及独立业务断言；剩余旧测试和主程序仍有完整迁移责任。
+## Overdraft and decimal cash reversal
 
+File 99l adds actual ordinary-overdraft, bad-debt and three-decimal cash reversal. Maven verify reported fifteen entries passing, subject to the correction above. Ordinary/bad-debt balances move -170→-120→-170, independently checking restoration of interest 30, collection interest 40, principal/exposure 100 and preservation of overdraft accrual 100/interest accrual 70. The decimal case has principal 0.01, interest 0.005 and collection interest 0.004. Deposit 0.01 repays 0.005/0.004/0.001; balance moves -0.019→-0.009→-0.019. Debit/credit totals are 2.01, including original fee 2. Expressions/independent assertions are SPP, not demo Java numeric logic.
 
-自动验收集成证据：`mvn -pl :xbod-deposit-demo -am verify -DskipTests` 成功，日志明确进入 `source-language-examples` 执行，九个入口逐个 PASS。这里跳过的是此前已回归的 JUnit，源入口仍实际运行；不是仅生成或打包。逐项覆盖和未完成责任见 `source-example-coverage.md`。Goal 继续保持活动，现金冲正、技术故障/版本冲突/并发、提交结果证据及删除全部旧 Java 尚未完成。
+## Revision conflicts and undo of partial work (in progress)
 
-## 完整现金冲正源验收（进行中）
+File 97 extracts reading facts/candidate generation into prepareCashDepositAttempt. Actual entries still explicitly choose pending-authorization audit or commitCashDepositRecords, preserving boundaries/modes/failure stages. File 99m deposits 600, prepares another 100 from revision 1, lets an actual deposit of 200 commit revision 2, then submits the stale candidate. The same real commit scenario inserts settlement before revision guarding; if step two conflicts, step one must be undone and source catch records CommitFailed in an independent quantum transaction.
 
-99j 新增 `crossDayCashReversalExample`，其 SPP fixture 明确构造银行资格、柜员、费率、正常/透支积数、五档协定事实，真实执行两个存款及首笔冲正。独立预期：初余额 100，首笔 600 后余额 700/积数 100；次日另存 100 后余额 800/积数 800；冲正首笔后余额 200，保留后续交易和积数 800，退原手续费 2，八条冲正记录借贷均为 602。跨日现金累计按 XBOD 原规则归零，明细数为 13，当前交易日保留次日。
+Expected facts: revision 2, balance 900, daily total 800; no candidate settlement, entries or reversal link; independent failure audit code=PERSISTENCE_VERSION_CONFLICT. Deterministically interleaved source steps prove staleness, not concurrent scheduling, communication faults, unknown outcomes or commit-point database faults.
 
-样例继续次日重试同一冲正，检查账户版本仍为 3、记录不重复、返回原冲正业务日期，并以另一交易编号再次冲正原笔，要求 `ORIGINAL_DEPOSIT_ALREADY_REVERSED` 及独立拒绝审计。`mvn -pl :xbod-deposit-demo -am verify -DskipTests` 已实际运行全部十个入口，现金冲正也 PASS。此证据不代替透支及分数金额冲正、冲正技术失败/并发的后续责任。
+Revision-conflict source acceptance: `mvn -pl :xbod-deposit-demo -am verify` reported all 1006 regressions/sixteen entries passing, with actual readback for candidate undo/independent audit. A further post-failure deposit of 50 was added, expecting balance 950/revision 3/daily total 850, demonstrating continued quantum movement/joint bank commit. Source entries were being rerun.
 
+The strengthened `mvn -pl :xbod-deposit-demo -am verify -DskipTests` again reported sixteen entries passing. After stale-candidate failure and independent audit, actual deposit 50 committed, returning balance 950/revision 3/daily total 850; the quantum-versus-proposed balance check also passed. Commit-point faults, unknown outcomes, concurrent complete entries, remaining rules/reports and all old-Java deletion remained. The goal stayed active. Earlier broad counts remain subject to the empty-method correction.
 
-同日及 Mode2 源路径已写入 99k：无后续成交时余额恢复为 100、版本 2、积数 100 保留，手续费仍退 2；同日恢复机构限额标记为真且交易日期还原为原笔之前的 20261006，Mode2 跨日不恢复机构限额且强制日期 20261008。正在通过 Maven verify 全量回归与源入口自动运行验证。
+## Declarative technical-fault acceptance (in progress)
 
+APP examples gained fault before/after atomicService, enabling one-shot technical faults scoped to an entry in the generic runner. There is no bank-specific framework logic or rewritten business recovery policy. File 99n throws after storeCashPostingRecords actually writes entries, after settlement, account update and eight entries have executed inside the real quantum transaction. SPP lifecycle catches failure, writes CommitFailed in an independent quantum transaction, then returns the original fault to acceptance.
 
-`mvn -pl :xbod-deposit-demo -am verify` 全量通过：1006 项既有回归与十二个实际源入口分别全部通过。之后仅增强 fixture 日期，以区分“还原原笔前日期”和“保持当前日期”；正在重新运行全部源入口，避免把日期未变化当作还原证据。旧手写 Java 仍未删除，整个 Goal 尚未达到纯源终态。
+Source expectations: restore revision 0/balance 100/daily total 0; no settlement/entries/link; independent audit code=EXAMPLE_SERVICE_FAULT. Retrying the same request with a new attempt number then commits revision 1/balance 700/daily total 600/eight entries totaling 600 each side. The runner also requires the specified fault to fire. This does not replace resource-commit-point/unknown-outcome cases.
 
+## Unified rerun after fixing empty branches
 
-增强日期验证后的最终证据：`mvn -pl :xbod-deposit-demo -am verify -DskipTests` 全部十二个源入口通过。同日冲正确实从原成交日期 20261007 恢复到前次交易日期 20261006；Mode2 在相同前次日期下强制写入 20261008。跨日且有后续交易仍保存当前日期、后续余额及积数。这里验证的是源 metadata 的机构限额恢复标记，不宣称已实现未纳入 demo 的机构限额账簿更新。
+After fixing empty catch, `mvn -pl :xbod-deposit-demo -am verify` succeeded: lang 289, appframe 482, generator 101, old demo 143, **1015 regressions**. APP separately ran all **17 source entries** successfully. The four earlier false-positive entries now generated/executed full methods; rejection/retry/reversal assertions were genuinely rerun. File 99n's fault fired; storage readback proved transactional settlement/account/entries undone, independent audit retained and subsequent same-request retry committed.
 
-## 透支及小数现金冲正
+This supersedes earlier claims affected by the empty-catch defect. Fourteen main/21 test Java files still awaited deletion; complete source-only acceptance remained unfinished and the goal active.
 
-99l 新增普通透支、坏账和三位小数金额的真实现金冲正，十五个源入口已在 Maven verify 中全部通过。普通/坏账余额 -170 → -120 → -170；独立校验原利息 30、催收利息 40、本金和敞口 100 的恢复，以及原有透支积数 100 和利息积数 70 的保留。小数案例本金 0.01、利息 0.005、催收利息 0.004，存入 0.01 偿还分量分别 0.005、0.004、0.001，余额 -0.019 → -0.009 → -0.019；分录借贷各 2.01（含原手续费 2）。数字表达式和独立断言均在 SPP 中，没有 demo Java 数字处理。
+## Calendar and interest-unit source acceptance migration (in progress)
 
-## 版本冲突及部分提交撤销（进行中）
+File 99o bankCalendarExampleRun assumes all four BankCalendarTest obligations: eight ACT leap/century/year-boundary/same-day cases, seven each for 360365/360360, five invalid dates plus null/reversed-period/unknown-convention errors, and truncation of 199.999 by unit 100 and 10 by unit 3. Thirty date vectors/two numeric assertions are constructed, invoked, caught and checked individually in SPP. APP only declares local services/runner entries.
 
-97 将读取事实和生成候选提取为 `prepareCashDepositAttempt`，实际入口继续显式选择待授权审计或 `commitCashDepositRecords`；原业务边界、事务模式及失败阶段保持一致。99m 先提交存款 600，基于版本 1 准备另一笔 100，再让实际存款 200 提交到版本 2，最后提交旧候选。候选使用同一真实提交场景，先插成交记录、再执行版本保护；若第二步冲突，第一步必须撤销，且由源 catch 的独立 quantum 事务记录 CommitFailed。
+Cases directly call generated decodeBankDate, not old handwritten BankDateDecoder. Unified acceptance was running; after success, old BankCalendarTest would be removed and clean generation would establish no stale bytecode. Other migration obligations remain.
 
-验收预期：当前账户保持版本 2、余额 900、当日累计 800；候选成交、分录、冲正关联均不存在；独立失败审计 code=PERSISTENCE_VERSION_CONFLICT。此案例采用确定的源步骤交错验证过期版本，不宣称已验证并发调度、通信故障、提交结果不确定或数据库在提交点的技术失败。
+Clean calendar acceptance: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 289, appframe 482, generator 101, remaining old demo 139, **1011 regressions**; **18 APP source entries** passed separately. Target regenerated from empty and BankCalendarTest.class was absent. Four removed JUnit methods were fully replaced by 32 source assertions, not discarded obligations. Actual handwritten inventory: main 14/test 20; the goal remained active.
 
+The run script now uses generic GeneratedExampleRunner, not a bank-specific Java main, and accepts APP entry names. Old bank reports still required declarative migration; historical configuration/independent expectations remain documented.
 
-版本冲突源验收结果：`mvn -pl :xbod-deposit-demo -am verify` 成功，1006 项回归及十六个源入口均通过，99m 的候选成交撤销和独立失败审计已有实际读回证据。随后加强失败后继续成功存入 50 的验证，预期余额 950、版本 3、当日累计 850，证明账本仍可正常执行量子移动与银行共同提交；正在重新运行源入口。
+## Independent deposit-kernel source acceptance (in progress)
 
+File 99p depositKernelExampleRun assumes DepositKernelTest's sixteen parameter sets: fifteen amount allocations/one negative-amount rejection. Success cases check all nine plan outputs; every case compares eight account-input fields with independent copied snapshots. Negative amount requires E1095 and still-null plan balance. Coverage includes ordinary/bad-debt/write-off order, full/partial repayment, exact principal boundaries, frozen/authorization deductions, three decimals and zero-amount kernel behavior. Inputs/expectations are constants from the old independent table, not recomputed using the implementation formula.
 
-补强结果：`mvn -pl :xbod-deposit-demo -am verify -DskipTests` 再次成功，十六个入口实际通过。99m 在旧候选失败并独立保存审计后继续实际存入 50，共同提交成功，读回余额 950、版本 3、当日累计 850；量子余额与提议余额的一致性检查也在该真实提交中通过。物理提交点故障、提交结果不确定、并发完整入口、剩余规则与报告、删除全部旧 Java 仍未完成，Goal 保持活动。
+Java reflection checks from old tests concern physical types and do not belong in business SPP. PHY numeric double as BigDecimal remains the binding source; source decimal computation/generated types are checked separately. New source acceptance was running; only after full success would old parameterized Java be deleted and clean generation rerun.
 
-## 声明式技术故障验收（进行中）
+## Five-tier agreement accrual source acceptance (in progress)
 
-APP examples 新增 `fault before/after 原子服务`，由通用运行器按入口作用域启用一次性技术故障。没有银行专属框架逻辑，也不改写业务恢复策略。99n 在 `storeCashPostingRecords` 实际写入分录后抛出故障，此时成交、账户更新和八条分录均已经在真实 quantum 事务内执行。SPP 存款生命周期捕获失败，独立 quantum 事务保存 CommitFailed，再把原失败返回验收场景。
+File 99q declares participants/checks/entry; 99qa/99qb/99qc split modes, precision boundaries and rejection fixtures rather than concentrating them in one file. Seventeen vectors replace AgreementProductTest's six methods: mode-2 tiers, mode-1 exact thresholds followed by mode-2 clearing, four currencies' default/explicit modes, disabled/zero-overlap/below-threshold cases, independently quantized segments, and wrong slot count/order/threshold/period. Success checks all five result fields/five tier products. Rejection checks codes, absent ordinary accrual and all slots remaining 999.
 
-源预期：账户恢复版本 0、余额 100、累计 0，成交/分录/关联不存在，独立失败审计 code=EXAMPLE_SERVICE_FAULT；随后原请求换尝试编号重试并真实提交，版本 1、余额 700、累计 600、八条借贷记录各 600。运行器还会检查指定故障确实触发；技术资源提交点失败及未知结果不由此案例代替。
+Examples use existing new AgreementBand[] { ... }, enhanced for and switch. Length-based allocation/index assignment is not existing business syntax; fixed five-slot collections suffice without Java implementation or language expansion. Acceptance was running; old Java tests remained.
 
+Clean kernel/agreement evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 289, appframe 482, generator 101, remaining old demo 117, **989 regressions**, plus **20 APP source entries** separately. Agreement case 03 actually reuses case 02's five slots, first checking tier 5's old product 2000, then mode 2 clearing it; other products/total 1600 are independently asserted. Empty-target generation/compilation/execution left no old BankCalendarTest, DepositKernelTest or AgreementProductTest classes.
 
-## 空分支修复后的统一重跑证据
+Deleted Java comprised sixteen kernel parameter sets/six agreement methods, with obligations fully assumed by source scenarios. Falling regression totals do not imply changed coverage. Actual remaining inventory: main 14/test 18. Eligibility/reversal/report/transaction-storage tests still referenced old entries and continued migrating; the goal remained active.
 
-`mvn -pl :xbod-deposit-demo -am verify` 在空 catch 修复后成功完成：lang 289、appframe 482、generator 101、旧 demo 143，共 1015 项回归；APP 独立执行 17 个源入口，全部通过。四个旧假阳性入口在本次确实生成并执行了完整方法，拒绝、重试及冲正断言已有重新执行的证据。99n 指定故障也确实命中，实际存储读回确认事务内成交、账户和分录撤销、独立失败审计保留，原请求随后重试提交成功。
+## Date windows, account control and cash admission (in progress)
 
-本结果取代上文受空 catch 缺陷影响的历史通过结论。仍有 14 个主 Java 和 21 个测试 Java 待删除；尚未完成全部纯源语言验收，Goal 保持活动。
+File 99r datedAgreementExampleRun passed seven valid/empty-window cases and one invalid effective date, checking ten ordinary days, agreement intersection, both accrual types and clipped boundaries. File 99s cashAccountControlExampleRun passed ordinary control, three EN432 variants, frozen EG877, cancelled EN113, real-estate EI090, and available balance 1 after new deposit 1 with frozen amount 10. All 22 APP entries passed; corresponding old tests still required deletion/clean verification.
 
+Files 99t and 99ta/99tb/99tc migrate all twelve BankRulesTest methods into 49 independent input/expected vectors: positive cash/date, temporary accounts, opening bounds, disabled limits, net-balance caps, warnings/day rollover, strict B/A thresholds, policy recheck after authorization, six original-transaction/two channel exceptions, USD-specific thresholds, interest units and control-before-admission. Pending cases actually invoke authorization checks/catch PENDING_AUTHORIZATION. Control rejections verify no later decision calculation. Fixtures/checks are split by admission, authorization and other rules.
 
-## 日历和利息单位的源验收迁移（进行中）
+This uses existing SPP/APP/PHY generation without new demo Java/bank scripts. All 49 vectors/source entries were running. Bank permission queries, precedence of multiple invalid facts, concurrency and physical commit faults were not yet claimed accepted.
 
-99o 新增 bankCalendarExampleRun，完整承接 BankCalendarTest 的四项测试责任：8 个 ACT 闰年/世纪年/跨年/同日边界，360365 和 360360 各 7 个独立预期，5 个无效日期以及空日期、逆序期间、未知约定的业务错误码，最后验证 199.999 按 100 单位向下取整和 10/3 按 3 单位向下取整。总计 30 组日期事实与 2 组数字计算断言，全部在 SPP 中逐次构造、调用、捕获和校验；APP 只声明本地服务及运行入口。
+Final clean date/control/admission evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 289, appframe 482, generator 101, remaining old demo 97, **969 regressions**, plus **23 APP source entries** separately. New source obligations cover eight agreement windows, complete control success/rejections and 49 cash-admission vectors. Empty-target generation left none of six migrated old test classes. The twenty-method reduction cannot be added to source-entry counts and does not remove business obligations.
 
-这些案例直接调用生成的 decodeBankDate，而不是旧手写 BankDateDecoder。正在运行统一源入口验收；通过后删除旧 BankCalendarTest，并从干净目录构建确认无陈旧测试字节码。其他旧测试的责任不因此免除。
+Actual inventory: main Java 14/test Java 15. Complete bank eligibility, rate queries, accrual persistence, reversal/recovery/storage faults, concurrency, cross-process idempotency, unknown outcomes and reports continued migrating. Final source-only acceptance was not complete; the goal stayed active.
 
 
-日历迁移干净验收结果：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 289、appframe 482、generator 101、剩余旧 demo 139，共 1011 项回归全部通过；18 个 APP 源入口另行全部通过。target 从空目录生成，已确认 BankCalendarTest.class 不存在。减少的 4 项旧 JUnit 方法已由 32 组源断言完整承接，不是删除验收责任。当前手写文件实际核对为主 Java 14 个、测试 Java 20 个，Goal 仍活动，继续迁移其余责任。
+## Bank eligibility, original-settlement notices and XBOD cash policy (in progress)
 
-运行脚本已切换到公共 GeneratedExampleRunner，不再调用银行专属 Java 演示主程序；参数是 APP 声明入口名。旧银行报告功能仍须用声明式方式迁移，文档保留其历史配置与独立预期。
+Files 99u/99ua/b/c expand DepositBankQualificationTest into 54 source vectors: independent branch/subbranch/city/province relationships, explicit rejection of missing relationships, differing ordinary/restricted-subtype scopes, UH/O/ZD teller numeric boundaries, thirteen transaction/three business exceptions, and independent card/passbook loss notices. Defaults are constants from old independent example configuration, not expectations derived from the implementation.
 
+File 99v executes actual source deposits with WN200/WN201 and queries accounts, settlements, entries and audit. Retry after changing the agency-contract flag must return original notices/teller facts without duplicate update. Another entry checks branch EN134 then mismatched teller context, asserting unchanged account revision/balance, absent settlements/entries and independent Rejected audit. Initialization reuses bank/accrual fixtures; complete commit remains the SPP quantum boundary.
 
-## 存款内核独立源验收（进行中）
+File 99w turns XbodCashReversalPolicyTest's five methods into eight vectors: four date/detail/overnight boundaries, insufficient accrual EN097, and refunds of original actual fees 0, 2 and 1.005. SPP constructs current/original facts; check services hold independent expectations and input-preservation assertions. All 27 APP entries were running; old corresponding tests remained.
 
-99p 的 depositKernelExampleRun 承接 DepositKernelTest 的十六组参数：十五组金额分配与一组负金额拒绝。成功组逐项验证九个计划输出，所有组逐项验证八个账户输入字段与复制快照相同；负金额要求 E1095 且计划余额仍为空。覆盖普通/坏账/核销偿还顺序、全部及部分偿还、精确本金边界、冻结与授权扣减、三位小数和零金额内核行为。输入与期望为旧独立表中的常量，未用被测公式反算期望。
+Clean eligibility/cash-policy results: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 289, appframe 482, generator 101, remaining old demo 84, **956 regressions**; **27 APP entries** passed separately. Empty-target generation/execution covered 54 eligibility/notice vectors, original-notice replay for real fee/accrual deposits, two rejections without updates and eight XBOD policies. Independent refund constants 0/2/1.005 and unchanged-original-fee checks also passed.
 
-旧测试的 Java 类型反射检查属于物理表示验证，不应放入业务 SPP。PHY 的 `numeric double as BigDecimal` 继续作为具体类型绑定来源；源小数计算与编译产物类型另行核对。正在运行新增源入口，完整通过后删除旧参数化 Java 测试并从空目录构建。
+All eight migrated test classes were absent. Old eligibility eight/cash-policy five methods were deleted with obligations assumed by source acceptance. Inventory: main Java 14/test Java 13. Complete bank query permissions, uncovered eligibility precedence, remaining fees/accrual/reversal/transactions/reports and all Java deletion remained; the goal stayed active.
 
+## Fee repositories and financial inverse components (in progress)
 
-## 五档协定积数源验收（进行中）
+Files 99x/99xa/b seed actual APP repositories with independently keyed customer/fee-code rates and call complete prepareDepositFee. Sixteen cases replace DepositFeeTest's five methods: same-institution exemption, same/cross-region codes with cross-region precedence, proportional discount followed by explicit half-up rounding plus fixed fee, minimum/maximum/zero maximum, Mobile without query, unmigrated account categories, missing rates, mismatched codes and negative amounts. Expected fees/variable amounts are independent constants. SPP quantum transactions seed configuration; Java Map fake queries do not replace repositories.
 
-99q 声明验收参与者、独立校验和入口；99qa/99qb/99qc 分别提供模式、精度边界和拒绝事实，避免一个 SPP 文件集中所有 fixture。17 组案例承接 AgreementProductTest 的六项方法：模式 2 分档、模式 1 精确阈值与后续模式 2 清除旧产品、四种币种默认/显式模式、禁用/零交集/阈值以下、分段独立量化、五槽数量/顺序/阈值/期间错误。成功组检查全部五个结果字段及五槽产品；拒绝组检查错误码、未产生普通积数、所有槽仍为 999。
+Files 99y/99ya/b replace DepositReversalAmountsTest's seven methods with ten original/current-account vectors. They run the actual deposit kernel, record original mathematical components and apply inverse calculation to current facts. Seven plan fields compare individually against constants; all eight current account fields remain unchanged. Coverage includes later withdrawals/deposits, current freezes/authorization, changed loan state without reallocation, actual delta from original exposure clamping, decimal repayment, capacity/result-eligibility rejection and forged original components. Early failures require no generated plan.
 
-样例只使用已有参与者集合构造 `new AgreementBand[] { ... }`、增强 for 和 switch。按长度分配及下标赋值不是现有业务语法，本例可由固定五槽集合直接表达，无需添加 Java 实现或扩大语法。此轮正在运行新增验收，旧 Java 测试暂未删除。
+All 29 entries were running; both old test files remained. Passing financial inverse calculation does not complete whole reversal, historical accrual adjustment or business compensation.
 
+Clean fee/inverse results: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 289, appframe 482, generator 101, remaining old demo 72, **944 regressions**; **29 APP entries** passed separately. Empty-target generation/execution passed sixteen actual-repository rate cases/ten inverse vectors, independent outcomes, unchanged inputs and early rejection.
 
-内核与协定迁移的干净证据：`mvn -pl :xbod-deposit-demo -am clean verify` 成功，lang 289、appframe 482、generator 101、剩余旧 demo 117，共 989 项回归全部通过；20 个 APP 源入口另行全部通过。协定源案例 03 实际复用案例 02 的五槽集合，先确认档 5 的原产品为 2000，再由模式 2 将其清零，其余产品与 1600 总数独立核对。生成、编译及运行来自清空后的 target；BankCalendarTest、DepositKernelTest、AgreementProductTest 的旧 class 均不存在。
+All ten migrated test classes were absent. Old fee five/inverse seven methods were removed, with source acceptance assuming their duties. Inventory: main Java 14/test Java 11. Posting fixtures still served full-deposit/JDBC tests and needed joint migration. Accrual, eligibility/full reversal, Saga, storage concurrency/faults/outcomes, cross-process operation, reports and all Java deletion remained; the goal stayed active.
 
-本次删除的是旧内核十六组参数和协定六项方法的 Java 文件，责任已用源场景完整承接；不以回归总数减少宣称覆盖率变化。当前实际库存主 Java 14 个、测试 Java 18 个，剩余资格、冲正、报告及事务存储测试仍引用旧入口，继续逐项迁移。Goal 保持活动。
+## Accrual source acceptance and transaction-outcome evidence (in progress)
 
+File 99z migrates DepositAccrualTest's calculation duties into four vectors: agreement windows over prior amounts; ordinary 360 versus overdraft ACT calendars; explicit normalUnit=3/overdraftUnit=0.01 quantization; and no added overdraft-interest days when only collection interest exists. Expectations are old independent constants; input accrual/five original tier products remain unchanged.
 
-## 日期窗口、账户控制和现金准入（进行中）
+File 99za's three real transaction entries use complete SPP quantum commit: joint account/accrual settlement, persisted original interest intervals, no repeated accrual on retry, zero interval for a second same-day deposit, invalid-unit rejection, and technical failure after account/accrual update but before entries followed by same-business-identity retry. Generic APP fault declarations must actually hit storeCashPostingRecords; no demo DataSource/PreparedStatement proxy is handwritten.
 
-99r 的 datedAgreementExampleRun 已实际通过七组有效/空窗口及一组非法生效日期，检查普通期间 10 天、协定交集、两类积数和裁剪后的起止日期。99s 的 cashAccountControlExampleRun 已实际通过正常控制、三种 EN432、冻结状态 EG877、取消 EN113、房地产账户 EI090，并验证冻结金额 10 下新存 1 的可用余额仍为 1。二十二个 APP 入口已全部成功；对应旧测试尚待删除后干净核实。
+Generic runtime gained optional catch fact transactionOutcome, reporting technical evidence without defining bank audit policy. No attempted commit plus successful JDBC rollback supports ROLLED_BACK. A throwing commit remains UNKNOWN even if rollback returns. Cleanup failure after returned commit is COMMITTED. Participant restoration failure/conflicting resource outcomes cannot establish whole-boundary rollback. No evidence yields UNREPORTED. Original exception identity/suppressed causes remain. Source file 99c selects bank events; revision/write-failure assertions now require RolledBack. Unreporting backends/remote protocols are not claimed to prove definite outcomes.
 
-99t 与 99ta/99tb/99tc 进一步迁入 BankRulesTest 的全部十二项方法，展开为四十九组独立输入和预期：现金正金额/日期、临时户、开户上下限、禁用限额、净余额上限、警告/换日累计、严格 B/A 阈值、授权后政策重验、六个原交易例外及两种渠道例外、USD 专用阈值、利息单位和控制先于准入。待授权场景还真实调用授权校验并捕获 PENDING_AUTHORIZATION；控制拒绝检查后续 decision 未被计算。fixture 数据与独立校验按准入、授权及其他规则拆分。
+Nine new generic JDBC evidence tests passed; conservative merging after participant restoration failure was also added. Full generation was running. Four new entries lacked final clean evidence, old accrual tests remained and migration was not declared complete.
 
-这一轮使用已有 SPP/APP/PHY 生成链路，没有增加 demo Java 或银行脚本，正在运行四十九组规则和全部源入口。尚未宣称银行权限查询、多重非法事实优先级、并发和物理提交点失败已经验收。
+First run: 31 of 33 entries passed. New normal-accrual/retry cases failed additional posting-total expectations absent from old tests. New assertions incorrectly expected debit/credit 50. Actual source uses current cash 50 plus prior deposit reduction 120 to repay principal 100, ordinary interest 30 and collection interest 40: totals should be 170. Independent constants were corrected and slot-amount checks added before rerun, without reducing obligations or deleting old accrual tests.
 
+Corrected full verify passed all 33 entries. Four accrual entries fully assumed six old methods, then DepositAccrualTest was deleted. File 99zb adds source-only audit classification: seven paired deposit/reversal fact sets covering four outcome types, replay, precommit rejection and missing work context. This checks policy only; physical outcome evidence remains backend-tested, not established by fabricated fixtures. Empty-target clean verify was running for 34 entries, final result pending. Inventory: main Java 14/test Java 10; removal was incomplete.
 
-日期窗口、控制和准入的最终干净证据：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 289、appframe 482、generator 101、剩余旧 demo 97，共 969 项回归全部通过；23 个 APP 源入口另行全部通过。新增源责任为八组协议窗口、完整控制拒绝/正常行为以及四十九组现金准入。target 从空目录生成，六份已迁移旧测试的 class 全部不存在。旧测试方法数减少二十，不能与源入口数相加，也不表示业务责任被移除。
+Final clean accrual/outcome evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 290, appframe 494, generator 101, remaining old demo 66, **951 JUnit tests**, none skipped; **34 APP entries** passed separately. Four accrual entries/seven audit pairs generated/executed from empty target. All eleven replaced test classes, including nested classes, were absent. Inventory remained main 14/test 10; the goal stayed active.
 
-目前实际库存主 Java 14 个、测试 Java 15 个。完整银行资格、收费查询、积数持久化、冲正/恢复与存储故障、并发、跨进程幂等、结果未知及报告责任仍继续迁移，不能宣布最终纯源验收完成。Goal 保持活动。
+Generic additions totaled twelve tests: eleven JDBC outcome checks, including partial resource commit, joining one resource, weak-reference identity distinction, cyclic cause chains and unmeasured later operations; plus one participant restoration failure. Language added one optional transactionOutcome type check. None implement bank-specific behavior. Cash-reversal eligibility/preparation, postings, Saga, storage reopen/concurrency/commit faults/outcomes, reports and remaining Java deletion continued; this pass does not establish those gaps.
 
+## Core reversal eligibility and read-only candidate preparation (in progress)
 
-## 银行资格、原成交提示和 XBOD 现金政策（进行中）
+File 99ca migrates old DepositReversalPreparation Java query/composition duties into three source entries: prepareFinancialDepositReversal, prepareCoreQualifiedDepositReversal and prepareFinancialDepositReversalPostings. APP queries read original settlement/current account. SPP copy saves independent capacity/operator/channel/refund candidate facts; existing SPP services handle mathematics, core eligibility, ledger evidence and reverse entries. They prepare candidates only, without account/entry/audit/link writes, and are not new transaction commits.
 
-99u/99ua/b/c 将 DepositBankQualificationTest 的关系、权限和提示展开为五十四组纯源事实：独立分行/支行/市/省关系，缺失关系明确失败，普通/限制子类的不同作用域，UH/O/ZD 柜员数值边界，十三种交易与三种业务例外，以及卡/折独立挂失提示。默认事实来自旧独立样例配置的常量，不由被测规则反算预期。
+File 99zc covers closed EO082, cancelled EN113, frozen EN111, SA01116 frozen exception without exempting cancellation, core-reversal document notices not inheriting ordinary deposit institution-scope thresholds, and core checks not inheriting frontend institution/control restrictions. File 99zd uses real deposits/later deposits, source quantum CAS updates to current frozen/lost/scope facts, then core candidate queries. It must retain later balance/accrual, capture current operator/capacity and reject after later cancellation. Actual audit/original-entry/link queries prove preparation has no commit side effects.
 
-99v 用真实源存款入口执行带 WN200/WN201 的成交，查询账户、成交、分录和审计；改变代理签约标记后重试仍必须返回原提示与原柜员事实，不重复更新。另一入口顺次验证分行 EN134 与柜员上下文不一致，检查账户版本/余额不变、成交/分录不存在及独立 Rejected 审计。初始化复用现有银行事实与积数 fixture，完整提交仍来自 SPP 的 quantum 边界。
+Initial parsing exposed that result binding requires type fields already defined in the multifile chain. The new file was originally numbered 87, before CashReversalWork's 99 declaration, causing field resolution failure. Renaming it 99ca places it after the definition. No bank Java bypass was used; arbitrary-file-order cross-file resolution remained a compiler limitation, not claimed fixed here. All 36 entries were running; old eligibility/preparation tests remained. Full financial/posting branches of the three entries still required independent source acceptance; core eligibility success alone does not prove them all.
 
-99w 将 XbodCashReversalPolicyTest 的五项方法转成八组源数据：四种日期/明细/隔夜边界，一组积数不足 EN097，以及手续费 0、2、1.005 的原实际金额退款。当前/原事实均在 SPP 中构造，独立预期与输入未修改的断言在校验服务中。正在运行全部二十七个 APP 源入口；旧对应测试尚未删除。
+The second parse also found that placing a helper Scenario after its caller caused a forward-service placeholder to fail conversion to SppScenario. Helpers were moved before entries, following the supported define-before-call order without changing business flow/assertions. Arbitrary cross-file/scenario definition ordering was not claimed supported. Real generation reran; old eligibility tests remained.
 
+After ordering fixes, full verify passed all 36 APP entries. Two source scenarios assumed four old core-eligibility obligations; DepositReversalEligibilityTest was deleted. Clean verify was checking absence of all twelve deleted test bytecodes. Inventory: main Java 14/test Java 9; full source-only acceptance remained incomplete.
 
-银行资格与现金政策的干净结果：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 289、appframe 482、generator 101、剩余旧 demo 84，共 956 项回归全部通过；27 个 APP 源入口另行全部通过。五十四组资格/提示、真实收费与积数存款的原提示重放、两种拒绝无更新及八组 XBOD 政策，均从清空后的 target 生成并执行。退款新增独立 0/2/1.005 常量与原费用未变校验，也全部通过。
+Next original-entry preparation acceptance requires actual missing persisted entries. Existing APP persist supported insert/insertIfAbsent/update/upsert, not delete; ObjectRepository also lacked a deletion contract. Generic declarations, transactional deletion, semantics/generation checks must be added before SPP/APP fixtures delete actual originals. Handwritten JDBC DELETE or replacing returned arrays is not a substitute. Missing refund-decision precedence and preparation without account/accrual/audit writes remain obligations.
 
-八份已迁移测试 class 均确认不存在；本轮删除银行资格八项与现金政策五项方法的旧文件，责任继续由源验收承担。当前库存主 Java 14 个、测试 Java 13 个；完整银行查询权限、未覆盖资格优先级、其余费用/积数/冲正/事务/报告与全部 Java 删除尚未完成。Goal 保持活动。
+Final clean core-eligibility evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 290, appframe 494, generator 101, remaining old demo 62, **947 JUnit tests**, none skipped; **36 APP entries** passed separately. All twelve replaced classes/nested classes were absent. New eligibility/current-fact cases generated/executed from empty target. Inventory: main 14/test 9; source-only requirements remained unmet and the goal active.
 
+Eight remaining read-only financial/posting preparation obligations, actual deletion/corrupted evidence, commit-point/outcome checks, concurrency, Saga/compensation and reports continued. No demo Java was added, nor bank query/eligibility logic moved into generic runtime Java.
 
-## 收费库与金融反向分量（进行中）
+## Generic deletion and original settlement/posting candidates (in progress)
 
-99x/99xa/b 使用真实 APP 仓库种入每组独立客户/收费代码的费率，完整调用 prepareDepositFee。十六组案例承接 DepositFeeTest 五项方法：同机构免收、同区/异区代码（异区优先）、比例折扣后显式半入再加固定费用、最低/最高/零上限、Mobile 无查询、未迁账户类别、缺少费率、代码不匹配和负金额。费用和变量额的预期均为独立常量；收费配置种入的事务在 SPP 声明 quantum，不以 Java Map 假查询替代仓库。
+APP gained persist(delete, argument(...)) and generated DELETE metadata. Synchronous local update services must join source-declared transactions; scalar/one-dimensional collection/composite keys are supported, with explicit missing-record errors. Delete does not inherit update compareVersion; compile/runtime validation reject silently ignored revision conditions. JDBC locks original snapshots before deleting snapshots/mapped native rows, using actual snapshot keys. Native constraints or later batch-delete failure require full restoration. Native decimal keys decode as BigDecimal, not lossy double. Unsupported generic backends reject delete explicitly; this defines no bank inverse operation.
 
-99y/99ya/b 承接 DepositReversalAmountsTest 七项方法，展开为十组原账与当前账事实。先实际运行存款内核并记录原数学分量，再对当前账做反交易；七个计划字段与独立常量逐项比较，所有当前账户八字段均校验不变。覆盖后续支出/存入、当前冻结与授权、当次贷款状态改变不重分配、原敞口钳制的实际增量、小数偿还、容量/结果资格拒绝和伪造原分量；早期失败要求计划未生成。
+Framework deletion tests passed: scalar boundary/missing/preserved other rows, later collection failure rollback, invalid revision metadata, joint composite snapshot/native deletion and rollback, native foreign-key failure recovery. Language checks cover metadata/invalid revision bindings; generator tests compile/execute deletion and verify idempotent retry does not delete twice. Initial native-table fixtures used Java records lacking default constructors and failed generated-model-style instantiation on readback; switching to Beans preserved native-query/recovery assertions. Exact-decimal native-key coverage was added for full validation.
 
-正在执行二十九个源入口；旧两份测试尚未删除。金融反向计算的通过不等于已经完成整笔冲正、历史积数调整或业务补偿。
+Files 99ze/99zf/99zg add eight entries replacing DepositReversalPreparationTest's eight methods. Original deposit 600, authorized deposit 1500, original replay and next-business-day 100 yield current revision 3/balance 2300/ordinary accrual 2200. A financial candidate reversing original 600 yields 1700 without commit; operator/capacity/fee decisions are independently copied. Original success/replay audit records, eight original entries totaling 602 each side and unreversed links remain. Explicit refunds 0/1.25/2 are supplied; ordinary/bad-debt/three-decimal cases use actual settlements/entries. Unknown/rejected originals, insufficient capacity, missing/negative/excess refund decisions, actual settlement/entry tampering and deletion of entry eight must reject candidates.
 
+Initial bank generation found String + still rejected by numeric semantics despite generator concatenation support. String + String typing was added, preserving String and rejecting mixed numbers/subtraction, with generic semantic regression. No hardcoded Java identifier constructor bypasses source expressions; role IDs/suffixes remain SPP. All 44 entries were running; old eight preparation methods remained, so migration was not complete.
 
-收费与金融反向的干净结果：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 289、appframe 482、generator 101、剩余旧 demo 72，共 944 项回归全部通过；29 个 APP 源入口另行全部通过。十六组真实仓储费率收费与十组原/当前账户反向事实均从清空后的 target 生成执行，独立结果、输入不变性和早期拒绝断言都通过。
+First execution passed **39/44**. Three debt/decimal entries and prior entries passed; five sharing cash fixtures failed. Review found reused cross-day fixtures started interest on 20261006, while old preparation tests started 20261007. The former adds one extra day on opening balance 100, incompatible with expected 2200. Only new preparation fixtures now explicitly set lastProductDate/lastTransactionDate=20261007, retaining independent accrual 2200/balance 2300/inverse balance 1700. Original cross-day cases and no-commit requirements were unchanged; rerun followed.
 
-十份已迁移测试 class 均确认不存在；本轮删除旧收费五项及反向七项方法的文件，源验收承担对应责任。当前库存主 Java 14 个、测试 Java 11 个。分录 fixture 仍被整笔存款与 JDBC 仓储测试引用，需一起迁移；积数、资格/完整冲正、Saga、存储并发/故障/结果、跨进程与报告以及全部 Java 删除仍未完成，Goal 保持活动。
+Dependency review: NormalCashDepositTest's basic settlement/three repayment types, authorization-policy recheck, intervening changes while waiting, original-result replay, identity reuse rejection and missing rates had source entries. Still missing were complete daily-warning/next-day-reset settlement, restarted pending identity and actual concurrent commits with equivalent number formats. DepositPostingTest also supplied old repository/full-deposit fixtures and could not be deleted alone. CashDepositReversalTest report assertions still used old entries; six Saga duties still depended on ExplicitSagaStep. Generic execution/recovery/report support and these obligations must be verified before deleting all Java. Original settlement/account consistency also needed checking: old load explicitly rejected INVALID_ORIGINAL_DEPOSIT_ACCOUNT, not yet covered by new entries.
 
-## 积数源验收与事务结果证据（进行中）
+With aligned dates, full verify passed all 44 APP entries; 501 generic runtime tests, including exact-decimal deletion keys, passed. New source cases assumed eight preparation duties and DepositReversalPreparationTest was removed. prepareCashReversalQueries then explicitly checks original/settled account IDs against transaction ownership. Existing storage-evidence entries actually alter original account ID and require INVALID_ORIGINAL_DEPOSIT_ACCOUNT while preserving current account/accrual/audit/entries. This addition/deleted-bytecode cleanup was running in clean verify. Inventory: main 14/test 8; full source-only goal remained unmet.
 
-99z 将旧 DepositAccrualTest 的纯计算责任迁成四组源事实：旧金额上的协议窗口、正常 360 与透支 ACT 日历分别使用、normalUnit=3 和 overdraftUnit=0.01 的显式量化，以及只有催收利息时不增加透支利息天数。预期来自旧测试的独立常量；输入积数与五档原产品保持不变。
+Final clean original-settlement/posting preparation evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 292, appframe 501, generator 101, remaining old demo 54, **948 JUnit tests**, zero failures/errors/skips; **44 APP entries** passed separately. Actual original-account tampering rejected INVALID_ORIGINAL_DEPOSIT_ACCOUNT while preserving account/accrual/audit/original entries. All thirteen deleted test classes, including nested classes, were absent. Inventory: main 14/test 8. Restart, concurrency, bank commit outcomes, Saga/business recovery and reports remained; the goal stayed active.
 
-99za 的三个真实交易入口使用完整 SPP quantum 提交，覆盖账户与积数共同成交、原计息区间持久化、同笔重试不重复积数、同日第二笔零区间、无效单位拒绝，以及账户/积数更新后、写分录前的技术故障和原业务身份重试。故障通过 APP 的通用声明注入，要求实际命中 storeCashPostingRecords；不是在 demo 手写 DataSource 或 PreparedStatement 代理。
+## Complete daily rollover and actual concurrent identity (in progress)
 
-公共运行层新增可选 catch 事实 transactionOutcome，仅报告技术证据，不定义银行审计政策。未发起 commit 且 JDBC rollback 返回可报告 ROLLED_BACK；commit 抛错即使 rollback 返回仍为 UNKNOWN；commit 返回后清理失败为 COMMITTED；参与者恢复失败或边界资源结果冲突不能宣称整体回滚。无证据为 UNREPORTED。原异常身份和 suppressed 原因保留。银行事件由 99c 源分支选择，版本冲突/写入故障的源断言相应要求 RolledBack。当前不宣称未上报后端或远程协议具备确定结果证明。
+The preceding stage made concrete progress: empty-target generation passed 948 regressions/44 source entries and removed old preparation tests. Continuing NormalCashDepositTest obligations, file 99zh adds actual deposits 300/300/next-day 100, persisting/querying settlements, accounts, entries and audit each time. Required outcomes: Ready→Warning→Ready, balances 400/700/800, daily cash 300/600/100, next-day transfer-total reset, updated date and detail count 13.
 
-新增九项 JDBC 通用证据测试已通过，另补参与者恢复失败的保守合并回归；正在运行完整生成链路。四个新增入口尚未取得最终干净结果，旧积数测试仍保留，不能据此宣称迁移完成。
+File 99zi uses independent request/lifecycle pairs for the same account/business identity, with source numbers 600.00 and 600. SPP parallel invokes complete cash lifecycles. Generic APP barrier before atomicService N and generated target/count metadata prove actual concurrency. Only example instances receive proxies; the first N paths synchronize before the target, failing if not all arrive within 30 seconds or the target never executes. This hides no transaction/business policy. initializeCashDepositExecution is targeted after both observe no settlement but before commit locks, preventing sequential replay from masquerading as concurrency. Required result: same original settlement, revision 1/balance 700, eight entries totaling 600 each side, one settlement/one replay audit. Framework tests cover cross-thread synchronization, timeout, one-shot behavior and cleanup; language checks count/target/fault incompatibility; generation checks metadata. Real execution was underway and old full-deposit tests remained. Any missing business reread/identity handling must be fixed in SPP, not replaced by generic Java bank retries.
 
-首轮执行：33 个入口中 31 个通过，新增正常积数和故障后重试在额外的分录总额预期上失败。旧测试没有该分录断言；新断言误写借贷各 50，实际源内核使用当次现金 50 与原存款减少 120 偿还本金 100、普通利息 30、催收利息 40，借贷应各 170。已修正为独立常量并增加对应槽金额断言，重新执行；未减少原业务责任，也未删除旧积数测试。
+First execution passed **45/46**: daily totals and prior 44 entries passed; concurrency failed at an actual CashDepositTrade primary-key race, PERSISTENCE_ALREADY_EXISTS. Source lifecycle lacked the old implementation's post-race result query. File 98 now directly expresses submissionFailure retention, leaving the failed transaction after an already-exists result, then querying original settlement by stable business ID. Only an existing settlement yields replay and an independent quantum Replayed audit; absent settlement/other errors rethrow the primary failure, preserving outer failure-audit policy. No bank Java lock/retry helper was added. Assertions require exactly one actual race failure, PERSISTENCE_ALREADY_EXISTS and measured ROLLED_BACK, proving the race branch rather than accidental sequential replay. All entries were rerunning.
 
+Final rollover/concurrency evidence: `mvn -pl :xbod-deposit-demo -am verify` passed lang 293, appframe 504, generator 101, remaining old demo 54, **952 JUnit tests**, zero failures/errors/skips; **46 APP entries** passed separately. Rollover checks passed Ready→Warning→Ready, totals and persisted facts. Concurrency verified equivalent exact numbers, actual barrier rendezvous, exactly one PERSISTENCE_ALREADY_EXISTS/ROLLED_BACK, original-result reread, one account/posting update and one Committed/one Replayed event. Ordinary business does not enable barriers. Generic tests cover new semantics/catalogue/runtime support. Inventory remained main 14/test 8; cross-instance/pending-identity obligations still prevented deleting NormalCashDepositTest or declaring source-only completion. Next: cross-process behavior, race without settlement, commit outcomes, Saga/recovery and reports.
 
-修正后的完整 verify 成功，33 个 APP 入口均实际通过；新增四个积数入口完整承接旧六项方法后，已删除 DepositAccrualTest。又补 99zb 的纯审计分类规则：七组存款/冲正配对事实覆盖四种结果证据及重放、提交前拒绝、缺少工作上下文。它只验证源政策，物理结果证明仍来自后端测试；不会把 fixture 构造当作确定事务结果。正在清空所有 target 后执行 clean verify，预期 34 个源入口，最终结果尚待取得。当前手写库存为主 Java 14、测试 Java 10，全部删除目标仍未达成。
+## Pending identity across JVMs and conflicts without settlement (in progress)
 
+Generic APP examples gained two-stage restart. Generation supplies two request/participant metadata sets and PHY data-source properties. The runner launches independent JVMs sequentially, each with empty requests/participants/new headers, without copying Java objects. A unique default H2 file URL is shared by declared properties/framework storage; explicit external URLs are retained. Logs/default databases remain in target/spp-examples. Stage-one failure prevents stage two; stage-two failure/timeout cannot report overall success. Source still describes business transactions.
 
-积数与事务结果证据的最终干净结果：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 290、appframe 494、generator 101、剩余旧 demo 66，共 951 项 JUnit 全部通过且无跳过；34 个 APP 源入口另行全部通过。四个积数入口和七组配对审计政策均在清空后的 target 生成执行。十一份已替代旧测试的 class（包括嵌套 class）全部确认不存在。当前库存仍为主 Java 14、测试 Java 10，全部删除目标仍未达成，Goal 保持活动。
+Language validates synchronous local scenarios/participants and incompatibility with fault/barrier; catalogues retain follow-up services/configuration. Generic tests use process IDs/database rows to prove independent processes, persistent readback/empty state and both failure paths. Initial fixture SQL used reserved H2 column value, causing two failures; stored_value fixed it without weakening assertions and generic tests passed. Initial bank integration found hyphens in existing spp.xbod.datasource-url were not expressible by qualifiedName. Quoted using properties were added with semantic tests; the PHY name stayed unchanged.
 
-公共层本轮实际新增 12 项测试：11 项 JDBC 结果证据（含部分资源提交、同资源加入、身份弱引用区分、循环原因链和未测量后续操作）及 1 项参与者恢复失败；语言层新增 1 项可选 transactionOutcome 的类型检查。它们不含银行专属实现。现金冲正资格与准备、分录责任、Saga、持久化关闭重开/并发/物理提交点故障/结果核对、报告与剩余 Java 删除继续实施；本轮成功不能作为这些缺口已验收的证据。
+File 99zj stage one explicitly seeds under quantum, reaches authorization waiting, then queries persisted identity, empty settlements/entries and waiting audit. A fresh stage-two process first queries those facts, rejects amount 1501 identity reuse while preserving original 1500, authorizes B and settles balance 1600/revision 1, then replays 1500.00 under stricter policy/next-day date without duplicate account/entry updates. Four attempts are waiting/rejected/committed/replayed. Stage two cannot obtain waiting state from the former process's lifecycle.execution.
 
-## 核心冲正资格与只读候选准备（进行中）
+File 99zk is a negative race-recovery case: source quantum fixtures preinsert one orphan entry; actual settlement hits a primary-key conflict during posting after account update. The failed transaction must definitely roll back; absent original settlement means rethrowing the original exception, retaining account revision 0/balance 100, no settlement, the orphan entry, RolledBack audit and original request identity. Rate/actual Locked rejections separately query persisted identity; cross-branch fee acceptance reads original stored facts/fee 2. All 48 entries were running; NormalCashDepositTest remained pending confirmation of all nine old obligations.
 
-99ca 将旧 DepositReversalPreparation Java 的查询和组合责任迁为三个业务源入口：prepareFinancialDepositReversal、prepareCoreQualifiedDepositReversal、prepareFinancialDepositReversalPostings。原成交及当前账户由 APP 查询绑定读回，容量/操作者/渠道/退款决定用 SPP copy 保存独立候选事实；数学、核心资格、账簿证据和反向分录复用既有 SPP 服务。它们只准备候选，不写账户、分录、审计或冲正关联，不能冒充新交易提交。
+After quoted-property correction, full verify passed all 48 entries. Two child JVMs separately passed waiting-seed and restarted rejection/authorization/replay stages; logs: target/spp-examples/restart-1061934216006567257. The no-settlement conflict also proved definite rollback, absent settlement, primary rethrow, account/orphan preservation and failure audit.
 
-99zc 的核心资格源规则覆盖关闭 EO082、注销 EN113、冻结 EN111、SA01116 冻结例外、注销不被该例外豁免、核心冲正的文档提示不继承普通存入机构范围门槛，以及核心校验不继承前端 institution/control 限制。99zd 用真实存款和后续存款，源 quantum CAS 更新当前冻结/挂失/范围事实，再查询核心候选；必须保留后续余额与积数、保存当次操作者/容量快照、再次注销后拒绝。查询实际审计、原分录和关联以核验准备不产生提交副作用。
+All nine NormalCashDepositTest obligations were checked: basic settlement/original facts/fees, three repayment types, policy change, intervening account change while waiting, replay under later state/policy, same-day/next-day totals, retained rejected/missing-rate identity, cross-JVM waiting identity and synchronized equivalent-amount races. Authorization acceptance gained queries for all three audit events: two waiting/one committed. Generic cross-JVM property propagation now covers custom application properties, not just spp./example. prefixes, with tests. NormalCashDepositTest was deleted; clean verify was checking fourteen replaced classes absent. Inventory: main 14/test 7; storage/commit outcomes, Saga, quantum journals and reports remained.
 
-首轮解析发现当前多文件链路在结果绑定时需要类型字段已定义；新文件原名 87 先于 CashReversalWork 的 99 声明，导致字段解析失败，现改为 99ca 位于其定义之后。没有使用银行 Java 绕行，任意文件顺序的跨文件字段解析仍是编译器能力限制，未宣称本轮已消除。正在运行全部 36 个源入口；旧资格及准备测试暂保留。三个新准备入口中的完整金融/分录准备分支仍需后续独立源验收，不能仅由核心资格案例通过推断全部完成。
+Final clean pending-identity evidence: `mvn -pl :xbod-deposit-demo -am clean verify` passed lang 294, appframe 507, generator 101, remaining old demo 45, **947 JUnit tests**, zero failures/errors/skips; **48 APP entries** passed separately, including both independent JVM stages. Logs: target/spp-examples/restart-5696792022188799453/stage-0.log and stage-1.log. Three authorization events, rejection/missing-rate identity, original fees, no-settlement conflict rollback/primary failure all ran from empty target. Fourteen migrated classes/nested classes were absent. Main 14/test 7 remained; the active goal continued with commit outcomes, Saga/recovery, quantum journals and reports.
 
-第二轮解析还发现新例子的辅助 Scenario 放在调用者之后，会将前向服务占位符按 SppScenario 转换而失败；现将辅助场景移到入口前，遵循当前先定义后调用的支持范围。此调整不改变业务流程或断言；未宣称任意跨文件/场景定义顺序受支持。再次运行真实生成链路，旧资格测试仍未删除。
+## Actual source faults at JDBC commit points (in progress)
 
-按定义顺序调整后，完整 verify 成功，36 个 APP 入口全部实际通过。核心资格四项旧责任已由两份源场景承接，DepositReversalEligibilityTest 已删除，正在 clean verify 检查十二份已删除测试均无残留字节码。当前库存主 Java 14、测试 Java 9，整体纯源验收仍未完成。
+The preceding clean run passed 947 regressions/48 entries and cross-JVM identity. Generic APP jdbcFault now captures the unique active JDBC connection after the target atomic update's first success, firing once at that transaction's selected point. beforeCommit is a precommit checkpoint: successful rollback yields ROLLED_BACK. commitBefore fails inside commit before physical commit; callers can know only UNKNOWN. commitAfter loses acknowledgement after physical commit, still UNKNOWN. afterCommit fails after confirmed commit, yielding COMMITTED without rollback. SPP retains business selection/query/recovery. There are no bank DataSource/Connection proxies or hardcoded deposit fault injectors. Missing target/transaction, multiple active connections or unreached fault point fail acceptance. Initially this control cannot combine with other example controls.
 
-下一批原分录准备验收还需要构造真实缺失分录：现有 APP persist 支持 insert/insertIfAbsent/update/upsert，没有 delete；ObjectRepository 同样缺少删除契约。应完善通用删除声明、事务内删除执行、语义与生成验证，再用 SPP/APP fixture 删除实际存储的原分录，不能以手工 JDBC DELETE 或只替换返回数组绕行。退款决定缺失的检查顺序及完整准备不写账户/积数/审计的责任亦需保留。
+The first language run found ordinary fault's permissive rule consumed jdbcFault's three Identifiers, wrongly reporting fault timing. A local parser predicate excludes this contextual marker while allowing jdbcFault as an ordinary Identifier, with regression coverage. Catalogues preserve target/timing. Generic runtime tests verify four actual data/outcome combinations, no rollback after confirmed commit, no early consumption, one-shot same-scope retry, and failure for missing target/transaction/multiple connections. All generic tests passed.
 
+File 99zl's four bank entries use complete source quantum writes for accounts, settlements, postings, links, conservation and success audit. Faults target storeCashAudit so seed/identity transactions do not consume them. SPP catch queries actual facts: uncommitted revision 0/balance 100 with no settlement/entries/link; committed revision 1/balance 700 with eight entries totaling 600 each side and unreversed link. Audit follows measured ROLLED_BACK/UNKNOWN/COMMITTED. Both pre/post-physical-commit connection faults are EXAMPLE_JDBC_COMMIT_FAULT: names cannot determine outcomes; queries must. Stable business ID/new attempt retry and 600.00 replay eventually produce one settlement.
 
-核心冲正资格阶段最终干净证据：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 290、appframe 494、generator 101、剩余旧 demo 62，共 947 项 JUnit 全部通过无跳过；36 个 APP 源入口另行全部通过。十二份已替代旧测试的 class（含嵌套类）全部不存在。新的核心资格和当前事实案例均在清空 target 后生成执行；当前手写库存主 Java 14、测试 Java 9，整体纯源要求尚未满足，Goal 继续活动。
+The former audit key used attemptId only, conflicting when Committed and CommitUnknown/CommittedResponseFailed occur in one attempt. APP now declares composite(attemptId,event), leaving SPP audit policy unchanged. New cases query whole history rather than assuming a unique event. Old Java CommitOutcomeUnknown maps to source CommitUnknown as a documented naming difference with unchanged outcome meaning. All 52 entries were running; old storage/full-reversal/Saga/report tests remained. Generic framework passes alone did not prove bank commit acceptance.
 
-只读金融/分录准备的其余八项责任、实际存储删除/证据破坏、提交点和结果核对、并发、Saga/补偿与报告仍继续实施。此次没有新增 demo Java，也没有把银行查询或资格逻辑迁入公共 Java 运行库。
+First bank integration passed **29/52**, not acceptance. commitBefore/commitAfter failure codes were the generic quantum wrapper message Cannot execute quantum transaction, not underlying SQLException text. UNKNOWN still requires independent checks; text is not outcome evidence. Most other failures came from optional scalar queries treating attemptId as complete storage identity after the composite-key change. Generic explicit optional scalar queries now fall back on declared-property filtering when identity is missing: zero matches returns empty, one returns the record, multiple reject REPOSITORY_SCALAR_QUERY_AMBIGUOUS. Complete role/DDL identities and void hydration do not fall back. Bank multievent entries use collections, never implicit first rows. JDBC/JSON repository, typed/request call, unique/empty/ambiguous tests were added before regeneration.
 
-## 通用删除与原成交/分录候选准备（进行中）
+Remaining old-test obligations were reviewed as deletion gates, not completed work:
 
-APP 增加 persist(delete, argument(...))，生成 DELETE 写入元数据；同步本地更新服务必须加入源声明事务，支持标量/一维集合和复合键，记录缺失明确报错。删除不继承 update 的 compareVersion，编译及运行层都拒绝忽略版本条件。JDBC 锁定原快照，再删除快照与映射原生表，原生键来自实际快照；原生约束失败或后续批量删除失败必须整体恢复。解码原生小数键使用 BigDecimal，避免将精确键转为 double。通用默认后端未支持删除时明确报错，不定义银行业务逆操作。
+| Handwritten test remaining | Source evidence still required |
+| --- | --- |
+| JdbcDepositStoreTest | Actual competing transactions on one revision; failures after account write/mid-batch; primary-error preservation when success/failure audit is unavailable; four bank commit outcomes awaiting integration |
+| JdbcDepositReversalStoreTest | Same/different reversal-identity races; account/original-settlement changes during reversal; stable identity; four commit outcomes; cross-process replay/audit unavailability |
+| DepositPostingTest | Independent original-entry fields/exact decimals; removal of old repository-fixture dependencies |
+| CashDepositReversalTest | Four actual reversal reports, current accrual preservation and real quantum journals, not just in-memory plans |
+| CashQuantumLedgerTest | Undo journals/current values together after outer failure; tiny exact amounts/independent account identities; wrong-before rejection/scope cleanup |
+| DepositSagaRecoveryTest | Six explicit recovery cases; no inverse without local settlement; preserving later independent commits; rejection not mislabeled compensation; stable recovery identity/query after completion-log failure |
+| DepositDemoReportTest | Actual persisted declarative reports/quantum records, not merely printed PASS names |
 
-框架删除验证已通过：标量边界/缺失/保留其他行、集合后续失败恢复、非法版本元数据、复合快照/原生表共同删除与回滚、原生外键失败恢复。语言验证检查生成元数据与非法版本绑定；生成器测试实际编译执行删除服务及幂等重试不重复删除。首轮原生表测试 fixture 使用无默认构造器的 Java record，读回链路按生成模型要求实例化而失败；已改用与生成模型一致的 Bean，并保持原生查询及恢复断言。另补精确小数原生键验证，将随完整检查执行。
+Current source deposits/reversals do not call old implementations, but that alone does not authorize deleting unmet obligations. Next steps: reversal commit faults, resource queries/reports, Saga source semantics/generated execution, then clean verify without handwritten Java.
 
-99ze/99zf/99zg 新增八个源入口承接旧 DepositReversalPreparationTest 八项方法：原存入 600、授权存入 1500、原笔重放、下一营业日 100 形成当前版本 3/余额 2300/普通产品 2200；金融候选反向原 600 得到 1700，仍不提交，操作者/容量/费用决定独立复制。原成功/重放两条审计、八条借贷各 602 的实际原分录、未冲正关联必须保持。退款 0/1.25/2 明确提供，普通/呆账/三位小数来自实际成交与实际分录。未知原笔、实际拒绝原笔、容量不足、缺少/负数/超过原费的决定，以及实际修改成交/分录和删除第 8 条分录都必须拒绝候选。
+Final commit-point evidence after query fixes: `mvn -pl :xbod-deposit-demo -am verify` passed lang 295, appframe 513, generator 101, remaining old demo 45, **954 JUnit tests**, zero failures/errors/skips; all **52 APP entries** passed. Four JDBC fault entries and prior 48, including pending identity in new JVMs, ran successfully. Source assertions distinguish the two actual UNKNOWN data outcomes; stable-ID retry/replay settles once, with two events retained for one committed attempt. This was incremental verify, not clean. No Java was deleted; main 14/test 7 remained, goal active. Next: reversal commits/races, audit unavailability, quantum journals, Saga/reports and remaining duties.
 
-首轮银行生成发现字符串 + 仍被数学语义拒绝，尽管生成器已有字符串拼接路径。现完善 String + String 的类型验证，保留字符串类型，混合数字及减法仍拒绝；新增通用语义回归。没有用硬编码 Java 编号构造器绕过源表达。所有角色编号及后缀仍在 SPP 构造。正在运行全部 44 个源入口，旧八项准备测试尚未删除，不能宣称该责任已完成。
+## Cash-reversal commit points and original identity across JVMs (in progress)
 
+The preceding full verify passed 954 JUnit/52 APP entries and fixed composite audit queries. No demo Java was added/rewritten. File 99zm shares actual cross-day fixtures: original deposit 600/fee 2, later deposit 100/current accrual 800. File 99zma holds independent assertions; 99zmb has six root scenarios: four jdbcFault points plus after-atomic faults after reversal-record insertion/link update. Target storeCashReversalTrade prevents original/later deposits consuming faults. After catch, SPP queries accounts, original/later/reverse entries, reversal record/link/audit. No settlement must retain revision 2/balance 800/unreversed link/no reverse entries. Committed reversal must yield revision 3/balance 200/accrual 800, eight reverse entries totaling 602 each side and link revision 1. Original/later entries compare side/subject/amount slotwise; original fees/revision/later accrual remain. Stable reversal ID/new attempt retry then next-day replay produces only one reversal.
 
-第一轮实际执行为 39/44：三个债务/小数入口及原有入口通过，五个共享现金 fixture 的入口失败。复核发现复用了跨日冲正 fixture 的初始计息日 20261006，而旧准备测试的初始计息日为 20261007；前者会额外累积原余额 100 的一天产品，不能套用旧测试的 2200。现仅在新准备 fixture 明确设置 lastProductDate 和 lastTransactionDate 为 20261007，保留独立产品 2200、余额 2300 和反向余额 1700 的断言，重新执行。未改原跨日冲正案例，也未降低准备不提交的要求。
+File 99zn first commits reversal, then APP restart launches an independent JVM with empty participants and query-only initialization, without rerunning seeds or carrying lifecycle state. After confirming revision 3/balance 200 and preserved original/later entries, a new deposit 25 yields revision 4/balance 225/accrual 1000. Old reversal replay returns original revision 3/balance 200 while preserving current revision 4/balance 225. Reusing settled identity with changed original transaction or overnightMode2 rejects DEPOSIT_REQUEST_ID_REUSED; a new number reversing the already-reversed original rejects ORIGINAL_DEPOSIT_ALREADY_REVERSED. Persisted audit distinguishes settlement/replay/both identity rejections. All 59 root entries were executing, with no success verdict yet. Concurrent reversal, audit unavailability, quantum journals, Saga/reports and removal of all handwritten Java remained.
 
 
-后续迁移依赖核查：NormalCashDepositTest 的基本成交/三种偿还、授权策略重新校验、等待期间账户变更、重放保留原结果、身份复用拒绝及费率缺失已有源入口，但仍缺同日累计警告与次日重置的完整成交入口、重新启动后读取待授权身份、等价数字格式的真实并发提交证据。DepositPostingTest 同时是旧仓储和整笔存款的 fixture，不能单独删除。CashDepositReversalTest 的报告断言仍依赖旧入口，Saga 的六项责任还依赖 ExplicitSagaStep。后续必须完善通用执行/恢复/报告能力并验证这些责任，不能只凭现有顺序入口通过删除所有 Java。另需检查源准备的原成交账户一致性，旧 load 曾明确拒绝 INVALID_ORIGINAL_DEPOSIT_ACCOUNT；现有新入口尚未覆盖该异常事实。
+Final reversal commit-point evidence: full verify passed lang 295, appframe 513, generator 101, remaining old demo 45, **954 JUnit tests**, zero failures/errors/skips; all **59 APP root entries** passed. Six new reversal faults and both independent JVM stages passed without regressions in the prior 52. Logs target/spp-examples/restart-4430443081500016374/stage-0.log and stage-1.log each report PASS. Later deposit revision 4/balance 225/accrual 1000 survived replay; source rejected two identity changes and another-number duplicate reversal. No compiler/framework Java changed or old implementation was deleted; additions were SPP/APP, with existing PHY storage guarantees. This was incremental, not clean. Inventory main 14/test 7; active work continued on races, uncommitted partial-entry conflicts/stale revisions, unavailable audit, quantum journals and Saga/reports before final deletion.
 
+## Actual same/different-identity cash reversal races (in progress)
 
-日期一致后完整 verify 成功：44 个 APP 入口全部通过；通用框架 501 项测试含精确小数删除键亦通过。旧准备八项方法已由新源责任承接，DepositReversalPreparationTest 已删除。进一步在 prepareCashReversalQueries 明确检查原/成交账户 id 与原交易账户一致，在已有存储证据入口实际修改原账户 id，要求 INVALID_ORIGINAL_DEPOSIT_ACCOUNT 并保留当前账户、积数、审计及分录。此追加异常责任和已删除旧测试的字节码清理正在 clean verify 中验证。当前库存主 Java 14、测试 Java 8；完整纯源目标仍未达到。
+Following 954 JUnit/59 source-entry success, files 99zo/99zoa/99zob add facts/two-path scenarios, independent assertions and root entries for two JdbcDepositReversalStoreTest race obligations. APP barrier before markCashReversalCommitting 2 synchronizes both after original/current-version/unreversed-link queries and inverse planning, before shared quantum commit, without holding exclusive JDBC locks. Assertions require exactly one actual PERSISTENCE_ALREADY_EXISTS or PERSISTENCE_VERSION_CONFLICT with ROLLED_BACK.
 
+File 99b gains submissionFailure/competingLink. After leaving failed transactions for already-exists/revision conflicts, source explicitly requeries reversal settlement by request ID. An existing settlement requires original/mode identity validation, original-result replay and independent quantum audit. Otherwise it requeries original links: only an actual link to another reversal supports Rejected/ORIGINAL_DEPOSIT_ALREADY_REVERSED; otherwise the original storage error remains. Java locks/retry helpers do not implement recovery/replay/error conversion.
 
-原成交/分录准备阶段最终干净证据：`mvn -pl :xbod-deposit-demo -am clean verify` 成功，lang 292、appframe 501、generator 101、剩余旧 demo 54，共 948 项 JUnit 无失败、错误或跳过；44 个 APP 源入口另行全部通过。实际原账户身份篡改亦拒绝 INVALID_ORIGINAL_DEPOSIT_ACCOUNT，账户/积数/审计/原分录保持。十三份已删除测试（含嵌套类）均无残留 class。当前手写库存主 Java 14、测试 Java 8，目标仍未完成，Goal 保持活动；重启、并发、银行提交点结果、Saga/业务恢复和报告责任继续实施。
+Same identity requires both calls returning original revision 3/balance 200, unique link, eight entries totaling 602 each side, one settlement/one replay event. Different identities require one success/one business rejection, one settlement/eight entries and no losing candidate residue. Both preserve original 600/fee 2 and later 100 entries/accrual. All 61 entries were generating/running; no pass was preclaimed or old repository Java deleted.
 
+First concurrency run: same identity passed; different identity failed its business rejection code. Read-only inspection of generated ExecuteCashReversalUnchecked.java showed classifyConcurrentCashReversalLink rejection inside catch was attached to the original storage conflict under generic handling, leaving that conflict primary. Rather than weakening outcome/expectations, SPP catch now only requeries settlement/link and records concurrentReplay; missing facts/query failures retain the original. Identity validation, replay/audit or evidence-based business rejection occur after catch, also preventing identity-reuse rejection being hidden by storage conflict. Diagnostic assertions were expanded while still requiring ORIGINAL_DEPOSIT_ALREADY_REVERSED. The original run continued; corrected regeneration had not yet proved all 61.
 
-## 完整换日累计与真实并发身份（实施中）
+Corrected parsing found the added dynamic diagnostic violated require's fixed StringLiteral second-argument contract; no bank scenario executed. The original fixed assertion identifier was restored and unnecessary concatenation removed before rechecking post-catch branches. Spp.g4 calculationStatement confirms a require-message restriction, not missing general String concatenation. The unexecuted correction run was not a pass; transaction/race assertions remained.
 
-上一阶段为明确进展：清空 target 后 948 项回归和 44 个源入口全部成功，旧准备测试已删除。接续 NormalCashDepositTest 的剩余完整交易责任，99zh 新增真实 300/300/次日 100：逐笔保存并查询原成交、账户、分录和审计；必须 Ready→Warning→Ready，余额 400/700/800，当日现金 300/600/100，次日转账累计清零、日期更新和明细数 13。
+Quantum persistence review, not yet implementation: old CashQuantumLedger precreated before_value/delta_value/after_value/current_value as VARCHAR(4096), then used JdbcQuantumJournalStore, explaining old 1e-25 precision passes. New source PHY defaults to DECIMAL(38,12); ordinary amounts cannot prove equal precision. APP table/primary-key/property collection queries and native snake_case/camelCase reading could map evidence roles to xbod_quantum_journal/xbod_quantum_value, but appDdlTables was disabled and text-to-PHY-BigDecimal conversion absent. PHY initializes before APP table creation; later APP DDL cannot substitute for adapter storage selection.
 
-99zi 使用两套独立请求/生命周期、同一账户和业务身份，以及源数字 600.00 与 600；SPP parallel 调用完整现金生命周期。为证明实际并发，APP examples 增加通用 barrier before 原子服务 N，生成目录传递目标及参与数；运行器只在样例实例启用代理，目标前首次 N 路同步，30 秒未到齐或未执行目标均失败，不隐藏事务/业务策略。当前入口选 initializeCashDepositExecution，即两路都已读取缺失成交且尚未持有提交锁时会合，确保验收不是先成交后再顺序重放。结果要求同一原成交、版本 1/余额 700、八条借贷各 600 分录、一条成交加一条重放审计。框架另验证屏障跨线程、超时、一次性和作用域清理，语言验证数量/目标/与 fault 不兼容，生成验证元数据。正在真实生成执行，尚未删除整笔存款测试；若并发路径发现缺口，须修正 SPP 的业务重读/身份处理，不能由公共 Java 代替银行重试。
+Required follow-up: explicit generic jdbcQuantum exact-text configuration, backward-compatible decimal default; incompatible existing tables must reject, never silently claim precision or auto-delete. Add exact numeric readback and APP/PHY mappings for actual journals/current values. SPP supplies independent tiny-amount/isolation/outer-failure/no-journal/no-value-change/stale-before/scope-cleanup expectations. Business calculations gain no precision/scale parameters; representation/capacity/storage remain PHY/mapping. Test facts must come from source transactions/real repositories, not migrating old CashQuantumLedger into generic runtime.
 
+Final concurrency evidence after post-catch classification/fixed require IDs: full verify passed lang 295, appframe 513, generator 101, remaining old demo 45, **954 JUnit tests**, zero failures/errors/skips; **61 APP root entries** passed. Both races had exactly one measured storage conflict/definite rollback; SPP queries/replay/rejection preserved unique accounts/links/entries and original/later evidence. Prior 59 entries regressed cleanly. This was incremental, not clean; no Java deleted. Main 14/test 7 remained; goal active. Tiny-value text storage, source queries/assertions and remaining quantum/Saga/report duties preceded final deletion.
 
-首轮实际执行 45/46：完整日累计与原 44 个入口通过，并发入口失败于 CashDepositTrade 的真实主键竞争（PERSISTENCE_ALREADY_EXISTS）。说明现有源生命周期尚未承接旧实现的同身份竞争后结果查询。现直接在 98 的 SPP 中表达：保存 submissionFailure；提交尝试报告已存在后，退出失败事务，再按原业务 id 查询原成交；只有存在原成交时生成重放结果，并在独立 quantum 边界写本次 Replayed 审计；查不到或其他错误继续抛原失败，外围失败审计策略不变。没有增加银行 Java 锁或重试器。并发源断言同时要求恰好一条实际竞争失败事实、PERSISTENCE_ALREADY_EXISTS 及测量得到的 ROLLED_BACK，证明已执行竞争分支而非偶然顺序重放。修正后正在重新运行全部入口。
+## PHY exact quantum representation and native journal queries (in progress)
 
+After 954 JUnit/61 entries passed, generic JdbcQuantumJournalStore gained decimalStorage="decimal" (compatible default) or "text" (VARCHAR(4096)). Text mode checks existing journal three-value/current-value column types/capacities; incompatibility returns QUANTUM_DECIMAL_STORAGE_MISMATCH, preserving data without automatic schema changes. PHY values pass through language checks/catalogue/startup; unknown values reject. Generic APP native readers convert text/numeric values exactly to BigDecimal/BigInteger and reject fractional integers instead of truncating.
 
-换日及并发阶段最终证据：`mvn -pl :xbod-deposit-demo -am verify` 成功，lang 293、appframe 504、generator 101、剩余旧 demo 54，共 952 项 JUnit 无失败/错误/跳过；46 个 APP 入口另行全部通过。新增换日入口逐笔通过 Ready→Warning→Ready、日累计与入库事实；并发入口通过两种精确数字表示、屏障实际会合、恰好一次 PERSISTENCE_ALREADY_EXISTS/ROLLED_BACK、查询原成交并返回同一结果、账户与分录仅一次更新、一条 Committed 与一条 Replayed。普通业务运行不启用屏障。新语义与生成目录以及运行支持均有通用框架验证。当前库存主 Java 14、测试 Java 8 未改变；NormalCashDepositTest 的跨运行实例/待授权身份仍未全部替代，不能删除它或宣布纯源验收完成。下一批继续跨进程、竞争无原成交的拒绝分支、提交点结果、Saga/业务恢复及报告。
+Four new generic tests passed: persisted 1e-25/two independent objects; outer JDBC rollback and continued commit after wrong-before rejection; unknown storage/incompatible decimal tables not impersonating text; declarative native exact-number reading/fractional-integer rejection. Language coverage accepts text/decimal, rejects float; generation checks decimalStorage metadata. Focused reactor passed. No bank CashQuantumLedger implementation moved into the framework.
 
+File 99zp declares two technical-evidence roles, object-based native journal/current-value queries, explicit quantum calls and independent tiny-value assertions. Existing APP table/repository syntax maps actual xbod_quantum_journal/xbod_quantum_value text columns. PHY cashRecords enables appDdlTables and cashLedger selects text. Abstract business numbers remain double formulas represented by PHY BigDecimal; no business precision/scale was added. All 62 entries were running; bank source isolation/outer rollback/wrong-before cases still had to precede old quantum-test deletion. Four framework tests cannot replace source acceptance; existing production schemas were not automatically migrated.
 
-## 待授权身份的跨 JVM 持久性与未成交冲突（实施中）
+The first new bank quantum entry failed EXAMPLE_Q_EXACT_VALUES; other executed entries passed. Startup inspection showed objectSnapshot installs JSON snapshot queries, while appDdlTables native reading belongs only to jdbcObjectRepository. PHY must explicitly select that existing implementation rather than pretend objectSnapshot reads technical tables. Catalogues also duplicated explicit snake_case platform columns/camelCase inherited fields, and pre-table annotations did not supply intended precision. Existing APP primarykey(Role.field) and map table { businessField = notnull String(width) physical_column; } now declare exact mappings. Business evidence stays double/PHY BigDecimal; physical names/text representation remain APP/PHY. The first run was still finishing; corrected regeneration had to revalidate all 61 plus quantum evidence, without a handwritten bank reader.
 
-通用 APP examples 增加两阶段 restart；生成两套请求/参与者元数据与 PHY 数据源属性，公共运行器依次启动独立 JVM、各自空请求和参与者、新请求头，不复制 Java 对象。默认生成唯一 H2 文件 URL，共享给声明属性和框架存储；使用既有显式外部 URL 时沿用。日志及默认文件数据库保留于 target/spp-examples。第一阶段失败不得启动第二阶段，第二阶段失败或超时不得报告整体成功，普通业务事务仍由源描述。
+The first run ultimately passed prior 61 entries and failed the new one; all 958 JUnit tests passed. The mapping correction next failed semantic validation requiring equal column/business types, before source execution. Generic exact-number/text mapping was added only for PHY built-in BigDecimal/BigInteger mapped to String columns; field bindings take precedence and ordinary numeric/nonnumeric mismatches still reject. Language/DDL share the rule. Two new tests cover acceptance, unbound/field-override/boolean rejection, actual VARCHAR width/aliases, unchanged business model types and no duplicate columns. Focused reactor passed; full verify reran without preclaiming 62 entries.
 
-语言检查同步本地场景、参与者、与 fault/barrier 不兼容，生成目录保存后续服务及配置。公共测试用进程 id 与数据库行证明真正独立进程、持久读回及空状态，并验证两种失败路径。首轮 fixture SQL 误用 H2 保留字 value 作列名导致两项失败，已改为 stored_value，保持原证明断言，通用测试全部通过。银行第一轮集成发现既有属性 spp.xbod.datasource-url 含连字符，qualifiedName 无法表达，现支持 quoted using 配置属性并补通用语义验证；不改既有 PHY 属性名。
+Corrected exact mappings passed full verify: lang 296, appframe 517, generator 102, old demo 45, **960 JUnit tests**, zero failures/errors/skips; **62 APP root entries** passed. File 99zp reads two exact current values/two COMMITTED records from real text tables, independently checking before/delta/after/conservation. Prior 61, including races/two cross-JVM scenarios, passed. Log: /tmp/spp-quantum-evidence-exact-mapper-validation.log. Incremental build only; main 14/test 7 remained, goal active. Isolation/failure/stale-value source acceptance, Saga/reports and final no-Java clean acceptance remained.
 
-99zj 新源阶段一显式 quantum 种入，等待授权后查询持久身份/空成交空分录和等待审计；阶段二新进程先查询这些已存事实，改金额 1501 复用身份拒绝且原 1500 不变，授权 B 后成交 1600/v1，再用 1500.00、更严政策和次日营业日重放，账户/分录仍一次，四条尝试为等待/拒绝/成交/重放。第二阶段不会靠上一进程的 lifecycle.execution 得到等待状态。
+File 99zpa adds three SPP/APP-only lifecycle entries: two accounts independently commit tiny amounts/25 and query real records; quantum update then business rejection proves rollback/zero journals/current values before legal commit; initial 100→110 followed by stale before=100 requesting 120 must fail, preserve two records/110, then legal 110→115 yields four records. No handwritten Java/external connections/bank adapter. Full 65-entry verify started without preclaiming success; old quantum tests remained. Exact-text mappings also reject arrays and diagnose invalid PHY types rather than throw mapper exceptions.
 
-99zk 是竞争恢复的负例：在源 quantum fixture 中预存一条孤立分录，让真实成交尝试在账户更新后、分录插入时遇到主键冲突；失败事务须确定回滚，查不到原成交时原异常继续抛出，当前账户 v0/100、空成交和原一条 fixture 分录保持，仅留下 RolledBack 审计和原请求身份。收费及真实 Locked 拒绝现另行查询持久身份；跨分行收费入口查询保存的原事实与 fee=2。正在执行全部 48 个入口；NormalCashDepositTest 仍保留，待全部旧九项责任确认后才删除。
+Saga migration review found SppDomain.validateCompensationDeclarations restricts targets to local atomic update with local transaction mode/resource. CompensationTransactionParticipant calls the target with original arguments, then writes COMPENSATION_DONE or COMPENSATION_FAILED. Actual bank recovery is a complete reversal scenario with queries/eligibility/inverse plan/explicit quantum commit; it cannot become a dummy atomic update or copied generic runtime business. Required work includes full-scenario recovery binding/parameter contracts, actual local-commit evidence, no inverse without settlement, retention after recovery rejection, stable reversal retries and query confirmation after committed recovery with unavailable audit. Existing Saga generation was not claimed to satisfy all six old obligations.
 
+The lifecycle first run was intentionally stopped during generation (exit 143); none of the 65 entries ran. This was neither full success nor runtime failure. Inspection showed QuantumConservationParticipant.beforeExecute locks and refreshes parameters from persistence; old CashQuantumLedger.append additionally compared expected after values and rejected QUANTUM_CASH_BALANCE_MISMATCH. Source cases therefore cannot claim input stale-before directly rejects runtime journals. File 99zpa now applies an increment inside transaction quantum then checkCashSettledQuantumBalance: actual 110 plus 20 becomes 130, inconsistent with stale plan 120, causing business rejection/rollback. Queries retain 110/two journals, then legal +5 yields 115. Conservation refresh is unchanged; direct journal wrong-before rejection remains separately framework-tested. Corrected generation would run three new/prior 62 entries.
 
-首轮 quoted 属性修正后的完整 verify 已成功：48 个入口全部通过，两个子 JVM 分别通过等待种入与重启后拒绝/授权/重放，实际阶段日志位于 target/spp-examples/restart-1061934216006567257。未成交分录冲突负例亦实际通过确定回滚、原成交缺失、原异常重抛、账户/孤立分录保持及失败审计。
+Corrected quantumIsolationExampleRun, quantumRollbackExampleRun, quantumStaleValueExampleRun and quantumEvidenceExampleRun actually passed. Separate object queries, no failed-operation records then legal commit, stale-plan QUANTUM_CASH_BALANCE_MISMATCH/ROLLED_BACK retaining 110/-10/two journals, then 115/-15/four journals were verified. Prior entries were still running, so all 65 were not yet claimed. Old quantum tests remained; current-value refresh semantics were unchanged.
 
-已对照旧 NormalCashDepositTest 九项责任：基本成交/存储原事实/收费、三类偿还、授权政策改变、等待期间账户改变、后续状态/政策下原请求重放、完整同日/次日累计、拒绝及费率缺失身份保留、跨 JVM 等待身份、真实同步等价金额竞争均有源证据。补授权场景整体三条审计查询（两次等待、一笔成交），通用跨 JVM 配置传递涵盖自定义应用属性并加证明，不限于 spp./example. 前缀。删除 NormalCashDepositTest 后正在 clean verify 检查十四份已替代旧测试均无残留 class；当前库存主 Java 14、测试 Java 7，仍需继续仓储/提交点结果、Saga、量子日志和报告迁移。
+Corrected full lifecycle verify passed **960 JUnit tests**, zero failures/errors/skips, and all **65 APP entries**, including two cross-JVM scenarios/actual races. Log: /tmp/spp-quantum-lifecycle-checked-validation.log. CashQuantumLedgerTest was deleted: main 14/test 6, fifteen old tests migrated. Source cases replace three business duties; generic tests separately cover external connections/direct journal stale checks. Clean verify began to check regeneration/no stale classes. Expected counts were lang 296/appframe 517/generator 102/old demo 42=957, source 65; these were predictions pending logs. Audit/partial-batch/stale candidates, Saga/reports and all main-Java deletion remained.
 
+During quantum clean verify's prior 65-entry baseline, after framework compilation, independent next-capability edits avoided recompiling under the running process. APP fault gained positive times and optional activation after a successful synchronous local atomic; fixtures cannot consume disabled faults, every configured occurrence must fire and old catalogues default to one. Optional String[] suppressedCodes exposes directly attached secondary failure codes while keeping primary code. New semantic/runtime/catalogue tests awaited the running build's end; that clean run could not validate these later edits. Bank primary/failure-audit double faults and post-preparation activation remained, without table deletion/handwritten JDBC injectors.
 
-跨 JVM 等待身份阶段最终干净证据：`mvn -pl :xbod-deposit-demo -am clean verify` 成功；lang 294、appframe 507、generator 101、剩余旧 demo 45，共 947 项 JUnit 无失败/错误/跳过；48 个 APP 入口另行全部通过，其中等待种入与重启续接两个独立 JVM 阶段分别通过。实际阶段日志为 target/spp-examples/restart-5696792022188799453/stage-0.log、stage-1.log。授权历史三条（两次等待、一笔成交）、拒绝/费率缺失身份读回、原收费事实、未成交冲突确定回滚及原异常保持均在清空 target 后实际执行。十四份已迁移旧测试（含嵌套类）均无残留 class。当前手写库存主 Java 14、测试 Java 7，全部删除目标尚未完成，Goal 保持活动；下一批继续提交点结果、Saga/业务恢复、量子日志与报告。
+Final quantum lifecycle clean verify passed lang 296, appframe 517, generator 102, old demo 42, **957 JUnit tests**, zero failures/errors/skips; all **65 APP entries** passed. Fifteen deleted test classes/nested classes were absent. Main 14/test 6 remained, goal active. This validates quantum baseline, not post-compilation repeated-fault/suppressed-code edits, which were separately testing. Log: /tmp/spp-quantum-lifecycle-clean-validation.log.
 
+Repeated-fault/suppressed-code focused reactor passed ExampleDeclarationTest, ScenarioFailureSemanticsTest, ExampleServiceFaultsTest, ScenarioSuppressedFactsTest, ExampleCatalogGenerationTest and GeneratedExampleRunnerTest. Coverage retains default one, no activation on failed activator, no reset on repeated activation, insufficient hits failing entries, generated array/List code forms and minimal-facts compatibility. Files 99zq/99zr add four bank entries: two unavailable primary/failure audits; missing-rate rejection plus audit failure; reversal double-audit faults activated only after real original/later deposits; and replay/failure-audit double faults after committed reversal, querying original settlement/balance/link/entries/six actual quantum records, then stable-ID retry adding replay audit only. Source failure facts opt into suppressedCodes; independent assertions preserve primary codes with secondary faults. Full 69-entry verify started without preclaiming passes/deleting tests. During framework tests, a fixture's nonexistent lifecycle.work reference was corrected to lifecycle.execution.status before bank compilation began.
 
-## JDBC 提交点的真实源故障（实施中）
 
-上一阶段 clean verify 947 项回归与 48 个源入口及跨 JVM 身份均成功，属于明确进展。本阶段承接旧仓储的提交点与结果责任：通用 APP jdbcFault 锁定目标 atomic update 首次成功后的唯一活动 JDBC 连接，只在该事务到指定点时触发一次。beforeCommit=提交前检查点，回滚返回则 ROLLED_BACK；commitBefore=提交调用中物理提交前报连接错，调用者只能 UNKNOWN；commitAfter=物理提交后丢失确认，调用者仍 UNKNOWN；afterCommit=已确认提交后的返回失败，为 COMMITTED，不再调用 rollback。业务选择、查询与恢复保持在 SPP。没有银行 DataSource/Connection 代理或硬编码存款故障器。缺目标、无事务、多活动连接、时点未实际触达皆失败，初版不与其他 examples 控制混合。
+The first four-audit-entry run stopped during bank parsing; none of 69 entries executed. New ReversalAuditEvidenceExample used reserved keyword quantum as a field, a fixture error rather than missing syntax. It was renamed evidence without relaxing keyword rules. Generic modules had passed; corrected bank generation/full acceptance restarted with old tests retained.
 
-语言第一轮遇到 jdbcFault 三个 Identifier 被普通 fault 的宽松规则吸收，语义错误地报告 fault timing；现以局部 parser predicate 排除该上下文标记，保持 jdbcFault 可作为普通 Identifier，补语义回归。生成目录保存目标和时点，通用运行测试实际验证四种数据结果及事务证据、已确认成交不调用 rollback、目标事务以前不消耗故障、同作用域重试一次性、无目标/无事务/多连接不冒充触发。通用测试完整成功。
+Remaining prepared-reversal review found a real gap: file 93 commitCashReversalRecords updates reversal, account, entries, link, quantum values and audit inside quantum but does not reread/compare original settlement evidence captured during preparation. File 99 combines preparation/commit without reusable prepare-only/submit-prepared entries. Old JdbcDepositReversalStore.commit rechecked original transaction/account/version/facts on the same connection and rejected ORIGINAL_DEPOSIT_RECEIPT_CHANGED; replay also checked original-voucher identity. Source preparation/submission must separate, recheck originals inside the explicit commit boundary, and cover changed vouchers/stale accounts/stable-ID retry. Current account CAS alone cannot replace original evidence. If deep role/collection comparison is missing, add generic expressions/generation rather than bank JSON comparison in shared runtime.
 
-99zl 四个银行入口以完整 source quantum 写账户、成交、分录、关联、守恒及成功审计；APP 故障锚定 storeCashAudit，因此种入与身份登记事务不消耗故障。SPP catch 查询实际结果：未提交 v0/100、空成交/分录/关联；已提交 v1/700、八条借贷各 600、未冲正关联；业务审计按实测 ROLLED_BACK/UNKNOWN/COMMITTED 分类。提交调用前后两种连接故障都叫 EXAMPLE_JDBC_COMMIT_FAULT，不能按注入名字推断状态，必须查询。随后以稳定业务 id、新尝试 id 重试及 600.00 重放，最终只一次成交。
+RepositoryWriteSession.persist already writes collection/array members sequentially without prechecking all duplicates. File 99zk's preexisting slot 1 proves only first-row conflict. New source cases must preinsert slot 4, prove slots 1–3 leave no residue while the conflicting fixture survives, explicitly delete it and retry the same identity, then check unique settlement/entries/link/audit. Deposit/reversal need separate proof.
 
-发现原 APP 审计键只用 attemptId，会使同次尝试的 Committed 与 CommitUnknown/CommittedResponseFailed 两条事件冲突。现由 APP 明确 composite(attemptId,event)，SPP 审计政策不变；新源案例查询整个历史，不用单事件查询猜测唯一行。旧 Java 的 CommitOutcomeUnknown 名称与当前源 CommitUnknown 映射记录为审计命名差异，结果语义保持。正在运行全部 52 个入口，旧仓储/完整冲正/Saga/报告测试仍未删除；不得凭当前通用框架测试直接宣称银行提交点全部完成。
+Corrected audit-failure full verify passed **964 JUnit tests/69 APP roots**, zero failures/errors/skips. All four new entries passed: unavailable primary/failure audits retain primary errors with one secondary; fee rejection is not hidden; committed reversal replay-audit failure preserves original settlement/balance/entries/link/six actual quantum journals, and stable-ID retry does not deduct again. Log: /tmp/spp-bank-audit-failure-corrected-validation.log. New capability/prior 65 entries passed. Incremental only; main 14/test 6 remained, goal active. Next: slot-4 faults, original-fact recheck, preparation/submission layering, Saga/reports.
 
+Files 99zs/99zt add two source-only mid-batch cases: preinsert slot4/777/DEMO.EXISTING, write slots 1–3, then trigger PERSISTENCE_ALREADY_EXISTS/ROLLED_BACK on the fourth. Independent queries require only the original fixture, unchanged account/settlement/link, failure audit and zero deposit quantum journals/four original reversal-path journals. After source quantum deletion, same-ID retry yields eight deposit entries/two quantum journals, or eight reverse entries/six total journals, preserving original/later deposits. Existing declarative batch delete is reused without bank Java/injectors. Full 71-entry verify was running, not yet passing.
 
-提交点首轮银行集成为 29/52，不能作为验收通过：commitBefore/commitAfter 的失败事实 code 是公共量子事务包装消息 Cannot execute quantum transaction，而非底层 SQLException 消息；事务结果仍须独立验证 UNKNOWN，不能靠错误文案推断。其余多数失败来自旧 optional 标量查询将 attemptId 当完整存储身份，复合键后误报不存在。公共查询补齐显式 optional 标量的缺失身份回退：按声明属性筛选，无匹配返回空，唯一匹配返回结果，多匹配明确 REPOSITORY_SCALAR_QUERY_AMBIGUOUS；完整角色/DDL 身份及无返回值 hydration 不回退。银行多事件入口使用集合历史，不隐式取第一行。通用测试覆盖 JDBC/JSON 两个仓储、类型调用和请求封装调用、唯一/空/歧义；继续重新生成验证。
+Participant comparison review found BusinessCalculationValidator accepts object equality, but NumericJavaRenderer.valueEquality uses value equality only for String/char/boolean/enum; Role/Contract == remains Java reference comparison. Comparing distinct copied instances with == cannot recheck complete original facts; existing == semantics would not change. A new explicit same-facts predicate must define recursive properties/ordered collections, nulls, mathematical built-in numbers and selected PHY adapters, not bank JSON strings/BigDecimal scale. APP locked-voucher queries must join existing SPP transactions, not open hidden adapter transactions.
 
+Mid-batch incremental verify passed lang 298, appframe 522, generator 102, old demo 42, **964 JUnit tests**, zero failures/errors/skips; **71 APP roots** passed. Actual slot-4 conflicts rolled back preceding entries while retaining fixtures; deletion/same-ID retry succeeded without duplicate quantum journals. Log: /tmp/spp-partial-posting-source-validation.log. Not clean; main 14/test 6 remained, with original evidence/preparation layers/Saga/reports unfinished.
 
-本轮旧测试责任复核（删除门槛，不代表已经完成）：
+Generic sameFacts and APP repository for update focused acceptance passed **27 JUnit tests**, /tmp/spp-locked-repository-framework-validation.log. Comparison metadata comes from source declarations/PHY adapters; locked reading opens no hidden transaction. File 91 archives original deposit facts; 93 locks/rechecks inside complete quantum commit; 99 separates preparation/submission while retaining the combined entry. Bank generation/compilation was ongoing; new behavior was not yet accepted. Main 14/test 6 remained. See participant-facts-and-locked-read.md.
 
-| 剩余手写测试 | 仍必须提供的源证据 |
-|---|---|
-| JdbcDepositStoreTest | 不同交易对同一版本的真实竞争、账户写入后/部分批次写入失败、成功及失败审计不可用时主异常保持；提交点四种结果待本轮银行集成通过 |
-| JdbcDepositReversalStoreTest | 同/不同冲正身份并发、冲正中版本/原成交变化、稳定请求身份、冲正提交点四种结果、跨进程重放及审计不可用 |
-| DepositPostingTest | 原分录独立字段预期及精确小数；旧仓储 fixture 依赖须同时移除 |
-| CashDepositReversalTest | 四种实际冲正报告、当前积数保持与真实量子日志，不只内存计划正确 |
-| CashQuantumLedgerTest | 外围失败后量子记录/当前值一并撤销、极小精确金额及不同账户身份独立、错误 before 值拒绝并清理作用域 |
-| DepositSagaRecoveryTest | 六类显式业务恢复、无局部成交不反交易、后续独立成交保留、恢复拒绝不冒充补偿、稳定恢复身份与完成日志失败后查询 |
-| DepositDemoReportTest | 声明式报告实际持久结果及量子记录，不能仅输出入口 PASS 名称 |
+Initial original-evidence bank generation stalled with high CPU in role-identity metadata traversal. Thread diagnostics located OpenApiGenerator.addRoleIdentityMetadataFields enumerating nested paths even without role mappings. New original snapshots amplified shared-graph recursion: a generic generation performance defect. That Maven process was stopped, not recorded as successful generation/acceptance. Generation now skips traversal when the mapping catalogue is empty. A nonbank 35-level shared-model test checks preserved fields/no metadata-free expansion. Focused tests/bank generation reran; /tmp/spp-original-evidence-pruned-generation-validation.log.
 
-现有完整源冲正与存款运行路径不调用这些旧实现，但这不足以删除其未替代责任。后续先用同一通用提交点控制完善冲正，再补资源查询/报告及 Saga 的源语义和生成执行，最终从无手写 Java 的目录 clean verify。
+The shared-graph first run generated within 0.6 seconds but its fixture omitted APP local deployment, so InspectRequest was absent and the assertion failed before bank execution. Explicit APP local inspect binding was added to exercise request identity metadata, without weakening generation/business semantics; corrected validation continued.
 
+The shared-graph fixture ultimately added standard APP validation/two ordinary Role parameters: context accepts only Contract and a single-object request may collapse to its model. Actual 35-level shared-reference request generation passed in 0.676 seconds, zero failures/errors/skips. InspectRequest has only facts/label; Node35 only first/second. Bank templates were generating, not yet complete. The optimization skips only entirely empty mapping catalogues, not a claimed complexity guarantee for all role-mapped graphs.
 
-提交点阶段最终证据：修复查询后完整 `mvn -pl :xbod-deposit-demo -am verify` 成功，lang 295、appframe 513、generator 101、剩余旧 demo 45，共 954 项 JUnit 无失败/错误/跳过；52 个 APP 入口全部通过。四个 JDBC 故障入口、原有 48 个入口（含两个新 JVM 的待授权阶段）均实际成功。UNKNOWN 的两种真实数据结果分别被源断言区分，稳定业务身份重试/重放只成交一次；已提交的同次尝试保留两条事件。此次为增量 verify，不宣称 clean 验证。本轮无旧 Java 删除，库存主 14/测试 7，Goal 继续活动。下一阶段先承接冲正的对应提交点与竞争恢复，再补齐审计不可用、量子日志、Saga/报告及剩余源责任。
+Bank build evidence correction: targeted test lifecycle did not repackage the Maven compiler plugin/dependencies. Target plugin JAR timestamp was 19:49 versus latest classes 20:40, so this generation could not validate latest semantics. That process was stopped after passing generic focused tests. Full reactor verify would package public modules before bank plugin invocation and run all JUnit/71 entries; /tmp/spp-original-evidence-source-validation.log. Neither earlier test-build bank phase counts as passing.
 
+First latest-plugin full verify failed bank Java compilation: six new services—prepareCashReversalAttempt, submitPreparedCashReversal, describeCashReversalPrepared, checkPreparedCashReversal, prepareCashOriginalEvidence, checkCashOriginalEvidence—lacked APP local bindings and response models. Public lang 300/appframe 528/generator 105, **933 JUnit**, passed; old demo/71 source entries did not execute. APP local declarations were added, with idempotency business on two scenarios, not patched generated Java. Corrected full verify /tmp/spp-original-evidence-binding-source-validation.log was running; main 14/test 6 remained, goal active.
 
-## 现金冲正提交点与跨 JVM 原成交身份（实施中）
+Corrected original-evidence integration passed full verify: lang 300, appframe 528, generator 105, old demo 42, **975 JUnit tests**, zero failures/errors/skips; all **71 APP roots**, including two cross-JVM groups and same/different-identity races, passed. File 93 locks/rechecks original deposits via sameFacts inside complete SPP quantum; 91 archives snapshots and 99 separates preparation/submission, all actually generated/compiled/executed. Six omitted APP bindings were supplied without generated-Java edits. Log: /tmp/spp-original-evidence-binding-source-validation.log. Incremental, not clean; main 14/test 6 remained. Three new independent changed-voucher/stale-candidate/settled-prepared-identity checks plus Saga/reports remained; prior 71 cannot substitute.
 
-上一阶段为明确进展：954 项 JUnit、52 个 APP 源入口完整 verify 成功，审计复合键查询回归已修复。本阶段没有增加或改写任何 demo Java。99zm 共用真实跨日 fixture（原存入 600、原手续费 2、后续存入 100、当前积数 800）；99zma 保存独立断言，99zmb 六个根场景包括四种 jdbcFault 及冲正记录写入后、关联更新后两种原子 after 故障。提交点锚定 storeCashReversalTrade，原存款/后续存款不会提前消耗该故障。SPP catch 后查询实际账户、原/后续/反向分录、冲正记录、关联和审计；无成交应保留 v2/800、关联未撤销、无反向分录；已成交应 v3/200、积数 800、反向八条借贷各 602、关联 v1。原/后续分录逐槽比对 side/subject/amount；原费用、原成交版本、后续积数均须保持。随后稳定冲正业务 id、新尝试号重试，再次日重放，最终只一次冲正。
+Prepared submission migration: file 99b consolidates original-request/prepared-result paths in decideCashReversalSubmission, retaining conflict queries/business rejection/replay/explicit quantum audit. Prepared entries preserve candidates; settled paths additionally compare archived original deposits/candidate originals and reject DEPOSIT_REQUEST_ID_REUSED on differences. Files 99zu/99zua/99zub add three source entries: persisted original settled.version changed to 99 rejects, then fixture restoration/same-ID retry; intervening deposit 5 makes the candidate stale, rejection followed by fresh preparation preserves that 5 from balance 805 and ultimately leaves 205; after reversal, later deposit 25 and future-date prepared replay retain current 225/original result 200, reject changed candidate original vouchers, then confirm after restoration. Independent queries check balance/revision, originals/later transactions/entries, audit and actual quantum journals. APP registers every new service; source update/persist(update) modifies fixtures, not handwritten Java. Full 74-entry verify started at /tmp/spp-prepared-reversal-source-validation.log; no pass/deletion yet, main 14/test 6.
 
-99zn 使用 APP restart 先成交冲正，再启动独立 JVM 构造空参与者并只查询，不能重跑第一阶段种入或携带生命周期。确认冲正仍为 v3/200、原/后续分录保留后，新存入 25（v4/225、积数 1000），重放旧冲正必须返回 v3/200 的原成交结果且保持当前 v4/225。改原交易或 overnightMode2 复用已成交身份分别拒绝 DEPOSIT_REQUEST_ID_REUSED，新编号再冲正已撤销原交易拒绝 ORIGINAL_DEPOSIT_ALREADY_REVERSED。实际持久审计必须区分成交、重放与两种拒绝。此阶段正在执行 59 个根入口，尚无成功验收结论；并发冲正、审计不可用、量子日志、Saga 与报告及手写 Java 全删除仍未完成。
+First prepared full verify passed 975 JUnit; source entries **73 passed/1 failed**. Changed-voucher/prepared-replay cases and all prior 71 passed. The stale candidate correctly rejected, fresh preparation committed and preserved the later 5, but a final combined account assertion failed. Source rules 60/30/90 show the third deposit is on the last accrual date: normalDays=0/normalIncrement=0, so accrual remains 800, not 805 (the current balance). Only the fixture changed to 800, with distinct balance/detail/accrual assertion codes and explicit third-settlement zero-day/zero-increment checks. Business calculations remained unchanged; correction was not preclaimed passing and old Java remained.
 
+Independent Saga gap work began allowing local Scenario recovery targets with their own explicit local transaction or delegation to one. Call-graph checks still reject reachable nested compensate, mismatched parameters, duplicates and self-recovery. Saga nodes may delegate to explicitly bounded source scenarios instead of dummy atomics/hidden APP transactions. New ScenarioCompensationSemanticsTest and full AppSemanticsTest ran separately. This was written after the earlier 975 tests/package, so 73 source passes cannot validate it. Log: /tmp/spp-scenario-compensation-semantics-validation.log.
 
-冲正提交点阶段最终证据：完整 verify 成功，lang 295、appframe 513、generator 101、剩余旧 demo 45，共 954 项 JUnit 无失败/错误/跳过；59 个 APP 根入口全部通过。六个新增冲正故障入口及两个独立 JVM 冲正阶段实际通过，原有 52 个根入口均无回归。阶段日志 target/spp-examples/restart-4430443081500016374/stage-0.log 和 stage-1.log 分别 PASS；后续存款 v4/225 与积数 1000 未被重放覆盖，两种身份变化与另一编号重复撤销被源拒绝。此次没有改写编译器/框架 Java，也未删除剩余旧实现；业务与验收新增内容只在 SPP/APP，存储保障继续使用原 PHY 声明。此次增量 verify 不宣称 clean。Goal 保持活动，库存主 14/测试 7；继续冲正并发、未成交的部分分录冲突与过期版本、审计不可用、量子日志、Saga/报告及最终删除。
+Saga recovery semantics/call metadata passed ScenarioCompensationSemanticsTest 3 plus AppSemanticsTest 245, **248 tests**, zero failures/errors/skips. Initial fixtures omitted complete APP in/out and used reserved commit; response headers/commitWork naming fixed them without relaxed syntax. Recovery may own/delegate explicit source-local transactions; absent boundaries, mismatched parameters, self/duplicate/reachable nested recovery still reject. Delegating Saga nodes generate store transaction metadata through commitWork, while workflow retains node metadata; non-Saga catalogues are unchanged. Actual runtime scenario recovery/six bank Saga duties remained; same log.
 
+Corrected prepared full verify began at /tmp/spp-prepared-reversal-corrected-source-validation.log, expecting 978 JUnit/74 APP entries, not yet accepted. Stale same-day accrual now expects 800/zero third increment. Prepared replay additionally rejects overnightMode2 identity reuse and independently expects five audit records: one settlement, two replays, two identity rejections. Old tests remained; main 14/test 6, active goal.
 
-## 同/不同身份的真实现金冲正竞争（实施中）
+Corrected prepared full verify passed lang 303, appframe 528, generator 105, old demo 42, **978 JUnit**, zero failures/errors/skips; all **74 APP roots** passed. Changed original vouchers, stale prepared results/accrual 800, settled prepared replay/two identity changes actually passed, preserving both cross-JVM groups/races. Log: /tmp/spp-prepared-reversal-corrected-source-validation.log. Per reversal-store-retirement.md, JdbcDepositReversalStoreTest's 16 methods were removed: main 14/test 5. Clean verify was running, old JUnit expected 26; no clean/no-stale-class claim yet. Saga/reports/all main-Java migration remained.
 
-上一阶段完成 954 项 JUnit 和 59 个源根入口，属于明确进展。本阶段补齐旧 JdbcDepositReversalStoreTest 的两类并发责任：99zo 事实与两路提交场景、99zoa 独立断言、99zob 根入口。APP barrier before markCashReversalCommitting 2 使两路都完成原成交/当前版本/未撤销关联查询和逆向计划，再同时进入共同 quantum 提交；同步点不持有 JDBC 排他锁。源断言必须恰好有一次实际 PERSISTENCE_ALREADY_EXISTS 或 PERSISTENCE_VERSION_CONFLICT，且其事务结果为 ROLLED_BACK。
+After reversal-store retirement, clean verify passed lang 303, appframe 528, generator 105, old demo 26, **962 JUnit**, zero failures/errors/skips; all **74 APP roots** passed. JdbcDepositReversalStoreTest/nested classes were absent; sixteen old tests retired, main 14/test 5. Log: /tmp/spp-reversal-store-retirement-clean-validation.log. This clean baseline predates 99zv's six Saga cases/99zw posting rules; those require another run and cannot be called accepted or goal-complete.
 
-99b 生命周期新增 submissionFailure 与 competingLink。已存在或版本冲突退出失败事务后，显式按请求 id 重查冲正成交；有成交则核对原笔及模式身份，返回原结果并在独立 quantum 写重放审计。无该成交则重查原交易关联；只有实际已指向另一冲正时，将本次业务标为 Rejected 并报 ORIGINAL_DEPOSIT_ALREADY_REVERSED，否则保持原存储失败。恢复、重放和错误转换不在 Java 锁/重试器中。
+First 99zv/99zw verify failed source parsing: a Scenario transaction group directly before try is not an allowed ordinary-statement form; transaction groups must appear as execution groups. File 99zv now uses existing serial { transaction quantum/saga { ... } }, preserving visible boundaries/modes, without generated edits or grammar relaxation. Public 936 JUnit passed; bank source did not run. Corrected verify continued.
 
-同身份案例要求两路都返回原 v3/200、唯一关联、八条借贷各 602、一条成交加一条重放审计；不同身份案例要求一成功一业务拒绝、一份成交和一组八条分录，失败候选不得残留。两者都核对原 600/费用 2 的成交和后续 100 的分录/积数仍保持。当前正生成执行 61 个根入口，没有提前宣称通过，也没有删除仍承担其他责任的旧仓储 Java。
+After syntax correction, parsing/APP validation passed, but PHY required explicit backends for cashSagaDepositNode, cashSagaLaterNode and cashSagaWorkflow. Each gained saga binding to existing localJdbc cashDatabase; Java does not hide modes. The first two rounds passed public 936 JUnit but no bank generation/execution; corrected PHY verify continued.
 
+The PHY-corrected -DskipTests run generated/compiled 3836 Java files but failed registration: JDK interface proxies could not cast to generated concrete Scenario handlers. No 81-entry evidence existed. Generic SourceScenarioService now permits in-place transaction-participant hook decoration while preserving scenario types; other services retain existing interface proxies. Two nonbank tests preserve concrete methods, begin/commit/rollback hooks and composed repeated decoration. Three generic report-exporter tests also passed, **5 total**, /tmp/spp-source-scenario-evidence-framework-validation.log. Optional spp.examples.evidenceDirectory and six runner tests were expanded for success/failure/cross-JVM files. Full framework/bank 81-entry validation was ongoing; main 14/test 5 remained.
 
-并发第一轮同身份通过、不同身份失败于首路业务拒绝码。只读检查实际生成 ExecuteCashReversalUnchecked.java 确认：catch handler 内 classifyConcurrentCashReversalLink 的业务拒绝按通用规则附加到原存储冲突，主异常保持原冲突。不是忽略事务结果或放宽预期；SPP 修正为 catch 内只重查成交/关联并记录 concurrentReplay，缺事实或查询失败保持原错误，退出 catch 后再进行身份检查、重放及独立审计，或者有据的业务拒绝。身份检查在 catch 外也避免并发身份复用错误被存储冲突遮蔽。断言增加实际失败码便于定位，仍要求 ORIGINAL_DEPOSIT_ALREADY_REVERSED。当前原轮继续完成；修正版待重新生成执行，未宣称 61 个入口通过。
+Final focused scenario-binding/evidence-export integration passed **11 JUnit tests**: scenario participants 2, exporter 3, runner 6; /tmp/spp-source-scenario-evidence-runner-corrected-validation.log. Export reads only @JsonProperty source facts, retaining exact numbers in JSON/Markdown and primary/secondary errors. Both JVM stages/parent restart results are saved separately, correcting parent failure overwriting setup-success evidence. Bank POM enables the generic evidence directory. Full verify repackages public code/templates, expecting 967 JUnit/81 roots without preclaiming Saga or final success.
 
+Full scenario-binding/export verify passed lang 303, appframe 533, generator 105, old demo 26, **967 JUnit**, zero failures/errors/skips; all **81 APP roots** passed. Six Saga cases/posting rules actually passed, with prior 74/cross-JVM/races unchanged. Exported facts show six Saga Done/NotCommitted/Failed/Confirmed outcomes, three recovery retries and two confirmations after completion-record failure. All seven new JSON/Markdown artifacts exist under target/spp-examples/evidence with PASS. Log: /tmp/spp-source-saga-runtime-evidence-validation.log. DepositPostingTest/DepositSagaRecoveryTest, six methods each, were removed after source replacement. Eighteen old tests retired; main 14/test 3, expected old JUnit 14. Post-cleanup clean verify had not run; report, deposit-store snapshot/different-ID races and all main-Java migration remained.
 
-修正轮在解析阶段发现新添的动态诊断不符合 require 第二参数的固定 StringLiteral 契约，银行场景未执行；保留原固定断言标识，去除这项非必要诊断拼接，再验证已修正的 catch 外业务分支。检查 Spp.g4 的 calculationStatement 确认这是 require 消息参数限制，不是普通字符串拼接语义缺失，不能将其记录为通用表达式漏洞，也不能把未运行的修正轮称为通过。主要事务与竞争断言保持原要求。
+The post-Saga/posting clean build failed old test compilation: JdbcDepositStoreTest still called deleted DepositPostingTest.rules. No 955-test/81-entry clean proof existed. No bank Java fixture was rewritten; the temporary gap remained while old deposit-store obligations migrated. Source 91 adds locked account reads/full sameFacts checks at unchanged revisions; 92/93 reserve settlement identity first inside complete quantum, then lock/recheck accounts before other commits, preserving same-identity collision behavior. CashQuantumMovement moves to 91 with current readback; file 95 deltas stay unchanged. Two 99zx entries cover same-revision snapshot tampering/repreparation and different cash identities meeting after preparation/before commit: one settlement/one revision conflict, then failed-ID reprepare preserving both. APP explicitly binds all new services; no bank Java. New source was unverified, inventory main 14/test 3, active.
 
+Generic recovery catalogues began aligning with scenario boundaries: generated call metadata/registered local services identify explicit local transactions and distinguish source-scenario business recovery from atomic snapshot/adapter quantum inversion. A bounded node without registered recovery remains RECOVERY_OPEN with guidance to bind business recovery, not mislabeled missing atomic update; absent boundaries cannot claim closure. Three new nonbank catalogue tests/full appframe were running using current code, not old JARs from the failed clean build. Log: /tmp/spp-scenario-recovery-catalog-framework-validation.log.
 
-量子持久性后续核查（尚未实现）：旧 CashQuantumLedger 明确预建 before_value/delta_value/after_value/current_value 为 VARCHAR(4096)，再使用通用 JdbcQuantumJournalStore，因此极小金额 1e-25 的旧测试能通过；新源 PHY 直接建默认 DECIMAL(38,12)，不能据普通金额案例认定同样精确。当前 APP 已有表/主键及按属性的集合查询，原生 reader 支持 snake_case/camelCase 名称对照，理论上可声明技术证据 Role 映射实际 xbod_quantum_journal/xbod_quantum_value；但 appDdlTables 默认未启用，且 reader 对文本数值到 PHY BigDecimal 尚无转换。PHY 初始化早于 APP 目录建表，不能靠后置 APP 建表替代适配器的存储选择。
+All **536 appframe JUnit tests** passed for recovery catalogues, same log. First bank boundary-source validation failed parsing 99zx's reserved quantum fixture field; renamed evidence without syntax/business changes. -Dmaven.test.skip=true was used only for this full source generation/execution, bypassing JdbcDepositStoreTest's old fixture compilation dependency. Public new code was independently tested; a complete clean verify remained mandatory after old-test removal. No bank source ran in the first attempt.
 
-后续实施要求：通用 jdbcQuantum 提供明确的文本精确数值存储配置，默认兼容原 decimal 模式；已有不兼容表须明确拒绝，不能静默当作精确或自动删表。补通用文本数值读回转换，并以 APP/PHY 声明映射查询实际日志和当前值；SPP 表达极小金额、账户隔离、外围失败无日志/无当前值变化及错误 before 值拒绝/作用域清理的独立预期。业务计算不新增精度/小数位参数，物理表示、容量及存储方式留在 PHY/存储映射。测试数据必须来自源事务和真实仓储，不能把旧 CashQuantumLedger 搬进公共框架。
+Both account-boundary entries actually passed. forgedCashSnapshotExampleRun rejects CASH_ACCOUNT_SNAPSHOT_CHANGED/ROLLED_BACK, preserving account 100/no voucher/link/entries/quantum residue; fresh preparation yields 700/revision 1/two quantum records. differentIdentityConcurrentCashExampleRun synchronizes two prepared submissions, yields exactly one settlement/one revision conflict, then reprepare gives revision 2/balance 800/two sets of eight entries/four quantum records, independently queried. JSON/Markdown were generated/read back. Full 83 entries had not finished; JdbcDepositStoreTest stayed. ExplicitSagaStep had no other Java references and its six recovery duties had source replacements, so that main file was deleted: main 13/test 3. Old bytecode cleanup awaited clean.
 
+Corrected account-boundary source validation passed `mvn -pl :xbod-deposit-demo -am verify -Dmaven.test.skip=true`: all **83 APP roots**, no FAIL, including prior 81/cross-JVM/races. Log: /tmp/spp-cash-account-boundary-corrected-source-validation.log. This skips JUnit/test compilation and is not full regression; new generic recovery catalogues separately passed appframe 536. New locked source boundaries/tampering/different-ID races actually generated/compiled/ran. Per deposit-store-retirement.md, JdbcDepositStoreTest's ten methods were deleted, eliminating the final retired-posting-fixture compile dependency. Nineteen old tests retired; main 13/test 2, four report/cash-reversal duties remaining. Full clean verify started, expecting 948 JUnit/83 entries, without preclaiming bytecode cleanup/completion. Aggregate bank reports/all remaining main Java still required migration.
 
-并发冲正阶段最终证据：修正 catch 外业务判定并恢复 require 固定错误标识后，完整 verify 成功，lang 295、appframe 513、generator 101、剩余旧 demo 45，共 954 项 JUnit 无失败/错误/跳过；61 个 APP 根入口全部通过。两种并发均恰好一次实测存储冲突及确定回滚，查询与业务重放/拒绝按 SPP 执行，账户/关联/分录保持唯一，原及后续成交证据不变；原 59 个入口无回归。此次增量构建，不宣称 clean，也未删除旧 Java。库存主 14/测试 7、Goal 活动。下一阶段已核实旧极小量子金额依赖文本建表，必须改为明确 PHY 配置及源查询/断言，补框架读回数值，再承接余下量子日志、Saga/报告责任并最终删尽手写 Java。
+Latest clean evidence (2026-10-08 23:16): `mvn -pl :xbod-deposit-demo -am clean verify` passed; /tmp/spp-account-boundary-retirement-clean-validation.log. **948 JUnit** (lang 303/appframe 536/generator 105/old demo 4), zero failures/skips; **83 APP entries**, zero failures, including real races/two independent-JVM groups. Old JdbcDepositStoreTest, DepositPostingTest, DepositSagaRecoveryTest, JdbcDepositReversalStoreTest, ExplicitSagaStep and nested classes were absent. This covers 83 entries, not subsequently added cash reports/restart entry 84. Remaining main 13/test 2 were still pending violations; goal active.
 
+Incremental 84-entry validation passed: /tmp/spp-source-cash-report-corrected-validation.log, `mvn -pl :xbod-deposit-demo -am verify -Dmaven.test.skip=true`, all **84 source entries**, including the new two-JVM cash report. JUnit/test compilation were skipped; this does not replace prior 948/83 clean evidence. Stronger report checks/two complete report entries were added later; current 86-entry package generation was running at /tmp/spp-source-complete-report-generation.log, not yet accepted.
 
-## PHY 精确量子表示与原生日志读取（实施中）
+Complete deposit-report two-JVM execution and JSON/Chinese-Markdown fact checks passed; DepositDemoReportTest was removed. Inventory main 13/test 1 (three CashDepositReversalTest methods). Old report classes still awaited clean removal. Generic batch registration avoiding per-item whole-catalogue refresh passed **537 framework JUnit**. Actual reversal reports failed audit ambiguity from reused attempt IDs; source fixture IDs were corrected and regeneration continued. See source-report-migration.md.
 
-上一阶段为明确进展：954 项 JUnit、61 个源入口完整 verify 全部成功，并发业务拒绝已移到 catch 后。本阶段公共 JdbcQuantumJournalStore 增加 decimalStorage="decimal"（默认兼容）或 "text"（VARCHAR(4096)）；text 明确检查已有日志三列及当前值列的文本类型/容量，遇到不兼容表报 QUANTUM_DECIMAL_STORAGE_MISMATCH，保留旧数据且不自动改表。PHY 配置经语言语义检查、生成目录及公共启动链路传入；其他值明确拒绝。公共 APP 原生 reader 对文本/数值的 BigDecimal、BigInteger 做精确转换，整数分数拒绝而非截断。
+Final migration gate on 2026-10-09: cash reversal reports with default parent-executor lifetime passed both new JVM groups; /tmp/spp-report-default-lifetime-runtime.log. Same-generation JSON/Markdown confirmed four actual reversals, 32 reverse entries, 20 quantum rows, cash 1700/revision 4/accrual 2200. Last thirteen main/one test Java files were deleted; source Java count became zero. Per-case request/authorization/source and actual replay-return assertions were strengthened in SPP but still required current clean regeneration. /tmp/spp-source-only-final-clean-validation.log was running; the goal was not yet complete.
 
-四项新公共测试实际通过：极小 1e-25 与两个独立对象的持久读回、外部 JDBC 回滚及错误 before 值拒绝后继续提交、未知存储/既有 decimal 表不冒充 text、声明式原生列到精确数字的读回及分数整数拒绝。已有语言测试扩充接受 text/decimal 与拒绝 float，生成测试确认 decimalStorage 传入目录，针对性 reactor 测试全部成功。未把银行 CashQuantumLedger 实现移入框架。
+## Final historical status (2026-10-09)
 
-99zp 新源声明两类技术证据 Role、按对象查询原生量子日志/当前值、显式 quantum 调用和独立极小金额断言。APP 以现有 table/repository 语法映射实际 xbod_quantum_journal/xbod_quantum_value 文本列；PHY cashRecords 开启 appDdlTables、cashLedger 选择 text。业务数字仍 double 的抽象公式，由 PHY BigDecimal 表示，没有在业务计算中增加精度/小数位。当前完整生成运行 62 个根入口；账户隔离、外围回滚、错误 before 值的银行源断言仍需补齐后才删除旧量子测试。不得用四个公共技术测试替代这项源验收，也不宣称已有生产表已自动迁移。
-
-
-银行首轮新量子入口失败 EXAMPLE_Q_EXACT_VALUES，其他已运行入口仍通过。核查公共启动实现：objectSnapshot 安装 JSON 快照查询，appDdlTables 的原生读取只接入 jdbcObjectRepository，因此需在 PHY 明确选择已有 jdbcObjectRepository；不能假装 objectSnapshot 自动读取技术表。生成目录另显示“snake_case 显式平台列 + camelCase 继承业务字段”重复展开，且表前注解未产生预想的列精度。现按已有 APP primarykey(Role.field) 与 map table { businessField = notnull String(width) physical_column; } 声明精确映射，业务证据保留 double/PHY BigDecimal，物理表名/列名/文本表示只在 APP/PHY。第一轮尚在完成，修正后需重新生成并验证原 61 个入口与量子入口，无手写银行查询器。
-
-上述第一轮最终为原 61 个入口通过、新量子入口失败；958 项 JUnit 全部通过。修正映射的下一轮在语义阶段被原有“列类型须等于业务字段类型”检查拒绝，未执行银行源入口。现补齐通用精确数字文本映射：只有 PHY 内置 BigDecimal/BigInteger 可映射 String 存储列，字段级绑定优先，普通数字和非数字错配仍拒绝；语言及 DDL 生成共享判定。两项新增测试覆盖接受、未绑定拒绝、字段覆盖拒绝、布尔拒绝、真实 VARCHAR 宽度与列别名、业务模型类型不变及无重复列，针对性 reactor 已通过。当前重新进行完整 verify；不提前认定 62 个源入口成功。
-
-
-精确映射修正轮最终完整 verify 成功：lang 296、appframe 517、generator 102、旧 demo 45，共 960 项 JUnit 无失败/错误/跳过；62 个 APP 根入口全部通过。99zp 从实际文本量子表读回两个精确当前值和两条 COMMITTED 日志，独立核对原值、增量、成交值及守恒；原 61 个入口，包括实际并发及两类跨 JVM 重启，无回归。日志 /tmp/spp-quantum-evidence-exact-mapper-validation.log。此次增量构建，主 14/测试 7 未删除，Goal 继续活动；仍需账户隔离/失败/旧值冲突源验收、Saga/报告及最终删尽 Java 的 clean 验收。
-
-
-99zpa 继续仅用 SPP/APP 描述三个量子生命周期入口：两个账户分别提交极小金额/25，查询两者真实记录；显式 quantum 内更新后业务拒绝，捕获确定回滚、查询零日志/零当前值，再合法提交；先提交 100→110，再以错误 before=100 请求 120，要求实际旧值冲突及回滚、原两条记录/110不变，随后按 110→115 合法提交并查询四条日志。没有手写 Java、外挂连接或银行专属适配器。当前启动 65 个源入口完整 verify，未预先宣称这些入口通过，旧量子测试仍保留。精确文本映射同时拒绝数组，并对无效 PHY 类型返回诊断而非使 mapper 检查抛异常。
-
-
-后续 Saga 源迁移核查：SppDomain.validateCompensationDeclarations 当前将补偿目标限定为 local atomic update，并要求目标有 local transaction mode/resource；CompensationTransactionParticipant 用原调用参数调用目标，之后写 COMPENSATION_DONE，失败写 COMPENSATION_FAILED。银行恢复实际是带查询/资格/反向计划/显式 quantum 提交的完整冲正场景，不能压成空壳 atomic update 或复制进公共运行库。因此还需验证并完善完整业务场景的恢复绑定与参数契约、真实本地成交证据、未成交不执行逆向、恢复资格拒绝后保留原成交、稳定冲正身份重试以及成交后审计不可用的查询确认路径。此项登记为后续通用能力实施工作，未认定现有 Saga 生成链路已满足旧六项责任。
-
-
-生命周期第一轮主动停止于生成阶段（进程已退出 143，未执行 65 个源入口），不是完整通过或运行失败。进一步核查 QuantumConservationParticipant.beforeExecute 确认它从持久层加锁刷新参数；旧 CashQuantumLedger.append 更新后另比对预期 after 值，不一致报 QUANTUM_CASH_BALANCE_MISMATCH。因此源案例不能误称运行链会按参数里的旧值直接拒绝日志。99zpa 改为显式 transaction quantum 内增量更新后调用已有 checkCashSettledQuantumBalance：实际当前 110，加 20 得 130，与旧计划 120 不符，业务校验拒绝并回滚，查询确认仍 110、原两条日志；随后合法加 5 得 115。守恒增量刷新行为不修改，直接 journal 错误 before 拒绝仍由公共测试独立覆盖。修正轮将重新生成执行三个新入口及原 62 个。
-
-
-修正轮已实际通过 quantumIsolationExampleRun、quantumRollbackExampleRun、quantumStaleValueExampleRun、quantumEvidenceExampleRun：两个对象分开查询，失败无记录后能再提交；过期计划触发 QUANTUM_CASH_BALANCE_MISMATCH/ROLLED_BACK，查询仍为 110/-10 及原两条日志，合法再次提交为 115/-15 和四条日志。当前原 62 个入口继续完整回归，尚未提前认定全部 65 通过；旧量子测试仍保留至该轮完成。没有更改 QuantumConservationParticipant 刷新最新值的行为。
-
-
-生命周期修正轮最终完整 verify 成功：960 项 JUnit 无失败/错误/跳过，65 个 APP 根入口全通过，两个跨 JVM 场景及实际并发无回归。日志 /tmp/spp-quantum-lifecycle-checked-validation.log。删除 CashQuantumLedgerTest 后库存主14/测试6，累计十五份旧测试已迁移；量子源案例替换三个业务责任，公共测试单独覆盖外部连接和直接日志旧值校验。启动 clean verify 确認重生成和十五份旧测试无残留；预计lang296/appframe517/generator102/旧demo42=957，源65。只是预计数，待实际日志。Goal活动，剩余审计/部分批次/过期候选、Saga/报告、主Java全部删除仍需完成。
-
-
-量子迁移 clean verify 仍在执行原 65 入口的基线（本轮编译公共模块完成后）。利用独立时间完善下一批通用源码能力，未重新编译影响该进程：APP fault 可指定 times 正次数、可选 after 成功的同步本地原子启用服务，fixture 不消耗未启用故障；必须触发全部次数，旧目录默认一次。可选 String[] suppressedCodes 将直接附加失败码写入源失败事实，主 code 保持。新增语言/公共运行测试及目录断言尚待当前构建结束后执行；不能把当前 clean 结果当作这些新扩展已验证。银行主/失败审计双故障与冲正准备后启用案例待迁移，不用删表或手写银行 JDBC 故障器。
-
-
-量子生命周期最终 clean verify 成功：lang296、appframe517、generator102、剩余旧demo42，共957项JUnit无失败/错误/跳过；65个APP源入口全通过。十五份已删除测试（包括嵌套类）无残留class。当前主Java14、测试Java6，Goal活动。此构建验证量子迁移基线，不包含编译之后才写入的连续故障/附加失败码新扩展；该扩展正在单独测试。日志 /tmp/spp-quantum-lifecycle-clean-validation.log。
-
-
-连续故障及附加错误码针对性 reactor 已通过：ExampleDeclarationTest、ScenarioFailureSemanticsTest、ExampleServiceFaultsTest、ScenarioSuppressedFactsTest、ExampleCatalogGenerationTest、GeneratedExampleRunnerTest。保留旧目录默认一次，启用服务失败不启用、重复启用不重置、次数不足使入口失败；附加码数组/List 两种生成形态及旧 minimal facts 兼容均有验证。99zq/99zr 新增四个银行源入口：主存款审计及失败审计连续两次不可用；费率缺失业务拒绝并且审计失败；真实原存款/后续存款准备后才启用冲正双审计失败；原冲正已成交后启用重放/失败审计双失败，查询仍有原成交、余额/关联/分录及六条真实量子日志，随后稳定身份重试只补重放审计。源失败事实显式 opt-in suppressedCodes，独立断言次要故障附加且主码保持。当前69入口完整verify已启动，未先认定通过或删除剩余旧测试。公共模块测试阶段发现并修正源 fixture 使用了不存在的 lifecycle.work，改为实际 lifecycle.execution.status；银行编译尚未开始。
-
-
-四个审计入口首轮在银行解析阶段终止，未执行69个入口：新 ReversalAuditEvidenceExample 的字段名 quantum 是既有保留字，属于案例错误，不是语法缺口。改为 evidence，未放宽关键字规则。公共模块已验证通过；修正后重新生成及执行银行完整验收，旧测试不删除。
-
-
-余下冲正候选核查发现明确缺口：93 的 commitCashReversalRecords 在 quantum 内更新冲正成交、账户、分录、关联、量子值及审计，但没有重新读取/对比准备时的原成交证据；99 的 executeCashReversalAttempt 将准备和提交放在同一场景，缺少可复用的只准备/提交准备结果入口。旧 JdbcDepositReversalStore.commit 在同一连接中复核原 transaction/account/version/facts，变化报 ORIGINAL_DEPOSIT_RECEIPT_CHANGED；重放还对已成交冲正所绑定的原凭证做身份核对。后续需将 prepare/submit 拆成源场景，在显式提交边界复核原成交事实，补源凭证变化/账户过期计划拒绝及稳定身份重试。不得用只检查当前账户CAS代替原成交证据。源角色/集合事实深层相等能力若不足，须完善通用逻辑表达式及生成，不复制银行JSON比较进公共库。
-
-批次故障已有 RepositoryWriteSession.persist 对集合/数组按顺序执行 write，无全批次事先排重；当前99zk预置slot1只能证明首行冲突。后续源案例预置中间slot4，核对slot1～3未残留、原冲突记录仍存；显式删除fixture后同身份重试，再验证唯一成交、分录、关联和审计。此项需存款及冲正两条路径独立证明。
-
-
-审计失败修正轮最终完整verify成功：964项JUnit、69个APP根入口均无失败/错误/跳过，四个新增入口全部通过。存款/冲正的主审计及失败审计连续不可用保持主错误并附加一项次要错误；业务费率拒绝不被审计失败掩盖；已成交冲正重放审计失败保留原成交、余额/分录/关联及六条真实量子日志，后续稳定身份重试不再扣减。日志 /tmp/spp-bank-audit-failure-corrected-validation.log。新增能力和原65入口完整无回归；本轮增量，主14/测试6保持，Goal活动。下一批落实slot4批次中途故障，并补原成交事实复核及准备/提交源分层；Saga/报告继续实施。
-
-
-99zs/99zt 新增两条纯源批次中途案例：预置slot4/777/DEMO.EXISTING，实际写slot1～3后第4条唯一冲突触发PERSISTENCE_ALREADY_EXISTS/ROLLED_BACK；独立查询要求仅原fixture一条、账户/成交/关联不变、失败审计存在，量子日志存款0条/冲正原4条；显式源quantum删除fixture后同身份再提交，存款8条及2条量子日志，冲正8条及总6条量子日志，原及后续存款保持。复用现有声明式批量delete，无新银行Java或故障器。71入口完整verify执行中，未提前认定通过。
-
-参与者事实比较核查：BusinessCalculationValidator 接受对象相等表达式，但 NumericJavaRenderer.valueEquality 只对字符串/字符/布尔/枚举使用值相等，对Role/Contract的 == 仍生成Java引用比较。因此不能用复制后两个不同实例的 == 复核原成交完整事实；不修改既有 == 语义。后续同事实谓词应显式说明递归属性/有序集合相等、null语义、内置数字数学相等以及已选PHY适配器比较，不以银行JSON字符串或BigDecimal标度作为业务判断。锁定原凭证的APP查询绑定亦须在已有SPP事务中执行，不能在查询适配器中另开隐藏交易。
-
-
-批次中途冲突最终增量 verify 成功：lang298、appframe522、generator102、旧demo42，共964项JUnit无失败/错误/跳过；71个APP根入口全部通过。99zs/99zt 实际在slot4冲突，确认前面已写分录全部回滚，原fixture保持；删除fixture后同身份提交成功，量子日志没有重复。日志 /tmp/spp-partial-posting-source-validation.log。本轮不是clean，主Java14、测试Java6保持；原成交事实复核、准备/提交分层、Saga和报告仍须迁移，Goal保持活动。
-
-
-sameFacts及APP repository for update 通用能力针对性测试全部通过，共27项JUnit，日志 /tmp/spp-locked-repository-framework-validation.log。比较元数据来自源声明及PHY数字适配；锁定读取不另开隐藏事务。91归档原存款事实，93在完整quantum提交内锁定读取/复核，99拆分准备及提交场景并保留原组合入口；当前银行生成编译验证中，未认定新源行为通过，主14/测试6保持。详细语义见 participant-facts-and-locked-read.md。
-
-银行首次原证据接入生成在角色身份元数据遍历处持续高CPU，无生成进展；线程诊断定位 OpenApiGenerator.addRoleIdentityMetadataFields 对无角色映射工程仍枚举所有嵌套路径。共享参与者图在新增原成交快照后放大无效递归，属于通用生成性能缺口。已终止该轮自身Maven进程，不能记为生成或银行验收成功。公共生成器在映射元数据目录为空时直接跳过此遍历；新增与银行无关的35层共享模型实际生成测试，核对声明字段保持且不扩展无元数据路径。修正后的针对性测试及银行生成正在执行，日志 /tmp/spp-original-evidence-pruned-generation-validation.log。
-
-共享图测试首轮生成在0.6秒内完成，但测试夹具未声明APP本地部署，故没有InspectRequest而断言错误，银行阶段未开始。补上明确的APP local inspect绑定，使测试实际经过请求身份元数据路径；没有放宽生成或业务语义。修正轮继续验证。
-
-共享图测试最终补齐标准APP验证及两个普通Role参数（context仅允许Contract，单个对象请求允许折叠为原模型），实际生成35层共享引用请求成功，0.676秒，无失败/错误/跳过；InspectRequest仅facts/label，Node35仅first/second。银行阶段已进入模板生成，尚未认定完成。该阶段只跳过整个映射目录为空时的无效遍历，不宣称对存在角色映射的所有图均提供相同复杂度保证。
-
-银行阶段构建证据纠正：针对性 test 生命周期没有重新打包 Maven 编译插件及其依赖，target 插件JAR仍为19:49而最新class为20:40，不能用此轮银行生成证明最新语义接入。已停止该轮自身进程（通用针对性测试已通过），改跑完整reactor verify，使公共模块package后再由银行调用插件，并执行完整JUnit与71源入口。日志 /tmp/spp-original-evidence-source-validation.log；不再将先前两个test构建的银行阶段计为通过。
-
-首次最新插件完整verify在银行Java编译阶段失败：新增 prepareCashReversalAttempt、submitPreparedCashReversal、describeCashReversalPrepared、checkPreparedCashReversal、prepareCashOriginalEvidence、checkCashOriginalEvidence 六个服务没有APP本地部署绑定，对应响应模型未生成。公共lang300/appframe528/generator105共933项JUnit通过，但旧demo测试及71源入口尚未执行，不记为银行成功。补齐APP local声明，两条场景使用idempotency business；未手改生成Java。修正后完整verify日志 /tmp/spp-original-evidence-binding-source-validation.log，执行中；库存主14/测试6，Goal仍活动。
-
-
-原成交事实复核接入修正轮完整 verify 成功：lang300、appframe528、generator105、旧demo42，共975项JUnit无失败/错误/跳过；71个APP根入口全部通过，含两组跨JVM重启及同/不同身份的真实并发冲正。93的完整SPP quantum内锁定读取原存款并以sameFacts复核，91归档原存款快照，99准备/提交分层已实际生成、编译、运行。APP六项遗漏绑定已补齐，没有手改生成Java。日志 /tmp/spp-original-evidence-binding-source-validation.log。本轮为增量verify，不是clean；主Java14、测试Java6保持。原凭证变化/过期候选/准备结果已成交身份的三组新独立验收，以及Saga和报告仍待实施；原71个通过不代替这些未完成责任，Goal保持活动。
-
-准备结果提交迁移本轮：99b将原请求/准备结果提交收敛为decideCashReversalSubmission源场景，保持已有冲突后查询/业务拒绝/重放及显式Quantum审计；新增prepared入口保留候选，已成交时额外比较归档原存款与候选原事实，差异返回DEPOSIT_REQUEST_ID_REUSED。99zu/99zua/99zub新增三条纯源入口：持久原凭证settled.version变99后拒绝及恢复夹具同身份重试；另行存入5造成过期候选，拒绝后重新准备保留805上的5，最终205；冲正后另行存入25，未来日期准备结果重放保留225当前余额/原200成交，改变候选原凭证拒绝，恢复原候选确认成交。独立查询余额/版本、原及后续交易/分录、审计历史和实际量子日志。APP显式注册所有新增服务，夹具原凭证改变通过源update和声明式persist(update)，没有手写Java。74入口完整verify已启动，日志 /tmp/spp-prepared-reversal-source-validation.log；尚未认定通过或删除旧测试，主14/测试6保持。
-
-准备结果首轮完整verify：975项JUnit通过，APP源入口73通过/1失败。新增原凭证变化及准备结果重放两入口已实际通过，原71入口均通过；过期候选已验证旧提交拒绝、重新准备提交和后续5元成交保持，但在最后合并账户断言处失败。源规则核查60/30/90：第三笔存款与上次积数日同日，normalDays=0、normalIncrement=0，原积数800保持；不是805（805是当前余额）。已修正fixture预期为800，将余额、明细和积数拆为明确错误码，并对第三笔实际成交额外断言零天/零积数增量。未改业务计算、未先认定修正通过，旧Java不删除。
-
-独立Saga缺口实施中：通用语义开始允许本地Scenario恢复目标，它必须在SPP声明或委托给声明了完整本地事务的源场景；场景调用图检测嵌套compensate仍拒绝，参数/重复/自我恢复检查保持。Saga节点也允许委托给有明确源边界的场景，而不是让原子空包装或APP隐藏交易。新增通用ScenarioCompensationSemanticsTest，正在与完整AppSemanticsTest单独验证。该扩展是在前述975项公共模块测试打包之后写入，不能用73入口通过声称它已验证。日志 /tmp/spp-scenario-compensation-semantics-validation.log。
-
-Saga恢复场景语义与调用元数据针对性验证完成：ScenarioCompensationSemanticsTest 3项及完整AppSemanticsTest 245项，共248项无失败/错误/跳过。夹具首轮因APP in/out声明不完整及commit为保留字解析失败，补齐响应header并将服务命名commitWork；未放宽语法。恢复可拥有或委托源中的明确本地事务，无边界/参数不一致/自我/重复/可达嵌套恢复链仍拒绝。Saga节点委托commitWork时生成store事务调用元数据，workflow保留node调用元数据；非Saga场景的既有目录行为保持。通用运行的实际场景恢复与银行六项Saga责任仍待验证。日志 /tmp/spp-scenario-compensation-semantics-validation.log。
-
-准备结果修正轮完整verify已启动，日志 /tmp/spp-prepared-reversal-corrected-source-validation.log，预计978项JUnit及74个APP入口，未提前认定通过。过期候选同日积数预期改800并独立核对第三笔零天/零增量；准备结果重放再增加改变overnightMode2复用成交身份的拒绝，审计独立要求一笔成交、两次重放、两次身份拒绝共五条。旧测试暂不删除，主14/测试6保持，Goal活动。
-
-准备结果修正轮完整 verify 成功：lang303、appframe528、generator105、旧demo42，共978项JUnit无失败/错误/跳过；74个APP根入口全部通过。新增99zu原凭证变化、99zua过期准备结果及同日积数800、99zub已成交准备结果重放与两类身份差异拒绝均实际成功；两组跨JVM重启和真实并发保持。日志 /tmp/spp-prepared-reversal-corrected-source-validation.log。按 reversal-store-retirement.md 的责任表删除 JdbcDepositReversalStoreTest（16方法），当前主Java14、测试Java5；正在clean verify，预期旧JUnit26，但不提前认定干净验收成功或旧class已清除。Saga和报告及全部主Java迁移仍未完成，Goal保持活动。
-
-旧冲正存储测试退休后的clean verify成功：lang303、appframe528、generator105、旧demo26，共962项JUnit无失败/错误/跳过；74个APP根入口全通过。JdbcDepositReversalStoreTest及嵌套class均无残留，累计十六份旧测试退休，当前主14/测试5。日志 /tmp/spp-reversal-store-retirement-clean-validation.log。此干净基线不包括其后才接入的99zv Saga六类和99zw分录规则新源，后者下一轮另行验证；不得据此宣称Saga已通过或整个目标完成。
-
-99zv/99zw首轮接入verify在源解析阶段失败：Scenario中显式transaction组直接接try并非现有语法允许的普通语句形态（事务组须以执行组表达）。将99zv的事务包装为现有serial { transaction quantum/saga { ... } }形式，保持所有边界和模式可见，未修改生成Java、未放宽语法。公共936项JUnit通过，银行新源没有运行，不计为成功；修正轮继续verify。
-
-事务组语法修正后，新源解析及APP语义通过，PHY验证指出三个Saga服务尚未明确分配后端（cashSagaDepositNode、cashSagaLaterNode、cashSagaWorkflow）。已在已有localJdbc cashDatabase后端逐个加入saga绑定，不把模式藏在Java。前两轮936项公共JUnit通过，银行生成运行仍未进行；补齐PHY后的verify继续验证。
-
-PHY绑定补齐轮（-DskipTests）完成生成和3836文件Java编译，但运行注册阶段失败：JDK接口代理不能转换为生成Scenario具体handler类。尚无银行81入口执行证据，不能计为通过。通用修正增加SourceScenarioService基类，可原位装饰事务参与者钩子而保留场景类型；TransactionParticipantProxy对其他服务仍用既有接口代理。两项非银行测试证明具体方法、参与者begin/commit/rollback及多次装饰组合均保持。报告通用导出器的三项测试也通过，合计5项JUnit，日志 /tmp/spp-source-scenario-evidence-framework-validation.log。现接入执行器可选spp.examples.evidenceDirectory导出，并扩展运行器现有六项测试验证普通成功/失败及跨JVM文件。框架修正和银行81入口下一轮完整验证中，主14/测试5保持。
-
-通用场景物理绑定与证据导出集成最终针对性验证：11项JUnit全部通过（2场景参与者、3导出器、6运行器），日志 /tmp/spp-source-scenario-evidence-runner-corrected-validation.log。导出仅通过@JsonProperty读取源事实，数字在JSON/Markdown保持精确；失败事实保留主/附加异常；两个JVM阶段与父restart结果分别保存，修正首轮父失败覆盖setup成功文件的问题。银行POM启用通用证据目录。现重新完整verify，公共新代码和场景基类模板会重新打包，验证预计967项JUnit及81根入口，不提前认定银行Saga及最终纯源目标通过。
-
-场景物理绑定与证据导出完整verify成功：lang303、appframe533、generator105、旧demo26，共967项JUnit无失败/错误/跳过；81个APP根入口全部通过。99zv六类Saga和99zw分录规则均实际成功，原74入口及两组独立JVM重启、真实并发无回归。证据导出实际读取到六类Saga的Done/NotCommitted/Failed/Confirmed状态、3次恢复重试与2次完成记录失败后的确认；七个新增入口的JSON和Markdown均在target/spp-examples/evidence存在且状态PASS。日志 /tmp/spp-source-saga-runtime-evidence-validation.log。按源责任接替删除DepositPostingTest和DepositSagaRecoveryTest（各6方法），累计十八份旧测试退休，当前主14/测试3，预计剩余旧JUnit14。清理后clean verify尚未执行，不提前认定旧class已清除；报告、存款存储的快照复核/不同身份真实竞争和全部主Java迁移继续，Goal保持活动。
-
-删除Saga和分录测试后的clean构建在旧测试编译失败：JdbcDepositStoreTest仍调用已删除DepositPostingTest.rules夹具，不能认定955项/81入口的干净证明已经取得。未补写银行Java夹具，保留临时构建缺口，继续完成旧存款存储剩余责任再删除其依赖测试。源91增加账户锁定查询/同版本完整sameFacts复核，92/93在完整quantum内先保留成交身份，再锁定复核当前账户并提交其他事实，保持同身份碰撞的原语义。CashQuantumMovement源合同移到91并增加current读回事实，95的增量运算保持。99zx两个新入口验证同版本原快照篡改拒绝及重新准备；不同现金身份真实并发在准备完/提交前屏障会合，只有一笔成交/一笔版本冲突，失败身份重新准备后两笔均保持。APP显式绑定所有新服务，没有银行Java。新源尚未验证；旧Java库存主14/测试3，Goal活动。
-
-独立通用恢复目录开始对齐场景边界：根据生成调用元数据及已注册的本地服务判别显式本地事务，区分SPP场景的业务恢复与原子对象快照/适配器量子反向。有边界但恢复目标未注册时保持RECOVERY_OPEN、提示绑定业务恢复，不把它误报为缺少原子更新；无边界不声称闭合。三项新非银行目录测试及完整appframe正在验证，不用先前清理构建的旧JAR证明新诊断通过。日志 /tmp/spp-scenario-recovery-catalog-framework-validation.log。
-
-恢复目录全部appframe536项JUnit通过，日志 /tmp/spp-scenario-recovery-catalog-framework-validation.log。银行账户边界首次源验证在解析99zx失败：夹具字段使用了保留字quantum；改名evidence，未改语法/业务逻辑。使用-Dmaven.test.skip=true仅用于本轮完整源生成/运行，绕过仍引用旧分录夹具的JdbcDepositStoreTest编译；公共新代码已独立验证，旧测试移除后必须再完整clean verify。首轮无银行源执行证据，不计为通过。
-
-账户边界两入口已实际通过：forgedCashSnapshotExampleRun拒绝CASH_ACCOUNT_SNAPSHOT_CHANGED/ROLLED_BACK，失败时账户100且无凭证/关联/分录/量子残留；重新准备后账户700/版本1、量子2条。differentIdentityConcurrentCashExampleRun两准备结果在提交前屏障会合，恰好一笔成交/一笔版本冲突；失败身份重新准备后版本2/余额800、两份八条分录以及量子4条均独立查询通过。对应JSON/Markdown已生成并读回核对。本轮完整83入口尚未终态，不提前删除JdbcDepositStoreTest。核查ExplicitSagaStep除自身外无任何Java引用，六类业务恢复已由99zv替代，已删除该主文件；当前主Java13/测试3，旧class清理仍待下一轮clean。
-
-账户边界修正轮完整源验证成功：mvn -pl :xbod-deposit-demo -am verify -Dmaven.test.skip=true，83个APP根入口全部通过，无FAIL；既有81入口、两组跨JVM重启及真实并发保持。日志 /tmp/spp-cash-account-boundary-corrected-source-validation.log。本轮跳过JUnit和测试编译，不宣称它是全测试回归；新的公共恢复目录已另行完整appframe536项JUnit通过。新91/92/93账户锁定复核和99zx篡改/不同现金身份竞争两项均已实际生成编译运行。按deposit-store-retirement.md责任表删除JdbcDepositStoreTest（10方法），解决它对已退休DepositPostingTest夹具的最后编译依赖；累计十九份旧测试退休，当前主Java13、测试Java2（剩四项报告/现金冲正责任）。现启动完整clean verify，预计948项JUnit和83入口，不提前认定旧class清除或整个目标完成；银行聚合报告及全部剩余主Java仍需继续迁移。
-
-
-最新干净构建证据（2026-10-08 23:16）：`mvn -pl :xbod-deposit-demo -am clean verify` 成功，日志 `/tmp/spp-account-boundary-retirement-clean-validation.log`。JUnit 948项（lang303、appframe536、generator105、旧demo4）零失败、零跳过；APP83入口零失败，包括实际并发及两个独立JVM重启组。已确认JdbcDepositStoreTest、DepositPostingTest、DepositSagaRecoveryTest、JdbcDepositReversalStoreTest及ExplicitSagaStep的旧class和嵌套class均不存在。此证据对应83入口，随后新增现金报告源码及第84重启入口不包含在该证据内。剩余13份主Java、2份测试Java仍属待迁移违规项，Goal继续活动。
-
-
-84入口增量验证完成：日志 `/tmp/spp-source-cash-report-corrected-validation.log`，`mvn -pl :xbod-deposit-demo -am verify -Dmaven.test.skip=true` 成功，84源入口全部通过（含新增现金报告两JVM组）。此命令跳过JUnit及测试编译，不能替代此前948项/83入口的clean证据。现金报告增强校验与两个完整报告入口之后接入，当前86源码的package生成正在运行 `/tmp/spp-source-complete-report-generation.log`，未认定86入口已通过。
-
-完整存款报告两JVM及JSON/中文Markdown事实核对通过，DepositDemoReportTest已删除，文件数当前主Java13、测试Java1（CashDepositReversalTest三项）。旧报告测试class尚待新的clean构建清除，不认定已清除。公共批量注册避免逐项全目录刷新已通过537项框架JUnit。实际冲正报告因重复尝试身份的审计歧义失败，已修正源fixture编号，正在再生成验证；详见source-report-migration.md。
-
-
-2026-10-09最终迁移门槛：默认父执行器现金冲正报告两新JVM组通过，日志 `/tmp/spp-report-default-lifetime-runtime.log`；同生成版本的JSON/Markdown已核对四实际冲正、32反向分录、20量子行和现金1700/版本4/积数2200。最后13主Java和1测试Java已删除，源目录Java当前全部为0。逐案例请求/授权/来源与实际重放返回增强已补SPP，尚需当前clean重新生成验证；`/tmp/spp-source-only-final-clean-validation.log` 正在执行，最终Goal尚未完成。
-
-
-## 最终状态（2026-10-09）
-
-本次纯源重构已完成：手写Java主0/测试0，旧14主类及21测试族无残留class，干净生成编译及945项公共JUnit、86个APP入口全部通过。五个两JVM组、逐案例输入/授权/来源增强、六成交48分录五候选及四冲正32反向分录20量子行全部核对。完整权威证据见[最终验证](source-only-final-verification.md)，当前状态以该记录为准，前文保留阶段历史及范围限制。
+This source-only refactoring completed: zero handwritten main/test Java, no old fourteen main classes/twenty-one test families, clean generation/compilation and **945 public JUnit tests/86 APP entries** all passed. Five two-JVM groups, strengthened per-case input/authorization/source, six settlements/48 entries/five candidates and four reversals/32 reverse entries/20 quantum rows were checked. See authoritative [final verification](source-only-final-verification.md). That record governs the historical final status; preceding sections retain intermediate evidence/limits.

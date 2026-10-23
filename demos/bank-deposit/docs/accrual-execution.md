@@ -1,46 +1,137 @@
-> 历史文档：本文件描述重构前的实现或验收，不代表当前源码与测试结果。现行方案见 [本轮重构](latest-petstore-refactoring.md)；旧源已移至 `legacy-source/`。
+> Historical document: this describes implementation and acceptance before the
+> refactoring, not current source or test results. See the [current refactoring](latest-petstore-refactoring.md).
+> Old sources are under `legacy-source/`.
 
-# 积数计算与共同提交
+# Accrual-product calculation and joint commit
 
-## 源路径与业务输入
+## Source paths and business inputs
 
-KSADEP0:1802–1867 使用交易前 SA-INTC-AMT、SA-LTM-PDTC-DT 和本次营业日调用 CSAPRD2，取得普通及五档协定积数。普通累计为旧 SA-DDP-PDT 加本次普通积数；当前现金入口只接受当日起息，因此不执行 4142 的回溯起息增量。
+KSADEP0:1802–1867 passes pre-trade SA-INTC-AMT, SA-LTM-PDTC-DT and the current
+business date to CSAPRD2 to obtain ordinary and five-band agreement products.
+Ordinary accumulation adds this ordinary product to the old SA-DDP-PDT. The cash
+entry accepts only same-day value dates, so it does not execute the backdated
+increment in section 4142.
 
-KSADEP0:1892–1920 另将交易前的本金、普通透支息和催收息交给 CSAPRD4。CSAPRD4:146–151 固定调用实际天数、功能 O；不能复用存款产品的 360 天日历。5200 段当前执行语句显式设置单位 .01，币种查询单位的 PERFORM 为注释；单位取整与工作区 PIC 截断是不同的来源。
+KSADEP0:1892–1920 separately passes pre-trade principal, ordinary overdraft
+interest and collection interest to CSAPRD4. CSAPRD4:146–151 always uses actual
+days and function O; it cannot reuse the deposit product's 360-day calendar.
+Active statements in section 5200 explicitly set unit .01. The PERFORM that
+queries the currency unit is commented out. Unit rounding and workspace PIC
+truncation have different origins.
 
-DepositAccrualInput 包含独立的积数状态、产品计息政策、日历及协定生效/取消和模式事实；五个 AgreementBand 保存阈值和累计积数。lastProductDate 对应 SA-LTM-PDTC-DT，独立于日累计使用的 SA-LTM-TX-DT；两种日期不能互相替代。
+`DepositAccrualInput` contains independent accrual state, product interest
+policy, calendar, agreement activation/cancellation and mode facts. Five
+`AgreementBand` values retain thresholds and accumulated products.
+`lastProductDate` corresponds to SA-LTM-PDTC-DT, independently of the daily-total
+date SA-LTM-TX-DT. These dates are not interchangeable.
 
-DepositInterestPolicy.normalUnit 与 overdraftUnit 是显式业务量化单位，与 PHY 的 BigDecimal 表示以及数据库保存方式无关。demo 选择存款单位 1、透支单位 .01；服务允许政策声明其他单位。normalEnabled 只控制普通/协定积数计算，不意味着已有透支停止积数。
+`DepositInterestPolicy.normalUnit` and `overdraftUnit` are explicit business
+quantization units, independent of PHY BigDecimal representation and database
+persistence. The demo chooses deposit unit 1 and overdraft unit .01; policies
+may declare other units. `normalEnabled` controls only ordinary/agreement
+products, not whether existing overdrafts continue accruing.
 
-## SPP 场景
+## SPP scenarios
 
-prepareDepositAccrual 设置交易前金额和期间，调用 calculateDatedAgreement 计算产品日历及协定重叠区间，再以固定 ACT 日历计算透支期间，最后累计普通、五档协定、透支本金及透支息积数。当前源路径用 SPP 的 new/copy 初始化工作参与者和独立快照，APP 绑定服务，PHY 绑定仓库及量子日志。尚未删除的旧 Java 模型分配器属于待迁移实现，不是允许保留的适配层。
+`prepareDepositAccrual` sets pre-trade amounts and periods, invokes
+`calculateDatedAgreement` for the product calendar and agreement overlap, then
+calculates the overdraft period with fixed ACT calendar. Finally it accumulates
+ordinary, five-band agreement, overdraft-principal and overdraft-interest
+products. At this historical stage the source used SPP `new`/`copy` to initialize
+working participants and independent snapshots. APP bound services and PHY bound
+repositories and quantum journals. Remaining old Java model allocators were
+implementations awaiting migration, not a permitted permanent adapter layer.
 
-CSAPRD4:165–181 的本金及两类息分别显式量化；本金为正时增加透支天数，普通透支息为正时增加应收息天数。催收息单独为正仍有息积数，但不增加该应收息天数，这是 5300 当前分支。测试保留该条件，不从积数大于零自动推导计数应增加。
+CSAPRD4:165–181 explicitly quantizes principal and the two interest categories
+separately. Positive principal increases overdraft days; positive ordinary
+overdraft interest increases interest-receivable days. Positive collection
+interest alone still contributes an interest product but does not increase that
+day count, following the active section 5300 branch. Tests preserve this condition
+instead of inferring a day increment from a positive product.
 
-累计状态对应 KSADEP0:1946、1973–1979、1992：普通积数增加本次普通分量，透支本金及息积数各增加本次分量，实际积数重新推导为普通累计减透支本金累计，积数日推进到本次营业日。实际积数没有减去透支息积数，按当前源公式保留。
+Accumulation follows KSADEP0:1946, 1973–1979 and 1992: add the current ordinary,
+overdraft-principal and interest components to their respective totals; derive
+actual product as ordinary total minus overdraft-principal total; advance the
+product date to the business date. Actual product does not subtract the
+overdraft-interest product, preserving the source formula.
 
-prepareCashDepositWithAccrual 串联完整现金业务计划和积数计划。待授权停在授权门槛，不计算或更新积数；积数输入非法会拒绝整笔交易，已经形成的金额及收费计划只是 scratch，没有写入数据库。
+`prepareCashDepositWithAccrual` combines the complete cash business plan and
+accrual plan. Pending authorization stops at the authorization threshold without
+calculating or updating accruals. Invalid accrual input rejects the entire trade;
+already prepared amount and fee plans are scratch data, not database writes.
 
-## 成交与冲正依据
+## Settlement and reversal evidence
 
-当前源路径的 CashAccountRecord.accrual/bands 随金额、账户资格、分录、成交及成功审计，在 commitCashDepositRecords 的显式 transaction quantum 中共同提交；storeCashAccount 由 APP 声明旧版本 CAS。CashDepositTrade.accrual/increments 保存起止日期、普通/透支期间天数、各类积数增量和五档实际分量，original/settled 保存前后累计、阈值及规则事实。旧 Java AccountFacts/Prepared 仍是待删除实现，不能决定这条源路径的事务边界。
+In the historical source path, `CashAccountRecord.accrual/bands` committed with
+amounts, account qualification, postings, trade and success audit in the explicit
+`transaction quantum` of `commitCashDepositRecords`. APP declared old-version
+CAS for `storeCashAccount`. `CashDepositTrade.accrual/increments` retained start
+and end dates, ordinary/overdraft day counts, each product increment and actual
+five-band components. `original/settled` retained before/after totals, thresholds
+and rule facts. Old Java `AccountFacts`/`Prepared` implementations still awaited
+deletion and could not determine the source path's transaction boundary.
 
-同日后续交易的积数期间为零；相同请求重放直接返回原成交，不重复增加积数。新的请求重新查询当前积数日及账户金额，使用交易前快照计算。本次事实为跨日冲正准备依据，不意味着已经实现冲正，更不能通过恢复旧日期覆盖后续交易。
+Later same-day trades have a zero accrual period. Replay of the same request
+returns the original trade without adding products again. A new request queries
+the current product date and account amounts and calculates from the pre-trade
+snapshot. These facts prepare evidence for cross-date reversal; they do not
+establish that reversal was implemented. Restoring an old date must not overwrite
+later transactions. Replay here describes the historical coordinated path, not
+a guarantee of optional request coordination in the basic distribution.
 
-无积数事实的早期金额/存储子集保留兼容调用；它不构成完整银行路径。命令行演示的全部账户现均有积数事实，并通过含积数的生成场景执行。
+Early amount/storage subsets without accrual facts retain compatible calls but
+are not the complete banking path. At this stage all CLI demonstration accounts
+had accrual facts and executed the generated scenarios that include them.
 
-## 遗留差异及尚未确认部分
+## Legacy differences and unresolved matters
 
-本实现遵循用户确认的业务语义优先：保持精确求和后按显式单位量化，不继承 CSAPRD4 两位参数/中间工作区的隐式截断。未运行原程序，三位利息输入不能作为逐位等价案例。
+The implementation follows the confirmed business-semantics-first requirement:
+sum exactly, then quantize by explicit units. It does not inherit implicit
+truncation from CSAPRD4's two-decimal parameters/intermediate workspaces. The
+original program was not run; three-decimal interest inputs are not evidence of
+digit-for-digit equivalence.
 
-本次正常业务模型将计算出的每个协定档分量累加到该档；原 KSADEP0:1514 仅在 WK-O-NGO-PRDT(1)>0 时调用协定保存段，可能使全额模式命中高档时不保存。这个调用条件尚未获得银行业务解释，登记为遗留差异；不能宣称全额模式的持久化与原系统等价。首批命令行配置无协定，协定持久化测试使用各档均有分量的模式 2。
+The selected business model adds each calculated agreement-band component to
+its band. Original KSADEP0:1514 calls agreement persistence only when
+WK-O-NGO-PRDT(1)>0, potentially omitting persistence when full-amount mode hits a
+higher band. No banking explanation for this condition was obtained; it remains
+a registered legacy difference. Full-amount persistence must not be claimed
+equivalent to the original system. The first CLI configuration has no agreement;
+agreement-persistence tests use mode 2 with components in every band.
 
-normalEnabled=false 保留既有普通累计并停止新增普通/协定分量，这是明确的 demo 业务契约；原两个计息标志、关闭计息类型与工作变量初始值的组合尚需完整银行配置核验。协议游标、负阈值禁用标志、回溯起息及 24 小时路径未迁入；当前数据来自声明的 demo 配置和真实 demo 数据库查询，未连接遗留银行数据接口。
+`normalEnabled=false` preserves ordinary totals and stops new ordinary/agreement
+components: an explicit demo contract. Combinations of the original two interest
+flags, disabled interest types and initial working values still require complete
+bank configuration. Agreement cursors, negative-threshold disabling flags,
+backdated value dates and 24-hour paths were not migrated at this stage. Data
+came from declared demo configuration and real demo database queries, not legacy
+bank data interfaces.
 
-## 可执行证据
+## Historical executable evidence
 
-DepositAccrualTest 的六项测试通过真实生成服务及 H2，验证日期裁剪/五档累计、两套日历、显式单位 3 与 .01、collection-only 天数条件、期间与原事实保存、同日及重复请求、配置拒绝、账户和积数已更新后账簿失败的共同回滚。DepositDemoReportTest 另验证文件关闭重开后积数仍在；跨日演示使用旧余额 2200 计算一个实际日的积数，而不是使用存入后的 2300。
+Six `DepositAccrualTest` tests used real generated services and H2 to verify date
+clipping/five-band accumulation, two calendars, explicit units 3 and .01,
+collection-only day conditions, periods and original facts, same-day/repeated
+requests, configuration rejection, and joint rollback when ledger writing failed
+after account and accrual updates. `DepositDemoReportTest` additionally checked
+that accruals survived file close/reopen. The cross-date demo calculated one
+actual day from old balance 2200, not post-deposit balance 2300.
 
+Source migration added four APP entries in 99z/99za covering those six
+responsibilities. The actual case used old base 650, principal 100, interest 30,
+collection interest 40 and net balance 480. A deposit of 50 produced base/balance
+530 and ordinary product 1712. Funding comprised cash 50 plus an old-deposit
+reduction of 120; posting debits and credits each totaled 170. Original period
+facts retained 20261001–20261007, six days, ordinary increment 1700 and principal
+product 600. Retry did not repeat the update; the second same-day trade had
+ordinary increment 0. A technical fault was declared after account/accrual
+updates but before posting writes. Source audit recorded RolledBack only for
+measured `transactionOutcome=ROLLED_BACK`.
 
-源迁移新增 99z/99za 的四个 APP 入口，覆盖上述六项责任。真实案例为旧基数 650、本金 100、利息 30、催收息 40、净余额 480，存入 50 后基数/余额 530，正常产品 1712；资金来自现金 50 与旧存款减少 120，分录借贷各 170。原期间保留 20261001 至 20261007、6 日、普通增量 1700 和本金积数 600；重试不重复更新，同日第二笔普通增量 0。技术故障声明在更新账户/积数后、分录写入前，源审计仅在 measured transactionOutcome=ROLLED_BACK 时记 RolledBack。新增源入口及审计政策入口均已通过 clean verify：951 项 JUnit、34 个源入口分别全部通过，旧积数测试及此前十份测试的 class 均无残留。最终证据见 source-only-refactoring.md；整体纯源重构仍因剩余 14 个主 Java、10 个测试 Java 未完成。
+The historical clean verification reported all 951 JUnit tests and all 34 source
+entries passing, including the added entries and audit-policy entry. No classes
+remained for the removed accrual test or ten previously migrated tests. See
+[source-only refactoring](source-only-refactoring.md) for final evidence. At this
+stage the overall source-only refactoring remained incomplete with 14 main Java
+and 10 test Java files. These are claims from revision `417a41f`, not results
+rerun for this English translation.

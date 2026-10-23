@@ -1,27 +1,27 @@
-# 最新重构验证记录
+# Latest refactoring verification record
 
-2026-10-13，重构仍在活动 goal 中；以下 1,135 项为补充有限入口核对之前的联合回归记录；本报告只证明下列已执行范围，不证明所有历史验收或透支资金模型已完成。
+On 2026-10-13, refactoring remained under an active goal. The 1,135 cases below record the combined regression before additional limited-input entry checks. This report establishes only the executed scope, not completion of all historical acceptance or overdraft funding models.
 
-## 联合回归
+## Combined regression
 
 ```
 mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop
 ```
 
-BUILD SUCCESS，失败、错误、跳过均为零：
+BUILD SUCCESS, with zero failures, errors or skips:
 
-| 模块 | JUnit 测试数 |
+| Module | JUnit test count |
 | --- | ---: |
 | lang | 362 |
 | appframe | 617 |
 | generator | 106 |
 | Petstore | 39 |
 | XBOD | 11 |
-| 合计 | 1135 |
+| Total | 1135 |
 
-XBOD 的 11 项测试内包括 92 个历史输入向量：核心偿还 15、协议积数 12、准入/授权 49、手续费 16。向量计数与 JUnit 方法数分开，不冒充 92 个独立测试。缺失费率与授权评估的新版协议差异见重构文档。
+The 11 XBOD tests include 92 historical input vectors: core repayment 15, agreement accrual 12, eligibility/authorization 49, and fees 16. Vector counts are separate from JUnit methods; they are not presented as 92 independent tests. See the refactoring document for changed missing-rate and authorization-evaluation protocols.
 
-## 分库存储验证
+## Split-database verification
 
 ```
 mvn -pl :xbod-deposit-demo -am test \
@@ -29,334 +29,337 @@ mvn -pl :xbod-deposit-demo -am test \
   -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing
 ```
 
-BUILD SUCCESS。覆盖零资金开户、现金对方负余额、成交回填、同日冲正、跨日保留后续存入、Mode2，以及普通保存故障时量子恢复、普通 Saga 已提交阶段仍需补偿的真实结果。testing 只是本 JVM 内两个独立 H2 数据源，不据此宣称验证真实网络分布式部署、XA、Seata AT 或 TCC。
+BUILD SUCCESS. Coverage includes zero-funded opening, negative cash-counterparty balances, post-settlement hydration, same-day reversal, cross-day preservation of later deposits, Mode2, quantum recovery after ordinary-save faults, and the actual result that committed ordinary Saga stages still require compensation. Testing uses two separate H2 data sources inside one JVM; this does not establish actual network-distributed deployment, XA, Seata AT or TCC acceptance.
 
-## 验证限制
+## Verification limits
 
-- 欠款及敞口的量子守恒贡献尚待建模决策；核心计算向量通过不代表透支偿还落库完成。
-- 分库普通 Saga 补偿未擅自发明，fail 记录待核对信息并保留 RECOVERY_REQUIRED。
-- 旧 86 个 APP 整体验收入口的技术故障、重启、通信与并发覆盖尚未全部迁移。
-- 本轮未提交、未上传。业务源只在 SPP／APP／PHY；Java 源仅限验收。
+- Quantum conservation contributions for debt/exposure still require a modeling decision; passing core calculation vectors does not prove persisted overdraft repayment.
+- Split-database ordinary Saga compensation was not invented unilaterally. Fail records retain facts requiring investigation and RECOVERY_REQUIRED.
+- Technical fault, restart, communication and concurrency coverage from the former 86 APP acceptance entries had not all migrated.
+- This round had not been committed/uploaded. Business source remains exclusively SPP/APP/PHY; Java source is acceptance-only.
 
-## 有限入口开户补充验收
+## Additional limited-input account-opening acceptance
 
-新增测试绕过测试辅助补零，仅给账户号、开户日期及空的已声明参与者实例；生成开户场景必须自行建立普通业务初态，默认仓储在量子库建立零事实，随后可以立即现金存入。补充通用仓储测试同时验证本地与独立量子库的缺失初值处理；原有非零初始化限制、提交后补建和恢复测试继续保留。
+A new test bypasses test-helper zero initialization, supplying only account number, opening date and empty instances of declared participants. The generated opening scenario must establish ordinary business initial state itself, while default repositories establish zero quantum facts, allowing immediate cash deposit. Additional generic repository tests cover missing initial values in local/separate quantum stores. Existing nonzero initialization restrictions, post-commit creation and recovery tests remain.
 
-2026-10-13 develop 专项 BUILD SUCCESS：QuantumOpeningRecoveryTest 9 项、DatabaseInitializationTest 2 项、银行验收 12 项，共 23 项，失败、错误及跳过为零。该记录不替代上面的联合回归；本轮新增运行库改动仍需在最终验收时纳入完整回归。
+On 2026-10-13, focused develop acceptance ended BUILD SUCCESS: QuantumOpeningRecoveryTest 9, DatabaseInitializationTest 2, bank acceptance 12; 23 total, zero failures/errors/skips. This does not replace the combined regression above; new runtime changes still required inclusion in final full regression.
 
-testing 专项同样 BUILD SUCCESS，共 23 项、失败/错误/跳过为零；包含有限开户后立即现金存入。测试两边数据库均隔离，避免重复业务账户号共享旧量子事实而造成串扰。
+Focused testing acceptance also passed all 23 cases with zero failures/errors/skips, including immediate cash deposit after limited-input opening. Both databases are isolated to avoid cross-test interference from repeated account numbers sharing old quantum facts.
 
-补充运行库全量回归 `mvn -pl appframe -am test`：BUILD SUCCESS，618 项、失败/错误/跳过为零。默认量子零记录改动已纳入此轮完整运行库验证。
+Additional full runtime regression, `mvn -pl appframe -am test`: BUILD SUCCESS, 618 tests, zero failures/errors/skips. Default quantum-zero creation changes are included in this full runtime validation.
 
-## 网点规则与账户归属补充验收
+## Additional branch-rule and account-ownership acceptance
 
-新增 54 组网点范围、柜员号边界与例外、卡和存折告警数据，复用旧源记录的输入及期望。新版银行业务向量共 146 组。
+Added 54 vectors for branch scope, teller-number boundaries/exceptions, and card/passbook warnings, reusing recorded historical inputs/expectations. The new bank business suite contains 146 vectors.
 
-账户归属新增真实存储验收：混用另一账户的资格事实时，存入在成交前拒绝；拿另一账户原合约办理冲正时，在成交前拒绝；分别确认未错误改变资金。
+Actual storage acceptance covers ownership: mixing eligibility facts from another account rejects deposit before settlement; using another account's original agreement rejects reversal before settlement. Both verify funds remain unchanged.
 
-2026-10-13，develop 和 testing 均执行银行三个测试类并 BUILD SUCCESS，各 15 项 JUnit 测试，失败、错误及跳过为零。这些向量和归属检查不解决 KI-R01 的欠款守恒建模问题，也不替代未迁移的技术恢复条目。
+On 2026-10-13, all three bank test classes ran in develop and testing, each BUILD SUCCESS with 15 JUnit tests and zero failures/errors/skips. These vectors/ownership checks do not resolve KI-R01 debt-conservation modeling or replace unmigrated technical recovery cases.
 
-## 现金冲正分录补充验收
+## Additional cash reversal entry acceptance
 
-补齐原分录查询、八槽证据校验、借贷反向计算及冲正分录保存。原合约为 key 的原分录查询、冲正合约为 key 的反向分录查询均由 APP 外键关系默认推导，未添加冗余 repository 配置。
+Completed original-entry lookup, eight-slot evidence validation, opposite debit/credit calculation and reversal-entry persistence. APP foreign-key relations infer original-entry queries keyed by the original agreement and reverse-entry queries keyed by the reversal agreement; no redundant repository configuration was added.
 
-新增真实费率存储路径：登记个性化费率，现金存入 10,000 时原手续费为 6；现金冲正全额退回 6，并重新查询数据库验证八条反向分录的槽位、科目、方向和金额。同步验证回填的净余额为零。明细在合约自动生成编号后补全归属再插入，避免保存空合约凭证。
+A real stored-rate path registers a personalized rate: depositing 10,000 incurs an original fee of 6; reversal refunds all 6. Database requery verifies the eight reverse entries' slots, accounts, directions and amounts, and the hydrated net balance of zero. Details receive agreement ownership after automatic agreement numbering and before insertion, avoiding empty voucher references.
 
-2026-10-13，develop 和 testing 银行验收均 BUILD SUCCESS，各 16 项 JUnit 测试，失败、错误及跳过为零，历史规则向量仍为 146 组。欠款量子守恒的模型决策及普通 Saga 补偿仍按已知问题处理，未据此宣布全量目标完成。
+On 2026-10-13, develop and testing bank acceptance each passed 16 JUnit tests with zero failures/errors/skips. Historical rule vectors remain 146. Debt quantum-conservation modeling and ordinary Saga compensation remain known issues; this does not declare the entire goal complete.
 
-## 冲正分录保存故障验收
+## Reversal-entry persistence fault acceptance
 
-新增插入反向分录前故障，分别读取数据库核对资金、原成交标记、冲正合约与分录。develop 的 LOCAL 恢复原资金和未冲正标记，冲正合约不存在，随后重试可完成。testing 的 Saga 反交易资金成功，但已提交原交易标记与冲正合约仍在，分录为空；fail 返回 RECOVERY_REQUIRED、handled=false 并记录 RECONCILIATION_REQUIRED，不冒充整笔回滚。
+A new fault before reverse-entry insertion rereads databases to check funds, the original settlement marker, reversal agreement and entries. Develop LOCAL restores original funds/unreversed state, leaves no reversal agreement, and permits a successful retry. Testing Saga successfully reverses the quantum transaction, but committed original markers/reversal agreements remain and entries are empty. Fail returns RECOVERY_REQUIRED, handled=false and records RECONCILIATION_REQUIRED; it does not claim whole-transaction rollback.
 
-2026-10-13 两套配置的 XbodTransactionTest 均 9 项通过，失败/错误/跳过为零。该新增方法连同此前计算和规则测试，银行方法总数为 17；本轮专项不等同重新运行所有 17 项。
+On 2026-10-13, XbodTransactionTest passed all 9 tests in each configuration with zero failures/errors/skips. Including previous calculation/rule tests, the bank total became 17 methods; this focused run did not rerun all 17.
 
-## 独立 JVM 文件数据库重启验收
+## Independent-JVM file-database restart acceptance
 
-新增 XbodRestartTest：三个独立 JVM 使用相同文件数据库依次开户存入、重启后查询原成交并跨日冲正、再次重启查询原成交标记和八条冲正分录，并确认账户与现金结算资金为零。后续 JVM 不重新开户、不重置量子事实；测试 Java 只调用生成服务及断言。
+New XbodRestartTest runs three independent JVMs against the same file databases: open/deposit; restart, query original settlement and reverse across days; restart again, query original settlement marker/eight reverse entries, and verify zero account/cash-settlement balances. Later JVMs neither reopen accounts nor reset quantum facts. Test Java only calls generated services and asserts.
 
-2026-10-13 develop、testing 的重启专项均 BUILD SUCCESS，各 1 项通过。testing 使用两个独立文件数据库。此项证明正常退出后的跨 JVM 持久化与继续办理，不声称覆盖进程被杀、提交结果未知或网络分区恢复。
+On 2026-10-13, develop and testing restart checks each passed 1 test, BUILD SUCCESS. Testing uses two separate file databases. This proves persistence/continued operation after normal JVM exit, not forced termination, unknown commit outcomes or network-partition recovery.
 
-## 跨日积数与场景拆分验收
+## Cross-day accrual and scenario separation acceptance
 
-新增 XbodAccrualTest 两条真实入账路径：余额 100 持有一天后再存入 50，保存正常积数 100；余额 650 的十天普通期间、四天协议窗口和五档门槛，保存普通积数 4,300、协议积数 2,200。通过生成查询重新读取数据库，不只验证计算计划。
+XbodAccrualTest adds two actual posting paths: hold 100 for one day then deposit 50, persisting ordinary accrual 100; use balance 650 across ten ordinary days, a four-day agreement window and five threshold tiers, persisting ordinary accrual 4,300 and agreement accrual 2,200. Generated queries reread storage rather than merely checking calculation plans.
 
-2026-10-13，积数 develop 专项两项通过；完成全部 13 个场景各自独立文件后，testing 的 Xbod*Test 全部 20 项通过，失败/错误/跳过均为零。历史规则向量仍为 146 组，欠款量子模型和补偿政策仍未关闭。
+On 2026-10-13, both focused develop accrual cases passed. After all 13 scenarios were separated into individual files, testing Xbod*Test passed all 20 cases with zero failures/errors/skips. Historical rule vectors remained 146; debt quantum modeling and compensation policy remained unresolved.
 
-同轮 develop 的 Xbod*Test 全部 20 项也 BUILD SUCCESS，失败/错误/跳过为零；场景拆分后的生成链路、本地共同提交、正常退出重启和真实积数保存均已纳入。
+The same round's develop Xbod*Test also passed all 20 cases with zero failures/errors/skips, covering split-scenario generation, local joint commit, normal-exit restart and actual accrual persistence.
 
-## APP 技术幂等与当前联合回归
+## APP technical idempotency and current combined regression
 
-可信 RemoteServiceIngress 验证存入和冲正的相同请求方/流水号重放，重新查询证明资金、合约编号和分录未重复发生；不同请求方相同流水号分别成交。本地调用携带相同请求技术头仍分别成交，不受远程幂等抑制。testing 专项四项通过；此项不冒充真实网络故障恢复。
+Trusted RemoteServiceIngress verifies deposit/reversal replay for the same caller/serial number. Requeries prove funds, agreement numbers and entries do not duplicate; different callers with the same serial settle independently. Local calls with identical technical request headers still settle separately, without remote idempotency suppression. Four focused testing cases passed; this does not establish real network-fault recovery.
 
-2026-10-13 当前联合回归 `mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop` BUILD SUCCESS：lang 362、appframe 618、generator 106、XBOD 24、Petstore 39，共 1,149 项，失败/错误/跳过为零。此轮包含新增默认量子零事实、单域部署生成、真实冲正分录、跨日积数、重启及幂等验收。
+On 2026-10-13, `mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop` ended BUILD SUCCESS: lang 362, appframe 618, generator 106, XBOD 24, Petstore 39, total **1,149**, zero failures/errors/skips. This includes default zero quantum facts, single-domain deployment generation, actual reversal entries, cross-day accrual, restart and idempotency.
 
-完整性审计见 [completion-audit.md](completion-audit.md)：欠款量子模型、普通 Saga 补偿及未逐入口迁移项未因联合回归通过而自动完成。
+See [completion-audit.md](completion-audit.md): a passing combined regression does not automatically complete debt quantum modeling, ordinary Saga compensation or historical entries not individually migrated.
 
-## 并发业务补充验收
+## Additional concurrent-business acceptance
 
-XbodConcurrencyTest 两条路径：不同账户在事前计算结束处同步后分别存入 100/200，数据库核对各自资金、结算对方、合约归属及明细计数；同一原交易的两个冲正请求都通过事前校验后竞争，只有一个成交，另一个报告 ROLLED_BACK，最终资金为零且成交冲正分录为八条。
+XbodConcurrencyTest covers two paths. Different accounts synchronize after advance calculation, deposit 100/200, then verify individual funds, settlement counterparties, agreement ownership and detail counts in storage. Two reversals of the same original transaction both pass advance checks before racing; only one settles, the other reports ROLLED_BACK, final funds are zero and exactly eight settled reverse entries remain.
 
-2026-10-13 develop、testing 并发专项均 BUILD SUCCESS，各 2 项、失败/错误/跳过为零。未在事务内设置测试屏障；没有手写账户计算或互斥业务实现。该项只验证两请求定点竞争，不冒充高负载或真实网络并发，也未逐项覆盖旧“不同请求身份作用于同一账户”重试入口。
+On 2026-10-13, develop/testing each passed both focused cases with zero failures/errors/skips. No test barrier was placed inside a transaction; no account calculation or business mutex implementation was handwritten. This verifies a controlled two-request race, not high load/real network concurrency, nor every former retry entry for different request identities acting on one account.
 
-## 执行中远程副本与请求内容冲突
+## In-progress remote duplicates and request-content conflicts
 
-并发相同请求方/流水号不会再次执行业务。现行 API 对正在运行的副本返回 REQUEST_IN_PROGRESS；原调用完成后，技术层重放取得相同合约编号与结果，数据库余额仍仅增加 100。此项没有偷偷改成同步等待协议。改变金额后复用原请求流水号，技术层返回 REQUEST_ID_REUSED，资金仍为 100。
+Concurrent identical caller/serial requests do not reexecute business. The current API returns REQUEST_IN_PROGRESS for an in-progress duplicate. After the original finishes, technical replay returns the same agreement number/result; persisted balance increases only by 100. This was not silently changed to synchronous waiting. Reusing the serial with a changed amount returns REQUEST_ID_REUSED and funds stay at 100.
 
-2026-10-13 develop 的 XbodIdempotencyTest 六项通过；testing 的并发重放等五项通过，新增请求内容冲突专项一项也通过。失败/错误/跳过均为零。执行中返回策略的未决部分见 KI-R05，不把新的技术返回政策藏进业务语言。
+On 2026-10-13, develop XbodIdempotencyTest passed 6 cases; testing passed 5 concurrent-replay-related cases plus the new content-conflict case separately. All had zero failures/errors/skips. Unresolved in-progress response policy is recorded in KI-R05; new technical return policy is not hidden in business language.
 
-## 本机 HTTP 与界面防重
+## Local HTTP and UI duplicate protection
 
-通过真实回环 HTTP 调用 GeneratedWebServer 的 APP 场景目录，验证存入/冲正、重复点击重放、服务器覆盖伪造调用模式/请求方头，以及未暴露服务 404。网页 Origin.USER 使用 APP 的 5 秒 duplicate；系统 Origin.SERVICE 使用请求方流水号幂等，LOCAL 不受二者抑制。验收最初错误地把网页请求当成系统 RPC，已依据运行协议修正并补齐 APP 配置。
+Actual loopback HTTP calls the GeneratedWebServer APP scenario catalogue, covering deposit/reversal, repeated-click replay, server override of forged call-mode/caller headers, and 404 for unexposed services. Browser Origin.USER uses APP's five-second duplicate guard; system Origin.SERVICE uses caller-serial idempotency; LOCAL is suppressed by neither. Acceptance initially misclassified browser requests as system RPC and was corrected to the runtime protocol with matching APP configuration.
 
-2026-10-13 develop、testing 的 HTTP + 幂等专项均 7 项通过，失败/错误/跳过为零。测试服务器使用随机本机端口，结束时关闭。不是对公网部署、网络丢包或完整银行前端的验证。
+On 2026-10-13, develop/testing HTTP plus idempotency checks each passed 7 tests with zero failures/errors/skips. Servers use random local ports and close afterward. This does not verify public deployment, packet loss or a complete bank frontend.
 
-银行当前共 29 项方法（计算 5、规则 3、事务 9、重启 1、积数 2、幂等 6、并发 2、HTTP 1）。此前 1,149 联合回归为新增并发/HTTP等验收之前的记录，不冒充最新全量联合结果。
+The bank then contained 29 methods: calculation 5, rules 3, transactions 9, restart 1, accrual 2, idempotency 6, concurrency 2, HTTP 1. The earlier 1,149-test combined run predates concurrency/HTTP additions and is not the latest full combined result.
 
-## 多参与者防重与最新联合回归
+## Multiple-participant duplicate checks and latest combined regression
 
-2026-10-13 执行 `mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop`，BUILD SUCCESS。Surefire XML 核对：lang 364、appframe 620、generator 106、XBOD 29、Petstore 39，共 1,158 项，失败、错误、跳过均为零。日志：`/tmp/xbod-multi-facts-joint.log`。
+On 2026-10-13, `mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop` passed. Surefire XML confirmed lang 364, appframe 620, generator 106, XBOD 29, Petstore 39: **1,158 total**, zero failures/errors/skips. Log: /tmp/xbod-multi-facts-joint.log.
 
-APP 的 `facts(path1, path2, ...)` 同时核对多个参与者，支持可空可选资料并兼容原单路径元数据；新增远程代理元数据查询测试，确保这些查询不会调用业务适配器。真实 HTTP 更改费用参与者但保持金额不变时拒绝重放，余额保持原成交值。develop/testing 专项及 develop 联合回归通过，KI-R06 关闭。
+APP facts(path1, path2, ...) compares multiple participants, supports nullable optional facts and remains compatible with single-path metadata. New remote-proxy metadata-query tests ensure these queries do not invoke business adapters. Actual HTTP rejects replay when fee participant facts change while amount stays unchanged; balance remains at the original settlement value. Develop/testing focused checks and develop combined regression passed; KI-R06 closed.
 
-本次测试通过不代表透支偿还的量子守恒模型、普通 Saga 补偿政策或全部历史恢复入口已完成；这些限制仍列在 known-issues-latest.md。
+This does not complete overdraft quantum conservation, ordinary Saga compensation policy or all historical recovery entries; limits remain in known-issues-latest.md.
 
-## 还本还息资金对方的分录验收
+## Repayment posting acceptance for fund counterparties
 
-2026-10-13 根据用户澄清修订 KI-R01：还息必须增加银行内部户，不能以欠息减少代替资金流入。新增 `repaymentPostingsIncludeBankInterestAndPrincipalCounterparts`，输入存入 100、欠息 10、催收息 5、欠本金 20，实际调用生成的计算、校验及分录服务，断言客户余额入账 65、还本 20、利息 10、催收息 5，借贷总额分别为 100。
+On 2026-10-13, KI-R01 was revised following user clarification: interest repayment must increase an internal bank account; reducing interest owed is not a substitute for incoming funds. New repaymentPostingsIncludeBankInterestAndPrincipalCounterparts supplies deposit 100, interest owed 10, collection interest 5 and principal owed 20. Actual generated calculation/check/posting services assert customer credit 65, principal repayment 20, interest 10, collection interest 5, and debit/credit totals of 100 each.
 
-执行 `mvn -pl :xbod-deposit-demo -am test -Dtest=XbodCalculationTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop`，六项通过，失败/错误/跳过均为零。日志 `/tmp/xbod-repayment-postings.log`。此项验证分配与分录计算，银行内部户量子资金落库和冲正仍需实现，不把分录断言当成账户入账验收。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodCalculationTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` passed all 6 tests with zero failures/errors/skips. Log: /tmp/xbod-repayment-postings.log. This validates allocation/posting calculation; internal-bank quantum fund persistence and reversal remained to implement. Posting assertions are not account-credit acceptance.
 
-## 真实收款内部户与量子状态联合验收
+## Actual receiving internal accounts and quantum-state combined acceptance
 
-2026-10-13 完成三类银行内部账户的 SPP 角色、独立开户场景、APP 表、原成交引用、存入及冲正更新。示例存入 100 后，客户余额 65、银行利息 10、催收息 5、本金回收 20、现金结算 -100；欠息、欠本金及敞口是同笔更新的量子状态，不再重复参加资金求和。
+On 2026-10-13, three internal-bank account types gained SPP roles, separate opening scenarios, APP tables, original-settlement references and deposit/reversal updates. After depositing 100: customer balance 65, bank interest 10, collection interest 5, principal recovery 20, cash settlement -100. Interest/principal owed and exposure are quantum states updated in the same operation, not counted again in the fund sum.
 
-新增 XbodRepaymentTest 三项验收：混合清偿后重新查询真实内部户并跨日冲正；后续普通分录保存故障时同步恢复银行资金和欠款；内部户余额不足时拒绝冲正，原交易仍未冲正且欠款不被恢复。通用 QuantumStateWithConservationTest 验证资金仍需守恒、状态边界失败使所有资金变化回滚、持久化及反交易重试不重复执行。语言测试验证被排除出资金组的实际量子写入仍进入完整元数据。
+Three new XbodRepaymentTest cases cover real internal-account requery/cross-day reversal after mixed repayment; restoration of bank funds and debt after later ordinary-entry persistence failure; and reversal rejection when internal-account funds are insufficient, preserving the unreversed original transaction and not restoring debt. Generic QuantumStateWithConservationTest verifies conservation, rollback of all funds on state-boundary failure, persistence and no duplicate inverse execution on retry. Language tests ensure quantum writes excluded from fund groups remain in complete metadata.
 
-核对归档源发现旧核心 JSON 提取遗漏了省略前导零的小数，共补回 22 个输入/期望字段；修复后两位小数的 PHY 容量确实不足，改为 `BigDecimal(25, 6)` 后，原 15 组精确计算向量通过。此前测试通过不能作为这批遗漏小数分支的验证依据。
+Review of archived sources found that old core JSON extraction omitted decimals without a leading zero. Twenty-two input/expected fields were restored. Corrected vectors exposed insufficient two-decimal PHY capacity; after switching to BigDecimal(25, 6), all original 15 exact-calculation vectors passed. Earlier passes do not establish coverage for those previously omitted decimal branches.
 
-命令 `mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop` BUILD SUCCESS：lang 365、appframe 623、generator 106、XBOD 33、Petstore 39，共 **1,166 项**，失败/错误/跳过均为零。日志 `/tmp/xbod-internal-accounts-joint.log`。最终六位小数配置的 testing 全量验收另外执行，不能以 develop 结果替代。
+`mvn -pl :petstore-demo,xbod-deposit-demo -am test -Dspp.environment=develop` passed: lang 365, appframe 623, generator 106, XBOD 33, Petstore 39, **1,166 total**, zero failures/errors/skips. Log: /tmp/xbod-internal-accounts-joint.log. Full testing acceptance for final six-decimal configuration was run separately, not inferred from develop.
 
-最终配置下执行 `mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS：33 项，失败/错误/跳过均为零。日志 `/tmp/xbod-internal-accounts-testing-final.log`。KI-R01 关闭，普通 Saga 业务补偿及尚未逐项核对的历史恢复验收保持各自状态。
+With final configuration, `mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 33 tests with zero failures/errors/skips. Log: /tmp/xbod-internal-accounts-testing-final.log. KI-R01 closed; ordinary Saga compensation and historical recovery cases not individually checked retain their own statuses.
 
-## 历史欠款分支与实际进程退出
+## Historical debt branches and actual process termination
 
-新增 XbodRepaymentTest 的四条历史持久化路径：普通欠款先息后本、不良贷款先还本、核销贷款先还本、0.005/0.004/0.001 小数偿还。分别验证真实内部户、欠款恢复、成交前积数、原手续费、八条冲正分录，以及明细计数和原交易日期。测试通过物理存储夹具准备既有账户事实，业务处理只调用生成的 SPP；必须同时准备 APP 表和当前对象仓储事实，不能只改表后误以为查询读到了新状态。
+Four historical persisted paths were added to XbodRepaymentTest: ordinary debt interest-first, nonperforming loans principal-first, written-off loans principal-first, and decimal repayments 0.005/0.004/0.001. They check actual internal accounts, restored debt, pre-settlement accrual, original fees, eight reversal entries, detail counts and original transaction date. Physical-storage fixtures prepare existing account facts; business handling calls generated SPP only. Both APP tables and current object-repository facts must be prepared; editing tables alone does not establish that queries read new state.
 
-新增 XbodReversalRuleTest 核对关闭/撤销/冻结/SA01116 例外及校验优先级，前置业务控制与核心冲正校验独立，以及 WN201 提示、EN134 拒绝。develop 的上述专项共 10 项全部通过。
+New XbodReversalRuleTest covers closed/revoked/frozen accounts, the SA01116 exception, check precedence, separate advance business control/core reversal checks, WN201 warning and EN134 rejection. All 10 focused develop cases passed.
 
-新增 abruptExitAfterConfirmedCommitPreservesDepositForReversal：子 JVM 在成交确认并记录原交易号后执行 Runtime.halt(73)，第二、第三个 JVM 查询并冲正，再查真实分录及余额。第一次干净构建发现 H2 文件库默认 500 毫秒写延迟下，立即退出会丢失近期确认结果；将文件连接配置设为 WRITE_DELAY=0 后，两条重启测试通过。run-demo.sh 的默认文件库连接和 PHY 默认也同步此配置。自定义文件库 URL 应保留同步写配置。此项验证成交确认后的进程退出，不冒充提交时刻未知、操作系统断电或 Saga 中途恢复。
+New abruptExitAfterConfirmedCommitPreservesDepositForReversal halts a child JVM with Runtime.halt(73) after confirmed settlement and recording the original transaction number. Second/third JVMs query, reverse, and inspect actual entries/balances. The first clean run revealed that H2's default 500 ms file-write delay can lose recently confirmed results on immediate exit. After setting WRITE_DELAY=0, both restart tests passed. Default file connections in run-demo.sh and PHY were aligned; custom file URLs should retain synchronous writes. This verifies process exit after confirmed settlement, not unknown commit timing, operating-system power failure or mid-Saga recovery.
 
-日志 `/tmp/xbod-debt-history-develop-v2.log`、`/tmp/xbod-crash-durability.log`。完整干净构建及分库验收单独记录最终结果。
+Logs: /tmp/xbod-debt-history-develop-v2.log and /tmp/xbod-crash-durability.log. Final clean-build/split-database results are recorded separately.
 
-## 干净构建最终结果
+## Final clean-build results
 
-2026-10-13 执行 `mvn -pl :petstore-demo,xbod-deposit-demo -am clean package -Dspp.environment=develop`，BUILD SUCCESS：lang 365、appframe 623、generator 106、XBOD 41、Petstore 39，共 **1,174 项**，失败/错误/跳过均为零。日志 `/tmp/xbod-clean-joint-final.log`。本轮先清除旧生成目录，重新生成带域服务目录与 APP/PHY 元数据；生成目录不再依赖旧根目录 app-ddl.properties。生产服务目录中没有旧 ExampleRun/Verification 入口。
+On 2026-10-13, `mvn -pl :petstore-demo,xbod-deposit-demo -am clean package -Dspp.environment=develop` passed: lang 365, appframe 623, generator 106, XBOD 41, Petstore 39, **1,174 total**, zero failures/errors/skips. Log: /tmp/xbod-clean-joint-final.log. Old generated directories were removed first; domain service catalogues and APP/PHY metadata were regenerated. Generated catalogues no longer depend on old root app-ddl.properties. Production catalogues contain no obsolete ExampleRun/Verification entries.
 
-XBOD 新增验收包括四种实际欠款分支、三个核心冲正规则检查，以及成交确认后强制退出的重启验证。旧技术生命周期与待授权流程不因此自动视为完整迁移；具体范围和差异见历史入口台账及 KI-R02/KI-R04/KI-R05/KI-R07。
+New XBOD coverage includes four persisted debt branches, three core reversal-rule checks and restart after forced exit following confirmed settlement. This does not automatically complete migration of former technical lifecycle/authorization-pending flows. See the historical entry ledger and KI-R02/KI-R04/KI-R05/KI-R07 for scope/differences.
 
-同日最终 testing 命令 `mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS：XBOD **41 项**，失败/错误/跳过均为零。日志 `/tmp/xbod-history-testing-final.log`。分库配置下新增坏账/核销/小数清偿及强制退出后的持久化检查均通过。
+The final testing command that day, `mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing`, passed **41 XBOD tests**, zero failures/errors/skips. Log: /tmp/xbod-history-testing-final.log. Split-database bad-debt/write-off/decimal repayment and forced-exit durability checks passed.
 
-## 完整历史日历入口验收
+## Complete historical calendar-entry acceptance
 
-从归档 `cboddeposit-99o-calendar-examples.spp` 逐项提取 30 组原输入与期望，保存为 `bank-calendar-cases.json`；另保留原两组计息单位向量（199.999 按 100 单位得到 100、10 按 3 单位得到 9，均计息两天）。`XbodCalendarTest` 只调用生成场景并断言，不在 Java 中实现日期或计息算法。覆盖世纪闰年、平年、跨年、起止同日、ACT/360365/360360、非法日期、倒置日期和不支持的日数制，错误码与归档逐项一致。
+Thirty original input/expected vectors were individually extracted from archived cboddeposit-99o-calendar-examples.spp into bank-calendar-cases.json. Two original interest-unit vectors remain: 199.999 with unit 100 gives 100; 10 with unit 3 gives 9; both accrue for two days. XbodCalendarTest calls generated scenarios/asserts only; Java does not implement date or interest algorithms. Coverage includes century leap years, ordinary years, year boundaries, same-day intervals, ACT/360365/360360, invalid/reversed dates and unsupported day-count conventions. Error codes match the archive individually.
 
-命令 `mvn -pl :xbod-deposit-demo -am test -Dtest=XbodCalendarTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS；2 个 JUnit 方法验证 32 组向量，失败/错误/跳过均为零。日志 `/tmp/xbod-calendar-testing.log`。此专项只补足日历入口，不代替完整交易回归或其余历史入口核对。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodCalendarTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed: 2 JUnit methods, 32 vectors, zero failures/errors/skips. Log: /tmp/xbod-calendar-testing.log. This fills calendar-entry coverage only, not full transaction regression or other historical-entry checks.
 
-## 历史会计分录入口验收
+## Historical accounting-entry acceptance
 
-`XbodPostingRulesTest` 与 `posting-rules-cases.json` 按归档 `cboddeposit-99zw-posting-rules-examples.spp` 迁移六种分配：普通存入含手续费、普通欠款先息后本、不良贷款先还本、零存入从原余额清偿、存入与原余额共同清偿、小数偿还。逐槽检查金额、科目、方向和序号，同时验证借贷总额。另核对错误方向、null 科目、伪造总额、分配缺失四类原错误码；前两项直接比较调用前后的生成请求对象，证明拒绝时未修改参与者。
+XbodPostingRulesTest and posting-rules-cases.json migrate six allocations from archived cboddeposit-99zw-posting-rules-examples.spp: ordinary deposit with fees, ordinary debt interest-first, nonperforming debt principal-first, zero deposit repaying from prior balance, combined deposit/prior-balance repayment, and decimals. Each slot's amount/account/direction/sequence and debit/credit totals are checked. Four original rejection codes cover wrong direction, null account, forged totals and missing allocation. The first two directly compare generated request objects before/after, proving rejected participants remain unchanged.
 
-当前规则要求场景显式调用 check，故测试调用 checkPostingRules 后才调用 calculateDepositPostings；旧计算内校验及 try/catch 不恢复。生产 depositCash 的分类、会计校验、分录规则校验、分录计算和借贷校验均位于事务之前。
+Current rules require explicit scenario checks, so tests invoke checkPostingRules before calculateDepositPostings. Old calculation-internal checks and try/catch are not restored. Production depositCash classification, accounting checks, posting-rule checks, posting calculation and debit/credit validation all precede the transaction.
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodPostingRulesTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS：3 个方法，失败/错误/跳过均为零；日志 `/tmp/xbod-posting-rules-testing.log`。这是该历史规则入口的专项证据，不代替分录持久化中途失败和其余恢复入口的验收。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodPostingRulesTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 3 methods, zero failures/errors/skips; /tmp/xbod-posting-rules-testing.log. This is focused historical rule-entry evidence, not acceptance for mid-persistence faults or other recovery entries.
 
-## 分录批量写入中途失败
+## Failure midway through batch entry insertion
 
-新增 `XbodPartialPostingTest`，技术故障限定在测试源码：H2 AFTER INSERT 触发器允许前三条写入，第四条抛出 SQLException；断言触发计数为 4，证明并非服务开始前失败。分别执行生成的存入、冲正场景，查询真实表确认失败批次零残留，重新查询客户与现金结算账户确认资金恢复。冲正失败还验证八条原存入分录保留。
+New XbodPartialPostingTest confines technical fault injection to test source. An H2 AFTER INSERT trigger permits three writes and throws SQLException on the fourth; trigger count 4 proves failure occurs mid-batch, not before service execution. Generated deposit/reversal scenarios each run; actual table queries confirm no failed-batch residue, and customer/cash-settlement requeries confirm restored funds. Failed reversal also preserves all eight original deposit entries.
 
-LOCAL 环境整笔回滚，删除故障触发器后重新办理成功且仅保存八条目标分录。testing 分库环境量子变化已反向恢复，但先前普通步骤已经提交（冲正标志仍为 true），因此必须报告 RECOVERY_REQUIRED，不能称为整笔回滚，也不在测试中替业务编写补偿。
+LOCAL rolls back the whole operation; after removing the trigger, retry succeeds with exactly eight target entries. In split-database testing, quantum changes are inverted but prior ordinary steps remain committed, including reversal=true. It therefore must report RECOVERY_REQUIRED, not whole-transaction rollback; tests do not implement business compensation.
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodPartialPostingTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` 与对应 develop 命令均 BUILD SUCCESS，各 2 项，失败/错误/跳过均为零。日志 `/tmp/xbod-partial-posting-testing.log`、`/tmp/xbod-partial-posting-develop.log`。旧例的预存主键碰撞、审计事件和精确量子日志条数未由该故障等价覆盖，迁移台账保留差异。
+Testing command `mvn -pl :xbod-deposit-demo -am test -Dtest=XbodPartialPostingTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` and its develop counterpart each passed 2 tests, zero failures/errors/skips. Logs: /tmp/xbod-partial-posting-testing.log and /tmp/xbod-partial-posting-develop.log. This fault does not equivalently cover old preexisting-primary-key collisions, audit events or exact quantum-journal counts; ledger differences remain explicit.
 
-## 入口事实覆盖与原成交结算参与者
+## Entry-fact hydration and original-settlement participants
 
-新增 `XbodSourceIntegrityTest`：入口伪造客户余额、欠款、账户关闭状态、明细数、现金结算余额、分配计划及合约金额，仍按查询到的零开户事实完成真实 100 元存入；冲正入口伪造原金额 999 和已冲正标志，默认查询恢复原成交 100 元事实并正确冲正。另逐一将现金结算、利息收入、催收息收入、本金回收参与者替换为另一个已开户的同类型角色，均被 ORIGINAL_SETTLEMENT_ACCOUNTS_MISMATCH 拒绝；原成交未标记冲正，客户资金及替代账户资金未改变。
+New XbodSourceIntegrityTest forges customer balance/debt/closed state/detail count, cash balance, allocation plan and agreement amount at entry. Queries restore zero-opening facts and a real deposit of 100 still succeeds. Reversal input forges original amount 999 and reversed=true; default queries restore the actual original 100 transaction and reverse correctly. Separately replacing cash settlement, interest income, collection-interest income or principal-recovery participants with other opened same-type roles is rejected with ORIGINAL_SETTLEMENT_ACCOUNTS_MISMATCH. The original remains unreversed and customer/substitute-account funds remain unchanged.
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodSourceIntegrityTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` 及对应 testing 命令均 BUILD SUCCESS，各 3 项，失败/错误/跳过均为零。日志 `/tmp/xbod-source-integrity-develop.log`、`/tmp/xbod-source-integrity-testing.log`。旧入口在查询之后篡改 prepared 工作对象的测试，与本次入口事实覆盖范围不同，迁移台账明确保留区别；也不将此测试视为解决 KI-R03 外部资格资料可信来源。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodSourceIntegrityTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` and the testing counterpart each passed 3 tests, zero failures/errors/skips. Logs: /tmp/xbod-source-integrity-develop.log and /tmp/xbod-source-integrity-testing.log. Historical post-query tampering with prepared work objects differs from entry-fact hydration coverage; the ledger preserves that distinction. This also does not resolve KI-R03 trusted external eligibility sources.
 
-## 同一账户不同请求并发
+## Different requests concurrently targeting one account
 
-新增 `XbodConcurrencyTest.concurrentSameAccountRejectsStaleFactsAndAllowsFreshRetry`：两线程在 prepareDepositAgreement 前汇合，确保两者已读取同一账户的旧事实，再分别存入 100、200。验证只有一个成功，失败方 handled=true；重新查询资金、现金结算余额、普通显示余额及明细数，确认只保留成功方。随后通过新的场景调用重新查询并办理失败方金额，最终余额 300、明细数 2。未在 SPP 引入版本属性或 Java 银行业务实现。
+New XbodConcurrencyTest.concurrentSameAccountRejectsStaleFactsAndAllowsFreshRetry synchronizes two threads before prepareDepositAgreement so both read the same old account facts, then deposits 100/200. Exactly one succeeds; the loser has handled=true. Requeries check funds, cash counterparty, ordinary display balance and detail count, retaining only the winner. A fresh scenario call requeries and retries the losing amount; final balance is 300 with two details. No SPP revision field or handwritten Java bank implementation was introduced.
 
-`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodConcurrencyTest#concurrentSameAccountRejectsStaleFactsAndAllowsFreshRetry' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` 与对应 testing 命令均 BUILD SUCCESS，各 1 项。两日志均记录 PERSISTENCE_VERSION_CONFLICT，路径分别为 `/tmp/xbod-same-account-develop.log`、`/tmp/xbod-same-account-testing.log`。这里冲突发生在普通更新阶段；不代表所有 Saga 部分成交故障均能自动恢复，KI-R04 继续保留。同步并发验收也不代替高负载或真实网络测试。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodConcurrencyTest#concurrentSameAccountRejectsStaleFactsAndAllowsFreshRetry' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` and the testing counterpart each passed 1 test. Both logs show PERSISTENCE_VERSION_CONFLICT: /tmp/xbod-same-account-develop.log and /tmp/xbod-same-account-testing.log. The conflict occurs in ordinary update; this does not prove automatic recovery for all partially committed Saga failures. KI-R04 remains. Controlled concurrency does not replace high-load/real-network tests.
 
-## 原分录损坏与原现金冲正策略补充
+## Corrupt original entries and additional original-cash reversal policy
 
-`XbodOriginalPostingIntegrityTest` 同时破坏 APP 表和对象仓储中的同一分录，分别改金额和删除一条，随后调用生成冲正场景；要求拒绝且客户资金、结算资金、原交易标志和反向分录均不改变。首次执行金额篡改通过，删除夹具因直接调用严格仓储 delete 缺少声明事务而失败，尚未进入冲正；测试改用直接 SQL 构造缺失事实，未放松生产仓储约束。
+XbodOriginalPostingIntegrityTest corrupts the same entry in both APP tables and object storage, changing an amount or deleting one entry, then invokes generated reversal. Rejection must preserve customer/settlement funds, original transaction marker and reverse entries. Initial amount-tampering acceptance passed, but deletion failed before reversal because strict repository delete lacked a declared transaction. The fixture switched to direct SQL to create missing facts without weakening production repository constraints.
 
-`XbodCashPolicyTest` 逐项迁移归档 cash-policy 八组规则：四组日期、明细、日累计及积数期望；积数 2200 小于待撤销 2200.001 时 EN097；原手续费 0、2、1.005 全额退回。测试调用生成的显式校验或计算服务，比较调用前后输入参与者不变，不恢复旧计算内 check。最终运行结果另记。
+XbodCashPolicyTest individually migrates eight archived cash-policy vectors: four date/detail/daily-total/accrual expectations; EN097 when accrual 2200 is below reversal amount 2200.001; full refund of original fees 0, 2 and 1.005. Tests invoke explicit generated check/calculation services and verify input participants remain unchanged, without restoring checks inside calculations. Final results follow.
 
-最终命令 `mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodOriginalPostingIntegrityTest,XbodCashPolicyTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，5 个方法，失败/错误/跳过均为零。日志 `/tmp/xbod-original-policy-testing.log`。原分录损坏均在更新前拒绝；cash-policy 八组历史期望全部保留。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodOriginalPostingIntegrityTest,XbodCashPolicyTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 5 methods, zero failures/errors/skips. Log: /tmp/xbod-original-policy-testing.log. Corrupt originals are rejected before updates; all eight historical cash-policy expectations remain.
 
-## 账户控制与手续费入口边界
+## Account-control and fee-entry boundaries
 
-新增 `XbodAdmissionBoundaryTest`：迁移原 cash-control 的正常通过、控制机构/只付不收/锁定/冻结/撤销/房地产类六种拒绝，以及余额 10 冻结 10 后存入 1 的可用余额 1。当前 checkCashControl 合并原前置与核心账户控制，计算仍独立。另经完整存入场景验证费率缺失和锁定拒绝，重新查询资金、明细并直接检查成交与分录表无记录。
+New XbodAdmissionBoundaryTest migrates ordinary acceptance and six cash-control rejections: controlling institution, payments-only/no receipts, locked, frozen, revoked and real-estate category. It also checks available balance 1 after depositing 1 into balance 10 with frozen funds 10. Current checkCashControl combines former advance/core account checks; calculation remains separate. Complete deposit scenarios additionally reject missing rates and locked accounts, requery funds/details and directly verify no settlement/entry records.
 
-跨网点费率 0.001、固定 1、最低 2、最高 50，对 600 元存入收取 2 元；查回八条分录验证两个手续费槽位，借贷各 602。新账户从零开户，不复制旧例凭空注入 100 的资金夹具。首次验收发现缺少费率虽记录 PARTICIPANT_NOT_IDENTIFIED，场景却继续入账：identify 只跳过其所在 if 块，未退出场景。修复为 if 内只查询，主层调用 checkRequiredFeeIdentified，以参与者确认状态返回原 DEPOSIT_FEE_RATE_NOT_FOUND 并在事务前终止。depositCash 与 quoteDepositFee 同步修复；纯费率计算预览不要求查询身份。旧业务 request/attemptId 和拒绝审计结构不回迁。最终执行结果另记。
+For cross-branch rate 0.001, fixed fee 1, minimum 2 and maximum 50, a deposit of 600 incurs fee 2. Eight persisted entries verify both fee slots and debit/credit totals 602. New accounts start at zero rather than copying historical fixtures injecting unexplained funds of 100. Initial acceptance found that missing rates recorded PARTICIPANT_NOT_IDENTIFIED but still posted: identify skipped only its enclosing if block, not the scenario. The fix performs queries inside if and calls checkRequiredFeeIdentified at the main level, using participant confirmation to return the original DEPOSIT_FEE_RATE_NOT_FOUND before any transaction. Both depositCash and quoteDepositFee were fixed; pure rate-calculation previews do not require queried identity. Old business request/attemptId and rejection-audit structures were not migrated. Final results follow.
 
-修复后 testing 专项 3 项通过，日志 `/tmp/xbod-admission-boundary-fixed.log`。随后全量 `Xbod*Test` 执行 60 项：59 项通过，唯一失败为资源复制时仍使用旧通用码的手续费第 14 组（实际已返回原业务码）。只修正该原始期望后，运行 `mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodRuleTest,XbodAdmissionBoundaryTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing`，6 项全部通过，涵盖 49/54/16 组规则及新增拒绝和真实入账测试；日志 `/tmp/xbod-fee-regression-final.log`。全量初次日志 `/tmp/xbod-expanded-testing.log` 保留失败证据，不称为一次全绿构建。其余 59 项无需因该单个期望值变更重复运行。
+The three focused testing cases then passed, /tmp/xbod-admission-boundary-fixed.log. Full Xbod*Test ran 60 cases: 59 passed; only fee vector 14 failed because copied resources still expected the old generic code while implementation returned the original business code. After correcting only that original expectation, `mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodRuleTest,XbodAdmissionBoundaryTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed all 6 cases, covering 49/54/16 rule vectors and new rejection/actual-posting checks; /tmp/xbod-fee-regression-final.log. The first full log, /tmp/xbod-expanded-testing.log, retains failure evidence and is not presented as a single all-green build. The other 59 cases were not repeated for that one expected-value correction.
 
-## 协议日期与分档结果复用
+## Agreement dates and reuse of tier results
 
-`XbodDatedAgreementTest` 迁移七组原协议日期窗口：部分重叠、全部覆盖、未来生效、已失效、无生效日、同日生效取消等，分别验证裁剪日期、重叠天数、10 天普通期间及原普通/协议积数；第八组非法日期由显式 checkAccrualDates 返回 EE374，输入不变。testing 专项 2 个方法全部通过，日志 `/tmp/xbod-dated-agreement-testing.log`。
+XbodDatedAgreementTest migrates seven original agreement windows: partial overlap, full coverage, future start, expired, no effective date, same-day activation/cancellation and related cases. It checks clipped dates, overlap days, the ten-day ordinary period and original ordinary/agreement accrual. An eighth invalid-date vector returns EE374 through explicit checkAccrualDates without modifying inputs. Both testing methods passed; /tmp/xbod-dated-agreement-testing.log.
 
-继续核对原 17 个分档案例，现有 JSON 覆盖 01、02、04 至 13，共 12 组；缺失的是 03 的跨调用结果复用和 14 至 17 的拒绝规则。新增 XbodAgreementReuseTest 在同一个生成请求上执行模式 1、修改输入后执行模式 2，验证旧 2000 分档积数被清零，新分档为 0/400/400/400/400；另验证缺少分档、分档乱序、负门槛、重叠期间过长时在计算前拒绝且所有参与者不变。最终结果另记。
+Review of all 17 original tier cases found JSON covered 01, 02 and 04–13, twelve vectors. Missing were case 03 cross-call result reuse and rejection cases 14–17. New XbodAgreementReuseTest executes mode 1 on a generated request, changes inputs, then executes mode 2. Old tier accrual 2000 must clear and new tiers become 0/400/400/400/400. Missing tiers, unordered tiers, negative thresholds and excessive overlap are rejected before calculation with all participants unchanged. Final results follow.
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodAgreementReuseTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，2 个方法验证缺失五组，失败/错误/跳过均为零。日志 `/tmp/xbod-agreement-reuse-testing.log`。加上既有 12 组，原 agreementProductExampleRun 的 17 组规则现均有对应验收。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodAgreementReuseTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 2 methods covering those five missing vectors, zero failures/errors/skips; /tmp/xbod-agreement-reuse-testing.log. Together with the existing twelve, all 17 agreementProductExampleRun rules now have corresponding acceptance.
 
-## 冲正额度与敞口恢复策略
+## Reversal capacity and exposure-restoration policy
 
-XbodReversalCapacityTest 迁移原通用反交易 07–10 中与现金共享的拒绝规则：可用额度不足 ES020、许可透支但基数负值 EN249、正基数与恢复欠本冲突 EN177、原金额不平衡；验证校验不改变任何输入。XbodRepaymentTest 新增真实敞口小于还本金额的开户夹具：欠本 20、敞口 5，偿本 10 后敞口为 0、原 exposureDelta 为 -5；按原 XBOD 现金规则冲正后欠本 20、敞口 10，本金回收账户回零。原现金规则与通用实际增量反交易差异已写入设计和迁移台账。
+XbodReversalCapacityTest migrates cash-shared rejection rules from generic inverse cases 07–10: insufficient available capacity ES020, permitted overdraft but negative base EN249, positive base conflicting with restored principal EN177, and unbalanced original amount. Checks leave every input unchanged. XbodRepaymentTest adds an actual opening fixture where exposure is below repaid principal: principal owed 20/exposure 5; repayment 10 yields exposure 0 and original exposureDelta -5. Under original XBOD cash reversal rules, reversal restores principal owed 20/exposure 10 and clears the principal-recovery account. Differences between original cash policy and generic actual-delta inverse behavior are documented in the design/migration ledger.
 
-`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodReversalCapacityTest,XbodRepaymentTest#cashReversalKeepsXbodPrincipalBasedExposureRule' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，3 项，无失败、错误或跳过。日志 `/tmp/xbod-reversal-capacity-testing.log`。本项保留已确认现金业务语义，不修改系统技术失败时的量子反交易算法。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodReversalCapacityTest,XbodRepaymentTest#cashReversalKeepsXbodPrincipalBasedExposureRule' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 3 tests, zero failures/errors/skips; /tmp/xbod-reversal-capacity-testing.log. This preserves confirmed cash business semantics, not a change to quantum inverse algorithms for technical failures.
 
-## 成交提示与办理信息持久化
+## Persisting settlement notices and handling information
 
-核对 bankWarningCashExampleRun 发现原成交记录要求保留卡/存折提示、准入告警和办理信息，而新版合约原先仅保存金额与冲正所需分量。新增 notices/operator/bankProfile/admission 四项明确业务事实，由 SPP prepareDepositAgreement 写入 CashDepositAgreement。
+Review of bankWarningCashExampleRun showed original settlement records retain card/passbook notices, admission warnings and handling information, while new agreements previously retained only amounts/reversal components. Four explicit business facts—notices/operator/bankProfile/admission—were added to CashDepositAgreement through SPP prepareDepositAgreement.
 
-XbodBankNoticeTest 完成真实 600 元存入后，用默认查询查回 WN200、WN201、WARNING/F0554、SA01102、未代理办理以及原账户系列 49927；再以不同办理和卡资料完成另一笔存入，重查第一笔，核对原事实仍保持。测试不写业务 Java，只准备请求并断言。同步验证原交易、冲正与技术幂等测试，结果另记。此项不解决外部资格资料可信来源 KI-R03，也不把新请求当作原请求幂等重放。
+After a real deposit of 600, XbodBankNoticeTest uses default queries to recover WN200, WN201, WARNING/F0554, SA01102, non-agent handling and original account series 49927. A second deposit uses different handler/card data; requerying the first confirms its facts remain unchanged. Test Java prepares requests/asserts only. Original transaction/reversal/technical-idempotency checks run alongside it; results follow. This neither resolves KI-R03 trusted external eligibility nor treats a new request as replay of the original.
 
-`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodBankNoticeTest,XbodTransactionTest,XbodIdempotencyTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，16 项，失败/错误/跳过均为零。日志 `/tmp/xbod-bank-notice-testing.log`。新增提示留存、原有现金冲正及远程重放均通过。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodBankNoticeTest,XbodTransactionTest,XbodIdempotencyTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 16 tests, zero failures/errors/skips; /tmp/xbod-bank-notice-testing.log. Notice retention, existing cash reversal and remote replay all passed.
 
-## 网点限制与柜员上下文的整场景拒绝
+## Whole-scenario rejection for branch limits and teller context
 
-XbodBankNoticeTest 新增完整场景验收：仅限原网点的账户在异网点办理时 EN134；柜员地区与费用办理上下文不一致时 DEPOSIT_OPERATOR_CONTEXT_MISMATCH。两次拒绝后重新查询客户/结算账户及明细，均未变化，直接查询 CASH_DEPOSITS/CASH_POSTINGS 均为空。
+New full-scenario XbodBankNoticeTest coverage rejects EN134 when an original-branch-only account is handled elsewhere, and DEPOSIT_OPERATOR_CONTEXT_MISMATCH when teller region conflicts with fee-handling context. After both rejections, customer/settlement funds and details are unchanged; CASH_DEPOSITS/CASH_POSTINGS remain empty.
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodBankNoticeTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` BUILD SUCCESS，2 项，失败/错误/跳过均为零。日志 `/tmp/xbod-bank-notice-develop.log`。同时验证上一轮新增成交提示留存功能在 LOCAL 部署正常；testing 的提示、冲正、幂等 16 项证据见上一节。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodBankNoticeTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` passed 2 tests, zero failures/errors/skips; /tmp/xbod-bank-notice-develop.log. This also confirms notice retention under LOCAL. The preceding section records 16 testing notice/reversal/idempotency passes.
 
-另逐项阅读 ordinaryCashExample、crossDayCashReversalExample、sameDayCashReversalExample、mode2CashReversalExample 的原断言，台账更新为明确的新测试映射及未直接迁移的旧技术结构，不再使用笼统未核对占位，也不将多个专项夸大为原入口逐字等价。
+Original assertions for ordinaryCashExample, crossDayCashReversalExample, sameDayCashReversalExample and mode2CashReversalExample were reviewed individually. Ledger entries now map explicit new tests and unmigrated technical structures rather than generic unchecked placeholders. Multiple focused tests are not exaggerated as literal equivalence to old entries.
 
-## 失败处置记录的查询缺口
+## Failure-disposition record query gap
 
-增强 XbodTransactionTest 两条保存故障验收：通过 findCashFailureRecord 重新查询处理记录，核对处理状态和所关联失败合约的完整失败字段。testing 命令 `mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodTransactionTest#storageFailureRollsBackFundsAndRunsSourceFailureDisposition+reversalPostingFailureRestoresFundsAndExposesOrdinaryStageOutcome' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` **失败**（1 failure、1 error），日志 `/tmp/xbod-persisted-failure-testing.log`。
+Two XbodTransactionTest persistence-fault cases were strengthened to requery findCashFailureRecord, checking disposition status and full failure fields in the associated failed agreement. Testing command `mvn -pl :xbod-deposit-demo -am test '-Dtest=XbodTransactionTest#storageFailureRollsBackFundsAndRunsSourceFailureDisposition+reversalPostingFailureRestoresFundsAndExposesOrdinaryStageOutcome' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` **failed**, with 1 failure and 1 error; /tmp/xbod-persisted-failure-testing.log.
 
-存入用例默认关联补全查找未提交的合约并报 PARTICIPANT_ASSOCIATION_NOT_FOUND；冲正用例查回实时合约导致原失败 code 消失。新增断言保持，未降低验收要求。定位到 ParticipantRelationshipQueries 的无差别关联递归，以及 APP snapshot 只允许角色标量属性的限制。修复方向与当前未完成状态见 KI-R08。
+Default association hydration in the deposit case queried an uncommitted agreement and raised PARTICIPANT_ASSOCIATION_NOT_FOUND. The reversal case read the live agreement, losing the original failure code. Assertions were retained rather than weakened. Causes were indiscriminate ParticipantRelationshipQueries recursion and APP snapshot support restricted to scalar role properties. KI-R08 records the proposed fix and incomplete status.
 
-### KI-R08 修复进展：关联快照贯通与物理容量
+### KI-R08 progress: association snapshots and physical capacity
 
-APP 解析及部署校验已允许实体/角色/合约参与者关联和集合的 snapshot，保留原标量映射限制。生成元数据已确认包含 `table.CASH_FAILURES.snapshotFacts=deposit,reversal`。默认关联查询跳过快照子树，存储投影不再把快照压缩为身份键。新增语言与运行测试分别通过 6 项和 2 项，另已加入存储投影测试待运行。
+APP parsing/deployment validation now permit snapshot participant associations/collections for entities, roles and contracts while preserving scalar-mapping constraints. Generated metadata contains table.CASH_FAILURES.snapshotFacts=deposit,reversal. Default association queries skip snapshot subtrees; storage projection no longer reduces snapshots to identity keys. New language/runtime checks passed 6 and 2 cases respectively; an additional projection test awaited execution.
 
-端到端测试仍未通过。v3 查询侧修复消除了缺失合约查询异常，但暴露写入仅存身份的问题；v4 同步保存完整快照后，H2 报 `DEPOSIT_RESULTINFO_FAILURE_SUPPRESSEDCODES VARCHAR(50)`（冲正为 REVERSAL 前缀）容量不足，造成失败记录自身保存失败。日志 `/tmp/xbod-failure-snapshot-v3.log`、`/tmp/xbod-failure-snapshot-v4.log`；两次 XBOD 均 9 项中 2 失败。不能关闭 KI-R08，下一步需完善参与者快照的物理表示/系统失败字段容量，并运行新增投影测试及端到端复验。
+End-to-end acceptance still failed. The v3 query fix removed the missing-agreement exception but exposed identity-only persistence. After v4 saved complete snapshots, H2 reported insufficient DEPOSIT_RESULTINFO_FAILURE_SUPPRESSEDCODES VARCHAR(50) capacity (REVERSAL prefix for reversal), causing failure-record persistence itself to fail. Logs: /tmp/xbod-failure-snapshot-v3.log and /tmp/xbod-failure-snapshot-v4.log; each XBOD run failed 2 of 9 tests. KI-R08 could not close. Participant snapshot representation/system-failure capacity, the new projection test and end-to-end revalidation remained.
 
-### KI-R08：快照 CLOB 与空值覆盖复验
+### KI-R08: snapshot CLOB and null-overwrite revalidation
 
-`/tmp/xbod-snapshot-clob-testing.log` 的 testing 联合验证通过：语言 6 项、运行库 3 项、XBOD 交易 9 项，共 18 项；失败记录重新查询能够保留失败合约的完整失败字段。生成的 CASH_FAILURES 使用 deposit/reversal CLOB 保存整个快照。
+The testing combined check in /tmp/xbod-snapshot-clob-testing.log passed: language 6, runtime 3, XBOD transaction 9, total 18. Requerying failure records preserved complete failed-agreement fields. Generated CASH_FAILURES uses deposit/reversal CLOB columns for whole snapshots.
 
-后续直接 JDBC 验收发现：将已有快照设为 null 时，通用列回退逻辑取出旧 JdbcClob 再做 JSON 编码，触发 PARTICIPANT_SNAPSHOT_WRITE_FAILED。现已改为快照列直接保存参与者当前完整值（包括 null），不回退旧数据库对象。命令 `mvn -pl generator -am test '-Dtest=ParticipantSnapshotJdbcTest,DDLGeneratorTest' -Dsurefire.failIfNoSpecifiedTests=false` 已通过，日志 `/tmp/participant-snapshot-jdbc-ddl-fixed.log`，覆盖长失败原因、类型化集合、空值覆盖及 DDL CLOB 生成。Goal 保持 active；本轮未标记 blocked，整体回归仍需继续。
+Later direct JDBC acceptance found that setting an existing snapshot to null caused generic column fallback to retrieve an old JdbcClob and JSON-encode it, raising PARTICIPANT_SNAPSHOT_WRITE_FAILED. Snapshot columns now save the participant's complete current value, including null, without fallback to old database objects. `mvn -pl generator -am test '-Dtest=ParticipantSnapshotJdbcTest,DDLGeneratorTest' -Dsurefire.failIfNoSpecifiedTests=false` passed; /tmp/participant-snapshot-jdbc-ddl-fixed.log covers long failure reasons, typed collections, null overwrite and CLOB DDL. The goal remained active, not blocked; broader regression still had to continue.
 
-## 当前全量回归与历史积数专项
+## Current full regression and historical accrual checks
 
-2026-10-13 执行 `mvn -pl :xbod-deposit-demo,petstore-demo -am clean test -Dspp.environment=develop`，日志 `/tmp/xbod-petstore-current-joint.log`。目前语言 366、运行库 627、生成器 107、XBOD 70 项通过，Petstore 尚在执行；最终结果以本节后续记录为准。新增 XbodAccrualRuleTest 用四组历史原始期望核对积数、计息日历差异、截取单位及催收利息天数，未用测试 Java 重写计算。
+On 2026-10-13, `mvn -pl :xbod-deposit-demo,petstore-demo -am clean test -Dspp.environment=develop` ran, logged in /tmp/xbod-petstore-current-joint.log. At this checkpoint, lang 366, runtime 627, generator 107 and XBOD 70 had passed; Petstore was still running. The final outcome follows. New XbodAccrualRuleTest uses four original historical expectations for accrual, interest-calendar differences, truncation units and collection-interest days; Java tests do not reimplement calculation.
 
-回归运行期间追加了 QuantumRepositoryFacts 快照子树边界修复及 QuantumParticipantSnapshotTest；上述全量结果不包含这项后续修改，需专项复验。
+During that run, QuantumRepositoryFacts snapshot-subtree boundaries were fixed and QuantumParticipantSnapshotTest added. The running full suite did not include these later changes; separate revalidation was required.
 
-上述 develop clean 联合回归最终 BUILD SUCCESS：语言 366、运行库 627、生成器 107、XBOD 70、Petstore 39，共 1,209 项，失败/错误/跳过均为零。结束于 2026-10-13 17:04:34。随后以 testing 环境启动量子快照、JDBC 快照、关联投影及 XBOD 交易/积数专项，日志 `/tmp/xbod-quantum-snapshot-final.log`，结果待实际核对。
+The develop clean combined run ultimately passed: lang 366, runtime 627, generator 107, XBOD 70, Petstore 39, **1,209 total**, zero failures/errors/skips, ending 2026-10-13 17:04:34. Testing quantum snapshots, JDBC snapshots, association projection and XBOD transaction/accrual checks then started, /tmp/xbod-quantum-snapshot-final.log, with results pending inspection.
 
-量子快照后续复验：首次测试夹具误用了 seedCurrentValue 三参数重载（其第一个参数为 groupId，并非属性），导致实时账户未初始化；修正为显式 groupId/attributeId/objectId 后，`/tmp/xbod-quantum-snapshot-final-v2.log` BUILD SUCCESS。运行库 5 项及 testing 的 XBOD 10 项通过，共 15 项。量子投影保留显式快照内的历史余额，量子查询不进入该快照子树；普通实时关联仍取最新余额。XBOD 9 项交易测试及四组历史积数测试均通过。
+In the first quantum-snapshot follow-up, a fixture incorrectly used seedCurrentValue's three-argument overload, whose first argument is groupId, not an attribute; live accounts were therefore uninitialized. Explicit groupId/attributeId/objectId fixed the fixture. /tmp/xbod-quantum-snapshot-final-v2.log passed: runtime 5 and testing XBOD 10, **15 total**. Quantum projection preserves historical balances in explicit snapshots; quantum queries do not enter snapshot subtrees, while ordinary live associations still hydrate current balances. Nine XBOD transaction tests and four historical accrual vectors passed.
 
-## testing 完整回归及原分录科目证据
+## Full testing regression and original-entry account evidence
 
-`mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，70 项，失败/错误/跳过均零；日志 `/tmp/xbod-current-testing-full.log`。该次运行包含量子快照子树修复。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=Xbod*Test' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 70 tests with zero failures/errors/skips; /tmp/xbod-current-testing-full.log. This run includes the quantum snapshot-subtree fix.
 
-随后核对旧 storedLedgerEvidenceExampleRun 发现原分录科目被篡改的拒绝规则尚未迁移。新增 CashDepositAgreement.postingEvidence、SPP preserveDepositPostingEvidence 和 APP 集合 snapshot；实际分录与成交快照比对位于显式 checkOriginalDepositPostings。Java 测试只通过数据库故障注入篡改科目，不实现业务规则。专项日志 `/tmp/xbod-original-evidence-testing.log`，完成前不将新增规则计入上述 70 项证据。
+Subsequent review of storedLedgerEvidenceExampleRun found that rejection of tampered original-entry accounts had not migrated. CashDepositAgreement.postingEvidence, SPP preserveDepositPostingEvidence and APP collection snapshots were added. Explicit checkOriginalDepositPostings compares actual entries with settlement snapshots. Java tests alter accounts through database fault injection only, not business-rule implementation. Focused log: /tmp/xbod-original-evidence-testing.log. The new rule was not counted in the preceding 70-test evidence before completion.
 
-原分录证据 testing 专项 BUILD SUCCESS：XbodOriginalPostingIntegrityTest 3 项、XbodTransactionTest 9 项，共 12 项。修改科目和金额返回 ORIGINAL_DEPOSIT_LEDGER_EVIDENCE_MISMATCH，缺失原分录返回 INVALID_ORIGINAL_DEPOSIT_POSTINGS；资金及原冲正标志未改变，也未保存反向分录。后续 develop 验收同时加入 XbodRepaymentTest，结果见 `/tmp/xbod-original-evidence-develop.log`。
+Focused testing original-entry evidence passed: XbodOriginalPostingIntegrityTest 3 and XbodTransactionTest 9, **12 total**. Changed accounts/amounts return ORIGINAL_DEPOSIT_LEDGER_EVIDENCE_MISMATCH; missing entries return INVALID_ORIGINAL_DEPOSIT_POSTINGS. Funds/original reversal marker remain unchanged and no reverse entries persist. Develop acceptance also added XbodRepaymentTest; /tmp/xbod-original-evidence-develop.log.
 
-原分录证据 develop 专项 BUILD SUCCESS：原分录完整性 3、交易 9、还本还息 8，共 20 项，失败/错误/跳过均零。覆盖 LOCAL 回滚、现金同日/跨日/Mode2 冲正、真实内部户偿还及旧小数偿还规则。日志 `/tmp/xbod-original-evidence-develop.log`。
+Focused develop acceptance passed: original-entry integrity 3, transactions 9, repayments 8, **20 total**, zero failures/errors/skips. It covers LOCAL rollback, same-day/cross-day/Mode2 cash reversal, actual internal-account repayment and historical decimal repayment; /tmp/xbod-original-evidence-develop.log.
 
-## 失败处置自身故障
+## Failure of failure disposition itself
 
-新增 XbodFailureDispositionTest，原业务服务故障之外使用 H2 触发器拒绝 CASH_FAILURES 插入。修复前两项均失败：主原因和回滚正确，但 ResultInfo.failure.suppressedCodes 为空，日志 `/tmp/xbod-secondary-failure-before.log`。通用 TransactionFailureHandling 现于 disposition 异常后更新返回失败事实，仍抛主异常；元数据更新自身失败也不覆盖主异常。现有框架测试增加返回信息断言。
+New XbodFailureDispositionTest adds an H2 trigger rejecting CASH_FAILURES insertion alongside the original business-service fault. Both cases initially failed: primary cause/rollback were correct but ResultInfo.failure.suppressedCodes was empty; /tmp/xbod-secondary-failure-before.log. Generic TransactionFailureHandling now updates returned failure facts after disposition exceptions while still throwing the primary exception. Failure to update metadata also cannot replace that primary exception. Existing framework tests gained return-info assertions.
 
-`mvn -pl :xbod-deposit-demo -am test '-Dtest=TransactionFailureHandlingTest,XbodFailureDispositionTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` BUILD SUCCESS，框架 7、银行 2，共 9 项。日志 `/tmp/xbod-secondary-failure-develop.log`。testing 对应命令日志 `/tmp/xbod-secondary-failure-testing.log`，结果待核对。
+`mvn -pl :xbod-deposit-demo -am test '-Dtest=TransactionFailureHandlingTest,XbodFailureDispositionTest' -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=develop` passed framework 7/bank 2, **9 total**; /tmp/xbod-secondary-failure-develop.log. The testing counterpart was logged in /tmp/xbod-secondary-failure-testing.log pending inspection.
 
-testing 框架/银行专项共 9 项通过；新增明确恢复状态断言后 testing 两条整场景再次通过，日志 `/tmp/xbod-secondary-outcome-testing.log`：二次保存失败不覆盖原 RECOVERY_REQUIRED，也不会把 handled 改为 true。LOCAL 同断言复验日志 `/tmp/xbod-secondary-outcome-develop.log`。
+All 9 testing framework/bank cases passed. After adding explicit recovery-status assertions, both full-scenario testing cases passed again; /tmp/xbod-secondary-outcome-testing.log. Secondary persistence failure neither replaces original RECOVERY_REQUIRED nor sets handled=true. LOCAL revalidation uses /tmp/xbod-secondary-outcome-develop.log.
 
-LOCAL 同恢复状态断言复验两项通过：原 ROLLED_BACK 保留，二次故障可见、handled=false；与 testing 的 RECOVERY_REQUIRED 区分。所有本轮专项失败/错误/跳过均零。
+Both LOCAL recovery-status cases passed: original ROLLED_BACK remains, secondary failure is visible, handled=false. This differs from testing RECOVERY_REQUIRED. All focused runs in this round had zero failures/errors/skips.
 
-## LOCAL 提交故障四阶段验收
+## Four-stage LOCAL commit-fault acceptance
 
-新增 XbodCommitOutcomeTest 对生成 depositCash 在 JDBC beforeCommit、commitBefore、commitAfter、afterCommit 四个技术故障点注入失败。分别期待 ROLLED_BACK、UNKNOWN、UNKNOWN、COMMITTED，并从真实数据库核对前两种无成交/分录、后两种保留一笔成交及八条分录；不以异常本身推断是否成交。该测试仅适用 LOCAL，testing 的多阶段协调须另行验证。首次执行日志 `/tmp/xbod-commit-outcome.log`，结果待核对。
+New XbodCommitOutcomeTest injects technical faults into generated depositCash at JDBC beforeCommit, commitBefore, commitAfter and afterCommit. Expected outcomes are ROLLED_BACK, UNKNOWN, UNKNOWN and COMMITTED. Actual database queries establish no settlement/entries for the first two and one settlement/eight entries for the last two; exceptions alone do not determine commitment. This applies only to LOCAL; multistage testing coordination requires separate acceptance. Initial log: /tmp/xbod-commit-outcome.log, pending inspection at that checkpoint.
 
-LOCAL 存入、冲正的八种提交故障组合通过：XbodCommitOutcomeTest 两项测试各包含四个独立数据库用例，失败/错误/跳过均零，日志 `/tmp/xbod-commit-outcome-both.log`。独立默认查询及物理表计数证明前两阶段没有本次合约/分录，后两阶段保留一笔及八条分录；资金变化与结果一致。此项不宣称已有提交未知自动恢复、远程重放消歧或分库提交恢复。
+All eight deposit/reversal commit-fault combinations passed: two XbodCommitOutcomeTest methods, each containing four isolated-database cases, zero failures/errors/skips; /tmp/xbod-commit-outcome-both.log. Independent default queries/physical counts prove absent current agreements/entries in the first two stages and one agreement/eight entries in the latter two; funds match outcomes. This does not establish automatic unknown-commit recovery, remote replay disambiguation or split-database commit recovery.
 
-## 日累计生命周期与非法积数配置
+## Daily-total lifecycle and invalid accrual configuration
 
-`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodDailyCashTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` BUILD SUCCESS，2 项，失败/错误/跳过均零。日志 `/tmp/xbod-daily-testing.log`。三次真实存入及默认重查验证 300→600 的累计警告、次日重置为 100、明细累计与积数 600；normalUnit=0 在完整场景拒绝且物理成交/分录为空。未复制旧初始凭空余额。
+`mvn -pl :xbod-deposit-demo -am test -Dtest=XbodDailyCashTest -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing` passed 2 cases with zero failures/errors/skips; /tmp/xbod-daily-testing.log. Three actual deposits/default requeries verify the warning as totals grow 300→600, next-day reset to 100, cumulative details and accrual 600. normalUnit=0 is rejected by the complete scenario with empty settlement/entry tables. Old unexplained opening balances were not copied.
 
-旧三类 report setup 是测试证据汇编，按测试移出 SPP 的约定不作为生产场景恢复。逐业务证据、授权续办/持久化审计未完成项和量子模型差异已写入 legacy-entry-migration，不能把拆分的专项宣称为旧报告逐字段等价。
+The three historical report setups compile test evidence and are not restored as production scenarios under the rule moving tests out of SPP. Business-by-business evidence, unfinished authorization-resumption/persisted-audit scope and quantum-model differences are recorded in legacy-entry-migration. Separate focused checks are not claimed equivalent field-for-field to old reports.
 
-## 准备后的冲正与介入存款
+## Prepared reversal with an intervening deposit
 
-新增 XbodStaleReversalTest，通过 APP 技术调用日志的测试监听器，在 prepareCashReversalPostings 前暂停已查询并校验的冲正；随后执行真实存入 5，再放行冲正。预期旧普通事实提交冲突且资金恢复为 105，原交易未标记冲正；全新查询后重试成功，余额为 5，介入交易八条分录保留。测试仅做技术调度和调用生成场景，不构造 Java 银行业务。首次 testing 日志 `/tmp/xbod-stale-reversal-testing.log`，结果待核对。
+New XbodStaleReversalTest uses a test listener on APP technical invocation logs to pause a queried/checked reversal before prepareCashReversalPostings. It executes a real deposit of 5, then releases reversal. Stale ordinary facts must conflict, funds restore to 105, and the original remains unreversed. Fresh-query retry succeeds, leaving balance 5 and all eight intervening-deposit entries. Tests only schedule technical execution and call generated scenarios, without Java bank business. Initial testing log: /tmp/xbod-stale-reversal-testing.log, pending inspection.
 
-XbodStaleReversalTest 在 testing、develop 两套配置均 BUILD SUCCESS（各 1 项）；日志 `/tmp/xbod-stale-reversal-testing.log`、`/tmp/xbod-stale-reversal-develop.log`。精确控制查询之后、更新之前介入另一笔生成存入场景，验证旧冲正失败和新查询重试，未使用 sleep 或手写业务更新。该证据覆盖账户事实过期，不替代原合约自身并发变更测试。
+XbodStaleReversalTest passed in testing/develop, 1 case each; /tmp/xbod-stale-reversal-testing.log and /tmp/xbod-stale-reversal-develop.log. Another generated deposit is precisely scheduled after query/before update, proving stale reversal rejection and fresh-query retry without sleep or handwritten business updates. This covers stale account facts, not concurrent changes to the original agreement itself.
 
-## 原合约准备后被改动
+## Original agreement changed after preparation
 
-XbodStaleReversalTest 新增技术故障：冲正查询完后，修改已存原合约 fee 及仓储修订标记，再放行。首次 testing 运行发现 PERSISTENCE_VERSION_CONFLICT 确实阻止覆盖，但普通 Saga 前序阶段已提交，故向调用方抛失败而不是 handled=true；最初按账户介入用例假定全部恢复的测试预期不成立。日志 `/tmp/xbod-changed-receipt-testing.log`。
+XbodStaleReversalTest adds a technical fault: after reversal queries complete, alter persisted original agreement fee and repository revision, then release execution. Initial testing confirmed PERSISTENCE_VERSION_CONFLICT prevents overwrite, but earlier ordinary Saga stages had committed, so the call throws rather than returning handled=true. The initial assumption of full recovery like the intervening-account case was invalid; /tmp/xbod-changed-receipt-testing.log.
 
-修订验收保留严格事实：原合约 fee=1 未被覆盖、原成交未标记冲正、资金恢复 100；testing 必须报告 RECOVERY_REQUIRED/RECONCILIATION_REQUIRED/handled=false，不直接重试以掩盖普通残留。LOCAL 则要求完整回滚，恢复测试夹具后重查重试成功。此差异属于已知 KI-R04，不修改生产代码去伪称回滚成功。
+Revised acceptance retains strict facts: fee=1 is not overwritten, the original remains unreversed, and funds restore to 100. Testing must report RECOVERY_REQUIRED/RECONCILIATION_REQUIRED/handled=false; direct retry cannot conceal ordinary residue. LOCAL requires complete rollback and successful requery/retry after fixture restoration. This is KI-R04, not a production change pretending rollback succeeded.
 
-原合约/账户过期专项完成：testing、develop 各 2 项通过（失败/错误/跳过均零），日志 `/tmp/xbod-changed-receipt-testing-v2.log`、`/tmp/xbod-changed-receipt-develop.log`。LOCAL 包含恢复夹具后成功重试；testing 原合约冲突明确保留待补偿结果。
+Both original-agreement/account-staleness cases passed in testing/develop, 2 each, zero failures/errors/skips; /tmp/xbod-changed-receipt-testing-v2.log and /tmp/xbod-changed-receipt-develop.log. LOCAL includes successful retry after restoring fixtures; testing explicitly retains compensation-required outcomes.
 
-## 冲正当前资格事实
+## Current reversal eligibility facts
 
-新增 XbodCurrentEligibilityTest：成交后在数据库夹具将 AccountEligibility.status 设为 FROZEN，再以 ACTIVE 入口调用生成的 reverseCash，要求 EN111；改用 SA01116 不能绕过当前现金路径限制，要求 UNSUPPORTED_CASH_REVERSAL_PATH。独立查询验证资金、冻结状态、原成交标志及零冲正记录。此项不把普通属性查询变成全程状态锁，也不承诺阻止已通过检查的在途交易。testing 日志 `/tmp/xbod-current-eligibility.log`，结果待核对。
+New XbodCurrentEligibilityTest changes stored AccountEligibility.status to FROZEN after settlement, then calls generated reverseCash with ACTIVE input, expecting EN111. SA01116 cannot bypass the current cash-path restriction and must yield UNSUPPORTED_CASH_REVERSAL_PATH. Independent queries check funds, frozen status, original marker and absence of reversal records. This does not turn ordinary property reads into lifetime state locks or promise rejection of already-checked in-flight transactions. Testing log: /tmp/xbod-current-eligibility.log, pending inspection.
 
-XbodCurrentEligibilityTest testing BUILD SUCCESS，1 项，失败/错误/跳过均零；日志 `/tmp/xbod-current-eligibility.log`。已查证当前资格来自默认数据库查询，不能由入口 ACTIVE 覆盖；冻结核心例外不会扩展现金场景的业务范围。
+Testing XbodCurrentEligibilityTest passed 1 case, zero failures/errors/skips; /tmp/xbod-current-eligibility.log. Current eligibility comes from default database queries and cannot be overwritten by ACTIVE input. A core frozen-account exception does not expand the cash scenario's business scope.
 
-## 非零积数保存后的故障
+## Fault after nonzero accrual persistence
 
-XbodAccrualFailureTest 先真实存入 100，次日申请再存 50，并在 insertCashDepositAgreement 前注入失败（积数保存已执行）。testing 专项通过：资金恢复 100/-100，积数保留已提交的 100 和次日日期，返回 RECOVERY_REQUIRED/handled=false；失败处理记录可重查，仍只有原一笔合约及八条分录。不把普通积数恢复冒充为量子反交易的一部分。日志 `/tmp/xbod-nonzero-accrual-testing.log`。LOCAL 重试验证待 `/tmp/xbod-nonzero-accrual-develop.log` 结果。
+XbodAccrualFailureTest first deposits 100, then requests 50 next day and injects failure before insertCashDepositAgreement, after accrual persistence. Focused testing passed: funds restore to 100/-100, committed accrual 100/next-day date remain, and RECOVERY_REQUIRED/handled=false is returned. Failure disposition is queryable; only the original agreement/eight entries remain. Ordinary accrual restoration is not portrayed as part of quantum inverse execution. Log: /tmp/xbod-nonzero-accrual-testing.log. LOCAL retry awaited /tmp/xbod-nonzero-accrual-develop.log.
 
-非零积数 LOCAL 专项通过（1 项，零失败/错误/跳过），日志 `/tmp/xbod-nonzero-accrual-develop.log`：故障后积数仍零、日期保持原日，资金 100/-100；重试后余额 150、积数 100。两套配置对差异的断言均由真实持久化结果支持。
+Focused LOCAL acceptance passed 1 test, zero failures/errors/skips; /tmp/xbod-nonzero-accrual-develop.log. After failure, accrual stays zero/date stays original and funds are 100/-100. Retry yields balance 150/accrual 100. Actual persisted outcomes support both configurations' differing assertions.
 
-## 同流水并发冲正及原合约持久化完整性
+## Concurrent same-serial reversal and persisted original-agreement integrity
 
-XbodIdempotencyTest 新增同一远程请求方/流水并发 reverseCash，用真实存入准备原成交；要求最终同一冲正凭证和结果、资金归零、只有一个冲正合约及八条反向分录。RUNNING 允许当前技术协议 REQUEST_IN_PROGRESS，原调用完成后再取原结果，不在业务 SPP 加幂等。testing 类全量 7 项通过，日志 `/tmp/xbod-concurrent-reversal-idempotency.log`。
+XbodIdempotencyTest adds concurrent reverseCash for one remote caller/serial, using an actual deposit as original settlement. Final reversal voucher/result must match, funds become zero, and only one reversal agreement/eight entries remain. While RUNNING, current REQUEST_IN_PROGRESS is permitted; after original completion the same result is retrieved. No idempotency is added to SPP business. Full testing class passed 7 cases; /tmp/xbod-concurrent-reversal-idempotency.log.
 
-新增 XbodOriginalAgreementIntegrityTest：不存在的原凭证、数据库原合约 amount 被改为 999、原合约账户改为另一个已开户账户。直接修改物理表和对象仓储两种表示，验证默认查询后的原成交守恒/归属检查，资金不变且无冲正合约/反向分录。testing 日志 `/tmp/xbod-original-agreement-integrity.log`，结果待核对。
+New XbodOriginalAgreementIntegrityTest covers missing original voucher, persisted amount changed to 999, and original account changed to another opened account. Both physical tables/object storage are altered to check conservation/ownership validation after default queries. Funds remain unchanged and no reversal agreement/entries persist. Testing log: /tmp/xbod-original-agreement-integrity.log, pending inspection.
 
-原合约完整性 testing BUILD SUCCESS，3 项，失败/错误/跳过均零。缺原合约返回 PARTICIPANT_NOT_IDENTIFIED；已存金额损坏返回 ORIGINAL_DEPOSIT_MOVEMENT_NOT_BALANCED；账户归属损坏返回 ORIGINAL_DEPOSIT_ACCOUNT_MISMATCH。日志 `/tmp/xbod-original-agreement-integrity.log`。
+Testing original-agreement integrity passed 3 cases, zero failures/errors/skips. Missing agreement returns PARTICIPANT_NOT_IDENTIFIED; corrupted amount returns ORIGINAL_DEPOSIT_MOVEMENT_NOT_BALANCED; corrupted ownership returns ORIGINAL_DEPOSIT_ACCOUNT_MISMATCH. Log: /tmp/xbod-original-agreement-integrity.log.
 
-## 冲正合约插入前故障
+## Fault before reversal agreement insertion
 
-XbodTransactionTest 新增 insertCashReversalAgreement 前技术故障验收，与已有反向分录故障共享资金、原成交标记及失败快照重查断言。要求冲正表无记录；LOCAL 完整回滚并允许新请求重试，testing 资金逆转但普通前序事实已提交，保留 RECOVERY_REQUIRED。testing 类全量日志 `/tmp/xbod-reversal-receipt-fault.log`，结果待核对。
+XbodTransactionTest adds technical failure before insertCashReversalAgreement, sharing fund/original-marker/failure-snapshot requery assertions with existing reverse-entry faults. Reversal tables must remain empty. LOCAL fully rolls back and permits a new-request retry; testing inverts funds but prior ordinary facts remain committed, requiring RECOVERY_REQUIRED. Full testing class log: /tmp/xbod-reversal-receipt-fault.log, pending inspection.
 
-冲正合约插入前故障完成：testing XbodTransactionTest 全类 10 项通过，LOCAL 对应方法 1 项通过，日志 `/tmp/xbod-reversal-receipt-fault.log`、`/tmp/xbod-reversal-receipt-local.log`。LOCAL 验证新请求重试成功；testing 原合约标记已提交而资金逆转，明确 RECOVERY_REQUIRED，不直接重试。
+Completed acceptance: testing XbodTransactionTest passed all 10 cases and the corresponding LOCAL method passed 1; /tmp/xbod-reversal-receipt-fault.log and /tmp/xbod-reversal-receipt-local.log. LOCAL verifies successful new-request retry; testing retains the committed original marker despite inverse funds and explicitly reports RECOVERY_REQUIRED without immediate retry.
 
-收口静态检查：src/main 无手写 Java；生产 SPP 无 try/catch/throw、Verification、context 及 transaction quantum/saga；PHY quantumStore 是部署配置，不作为 SPP 业务事务语法。git diff --check 通过。README 和设计页已移除过时回归次数及资金模型待决策描述，历史执行日志仍保留在验证文档。
-# 当前干净回归补充（2026-10-13）
+Final static checks: no handwritten Java under src/main; production SPP contains no try/catch/throw, Verification, context or transaction quantum/saga. PHY quantumStore is deployment configuration, not SPP business transaction syntax. git diff --check passed. README/design pages removed obsolete regression counts and pending-fund-model descriptions; historical logs remain in verification documents.
 
-本轮 clean develop 联合回归在 appframe 失败：lang 366 项通过，appframe 628 项中 7 failures、3 errors，后续模块未执行。日志 `/tmp/xbod-final-joint-develop.log`。新增 QuantumRepositoryFacts.snapshotProperties 无条件访问可空 APP 表目录，破坏无目录的量子开户恢复路径。
+# Additional clean regression (2026-10-13)
 
-已修复为无目录时返回空快照配置。QuantumOpeningRecoveryTest、DatabaseInitializationTest、QuantumParticipantSnapshotTest 共 12 项通过（`/tmp/xbod-snapshot-no-catalog.log`），覆盖无目录恢复与有目录历史快照。已重新启动完整 clean 联合回归（`/tmp/xbod-final-joint-develop-v2.log`）；本条记录时尚未完成。
+This clean develop combined run failed in appframe: lang 366 passed; appframe had 7 failures/3 errors among 628 cases; later modules did not execute. Log: /tmp/xbod-final-joint-develop.log. New QuantumRepositoryFacts.snapshotProperties unconditionally accessed a nullable APP table catalogue, breaking quantum-opening recovery without a catalogue.
 
-## 当前源码干净联合回归通过（2026-10-13 18:36）
+The fix returns empty snapshot configuration when no catalogue exists. QuantumOpeningRecoveryTest, DatabaseInitializationTest and QuantumParticipantSnapshotTest passed 12 cases, /tmp/xbod-snapshot-no-catalog.log, covering no-catalogue recovery and catalogue-backed historical snapshots. A full clean combined rerun started, /tmp/xbod-final-joint-develop-v2.log, but was unfinished at that checkpoint.
 
-命令：`mvn -pl :xbod-deposit-demo,petstore-demo -am clean test -Dspp.environment=develop`。日志 `/tmp/xbod-final-joint-develop-v2.log`，BUILD SUCCESS，用时 9 分 6 秒。lang 366、appframe 628、generator 107、XBOD 86、Petstore 39，共 1,226 项，零失败、零错误、零跳过。该批次包含无 APP 表目录兼容修复、历史快照、内部收款户、原分录证据及所有已新增故障/并发测试。
+## Clean combined current-source regression passed (2026-10-13 18:36)
 
-已启动 testing 的 XBOD 全量验证，日志 `/tmp/xbod-final-testing.log`，此处暂不记录未完成结果。独立试算及其他明确未迁移范围仍以 completion-audit 和 known issues 为准。
+Command: `mvn -pl :xbod-deposit-demo,petstore-demo -am clean test -Dspp.environment=develop`.
+Log: /tmp/xbod-final-joint-develop-v2.log. BUILD SUCCESS in 9 minutes 6 seconds: lang 366, appframe 628, generator 107, XBOD 86, Petstore 39, **1,226 total**, zero failures/errors/skips. This includes no-APP-catalogue compatibility, historical snapshots, receiving internal accounts, original-entry evidence and all fault/concurrency cases added by that point.
 
-## testing 全量回归通过（2026-10-13 18:41）
+Full testing XBOD verification then started, /tmp/xbod-final-testing.log; no unfinished result was claimed. Independent preview and other explicitly unmigrated scope remain governed by completion-audit/known issues.
 
-命令 `mvn -pl :xbod-deposit-demo -am test -Dtest=Xbod*Test -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing`；日志 `/tmp/xbod-final-testing.log`。86 项，零失败、零错误、2 项跳过；跳过的是仅适用于 LOCAL 的 XbodCommitOutcomeTest 两个方法。该批次尚未包含随后新增的 previewCashReversal 场景，不能宣称验证了试算；试算另行生成与专项验收。
+## Full testing regression passed (2026-10-13 18:41)
 
-## 独立现金冲正试算专项（2026-10-13）
+Command: `mvn -pl :xbod-deposit-demo -am test -Dtest=Xbod*Test -Dsurefire.failIfNoSpecifiedTests=false -Dspp.environment=testing`.
+Log: /tmp/xbod-final-testing.log. 86 tests, zero failures/errors, **2 skipped**: the two LOCAL-only XbodCommitOutcomeTest methods. This predates previewCashReversal and does not establish preview acceptance; preview was separately generated/tested.
 
-新增 SPP previewCashReversal，复用正式冲正前的查询、check 与 calculate，不含 transaction、量子更新或普通持久化调用。XbodReversalPreviewTest 在 develop/testing 各 2 项通过；日志 `/tmp/xbod-preview-develop.log`、`/tmp/xbod-preview-testing.log`。真实存入 100 后再存入 5，试算生成八条平衡候选分录，数据库余额仍为 105、原交易未冲正、冲正合约及分录表均为空；随后正式冲正保留后来存入的 5。缺原成交拒绝也无持久化副作用。该专项不声称覆盖旧通用部分退费候选。
+## Independent cash-reversal preview checks (2026-10-13)
 
-## 打包和脚本启动验收
+New SPP previewCashReversal reuses formal reversal's queries/checks/calculations without transaction, quantum updates or ordinary persistence. XbodReversalPreviewTest passed 2 cases each in develop/testing; /tmp/xbod-preview-develop.log and /tmp/xbod-preview-testing.log. After deposits of 100 then 5, preview produces eight balanced candidate entries while database balance stays 105, original stays unreversed, and reversal agreement/entry tables remain empty. Formal reversal then preserves the later 5. Missing originals are rejected without persistence side effects. This does not cover historical generic partial-fee-refund candidates.
 
-`mvn -pl :xbod-deposit-demo -am package -DskipTests -Dspp.environment=develop` 成功，日志 `/tmp/xbod-final-package.log`。使用 run-demo.sh web、跳过重复构建、回环端口 18089、独立 H2 内存库实际启动，POST openDepositAccount 成功创建零资金账户并返回开户参与者。最初省略整个参与者的请求被技术错误拒绝；补齐场景声明的六个参与者对象后成功，README 已提供完整 JSON。该验证不宣称入口会自动构造被省略的参与者。临时服务器已停止，未留下后台服务。
+## Packaging and script startup acceptance
+
+`mvn -pl :xbod-deposit-demo -am package -DskipTests -Dspp.environment=develop` succeeded; /tmp/xbod-final-package.log. Actual run-demo.sh web startup skipped duplicate build, used loopback port 18089 and an isolated H2 in-memory database. POST openDepositAccount created a zero-funded account and returned opening participants. Initially omitting entire participants was technically rejected; providing all six declared participant objects succeeded. README supplies complete JSON. This does not claim omitted participants are automatically constructed. The temporary server was stopped with no background service left.

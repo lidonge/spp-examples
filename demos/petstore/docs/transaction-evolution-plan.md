@@ -1,28 +1,70 @@
-# 事务边界与普通、量子事实实施计划
+# Transaction boundaries and ordinary/quantum fact implementation plan
 
-> 2026-10-11 事务及存储规则更新：以下此前的共同提交、自动扮演者保存及 CustomerSubject 描述属于历史设计；当前规则见[实施约定](../../../book/references/transaction-storage-v1.md)。当前 APP 选择 AT 普通更新，量子先独立成交，不同模式通过 Saga 恢复，REQUIRED 不改变这一点。Person/Product 由原域显式维护。
+> Historical plan, preserved from revision `417a41f`. The 2026-10-11 transaction/
+> storage update superseded earlier joint-commit, automatic player-save and
+> CustomerSubject descriptions below. See the [implementation contract](../../../book/references/transaction-storage-v1.md).
+> That update selected AT ordinary updates, quantum settlement first and Saga
+> recovery between modes; REQUIRED does not change this. Person/Product are
+> explicitly maintained in their owning domains. Later LOCAL deployment rules
+> and current environment configuration must also be consulted.
 
-本轮需求：业务只声明一致性边界和传播行为；准入查询在事务外完成，在途业务不因买家后来停用而被重新否决。事务外读取并计算、事务内修改的普通事实由 APP 默认乐观保障，量子事实由选定的量子实现保障。
+The requirement was for business source to declare consistency boundaries and
+propagation only. Admission queries finish outside transactions; later buyer
+deactivation does not re-reject in-flight business. APP's default optimistic
+protection covers ordinary facts read/calculated outside and modified inside a
+transaction. The selected quantum implementation protects quantum facts.
 
-## 设计
+## Design
 
-普通事实与技术修订标记必须一次读取，写入使用数据库原子条件更新。修订标记属于持久化元数据，不出现在 SPP。固定参与者实例与跨域模型投影要传递同一个读取基线。只有实际修改普通事实的参与者参与普通版本比较；纯准入读取不进入提交条件。量子余额和库存从逻辑量子域补全，不以普通角色快照中的副本作为权威值；量子成交不得推进普通事实修订标记。
+Ordinary facts and technical revision markers must be read together; writes use
+atomic database conditional updates. Revision markers are persistence metadata,
+not SPP fields. Stable participant instances and cross-domain model projections
+carry the same read baseline. Only participants whose ordinary facts actually
+change enter ordinary version comparisons. Admission-only reads do not become
+commit conditions. Quantum balances/stock hydrate from the logical quantum
+domain, not ordinary role snapshot copies. Quantum settlement must not advance
+ordinary-fact revisions.
 
-APP 防重可以先登记请求、再保存完成结果，但不得用一个隐含数据库事务包住整个场景。失败及提交结果不确定的请求保留恢复状态，不能自动重新执行已经提交的业务阶段。
+APP duplicate protection may register requests then retain completed results,
+but cannot wrap an entire scenario in a hidden database transaction. Failed or
+commit-uncertain requests retain recovery state; already committed stages cannot
+be rerun automatically. This describes the optional coordination path, not a
+basic-SDK replay guarantee.
 
-预约场景先提交受理合约，再尝试库存预占；预占失败保留已受理合约。付款的资金结算使用嵌套 REQUIRED，加入订单及回执的共同提交边界。前者展示阶段独立提交，后者展示一致性单元组合。
+Reservation first commits acceptance, then attempts stock reservation; failed
+reservation retains acceptance. The historical payment design used nested
+REQUIRED for funds within the order/receipt joint boundary. These demonstrate
+independent stages versus composition of consistency units; actual guarantees
+remain subject to the updated resource rules above.
 
-## 实施路径与验收
+## Implementation path and acceptance
 
-1. 补齐通用仓储的可靠读取基线、原子条件更新和跨域基线传递。
-2. 分离普通快照与量子权威事实，移除仅用于复制量子成交结果的普通角色保存。
-3. 修正场景防重的隐含事务，登记失败恢复限制。
-4. 在上述保障到位后缩小全部场景边界，更新场景审计。
-5. 新增预约受理/预占场景、APP/PHY持久化及中文网页入口，保留付款嵌套 REQUIRED。
-6. 只生成、编译生产和测试源码并静态核对，不运行测试、服务或数据库；编译不能当作运行时并发保障的实测证明。
+1. Add reliable repository read baselines, atomic conditional updates and
+   cross-domain baseline propagation.
+2. Separate ordinary snapshots from authoritative quantum facts; remove ordinary
+   role saves used solely to copy quantum settlement results.
+3. Remove hidden scenario-deduplication transactions; record recovery limits.
+4. After these protections exist, narrow every scenario boundary and update its audit.
+5. Add reservation acceptance/stock scenarios, APP/PHY persistence and the then-
+   Chinese web entry; retain payment's nested REQUIRED.
+6. Generate/compile production and test sources and inspect statically only.
+   Do not run tests, services or databases for that phase. Compilation is not
+   measured runtime concurrency evidence.
 
-## 与传统方案比较
+## Comparison with traditional implementations
 
-传统 Java 常把查询、校验、计算和更新全部置于方法级事务，或由开发者手写版本判断。SPP 将业务边界写在场景中，APP 统一生成技术比较，缩短普通资源锁定时间并显式展示独立提交阶段。代价是框架必须可靠管理读取基线、跨域传递和失败恢复；乐观冲突仍可能发生，业务不应误把冲突当作校验规则。多个独立事务天然没有整体回滚，前一步的成功必须成为可查询的业务事实。
+Traditional Java often puts queries, validation, calculations and updates in one
+method-level transaction, or requires handwritten version checks. SPP puts
+business boundaries in scenarios and lets APP generate technical comparisons,
+shortening ordinary-resource lock duration and exposing independent stages.
+The cost is reliable framework baseline management, cross-domain propagation and
+failure recovery. Optimistic conflicts remain possible and are not business
+validation rules. Independent transactions have no overall rollback; an earlier
+success must remain a queryable business fact.
 
-本文六个实施步骤已落入源码及文档，并完成生成、编译和静态审查；运行测试未执行。当前30场景、837份生成生产Java，详见[验收审计](acceptance-audit.md)。旧数据库迁移和未知请求的自动恢复未实现，不作为本轮已完成能力。
+At the recorded milestone all six implementation steps existed in source/docs,
+with generation, compilation and static review complete but no runtime test
+execution. The historical inventory was 30 scenarios and 837 generated
+production Java files; see [acceptance audit](acceptance-audit.md). Old-database
+migration and automatic unknown-request recovery were not implemented. These
+counts and test restrictions describe that phase, not current acceptance results.
