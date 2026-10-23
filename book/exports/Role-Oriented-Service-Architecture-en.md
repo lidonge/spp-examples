@@ -908,7 +908,7 @@ The customer uses this value. If its only purpose is database uniqueness, the in
 
 Its purpose is resolving ambiguity. Review still asks who uses the number, in which activity and how it supports processing or verification. “Internally unique” describes technology, not a business credential.
 
-Models are organized by membership, goods, cart, orders and other functions. See the [Petstore source guide](../../demos/petstore/docs/source-guide.md).
+Models are organized by membership, goods, cart, orders and other functions. See the [Petstore source guide](../../demos/petstore/docs/language-tour.md).
 
 
 ---
@@ -1184,7 +1184,7 @@ Current names and agreed contract names have different duties. Order queries mus
 
 For example, a bank's failure-disposition record must preserve the deposit or reversal contract at the time of failure, including the system-provided cause, service, phase and recovery status. Saving only an association and later querying current facts can change the record's meaning as balances or contracts change.
 
-APP `snapshot` now preserves explicitly declared associated participants and collections as historical snapshots. Queries do not continue filling those snapshot subtrees through role or association chains, and current quantum balances do not overwrite historical balances inside them. Ordinary live associations still follow their normal completion rules. APP configuration distinguishes these uses; see the [bank snapshot verification](../../demos/bank-deposit/docs/latest-refactoring-verification.md).
+APP `snapshot` now preserves explicitly declared associated participants and collections as historical snapshots. Queries do not continue filling those snapshot subtrees through role or association chains, and current quantum balances do not overwrite historical balances inside them. Ordinary live associations still follow their normal completion rules. APP configuration distinguishes these uses; see the [bank snapshot verification](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md).
 
 ## Identity Is Not the Whole Fact Set
 
@@ -1214,7 +1214,7 @@ Establishing zero quantum facts differs from crediting nonzero funds. Account op
 
 With role and quantum facts in one database, a common local transaction establishes them. With split storage, the built-in runtime commits role records and a durable technical recovery task locally, then creates remote zero records after confirmation. Local rollback removes both. Remote unavailability or lost responses retain the task for retry. Retry creates only missing zero records, never overwrites settled values, and produces no quantum transaction journal entry.
 
-Scenarios still call role insertion without manually splitting opening or writing business compensation. Opening is not fully successful before remote zero records exist. The current mechanism covers built-in JDBC ordinary and quantum repositories; see [split zero-record recovery](../../demos/petstore/docs/quantum-opening-recovery.md).
+Scenarios still call role insertion without manually splitting opening or writing business compensation. Opening is not fully successful before remote zero records exist. The current mechanism covers built-in JDBC ordinary and quantum repositories; see [split zero-record recovery](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md).
 
 Every fact should have an owner, locator and maintenance entry. See the [transaction and storage specification](../references/transaction-storage-v1.md).
 
@@ -1473,7 +1473,7 @@ The bank case in Part VII, Chapter 33 provides a concrete comparison: cash rever
 
 The case's split-storage repository has not yet implemented automatic recovery for committed ordinary stages. This does not change the principle of version-guarded automatic reversal, but shows that the backend protocol must actually be implemented and verified. Recording reconciliation facts is failure disposition; restoring funds and ordinary records is transaction recovery.
 
-Tests also change an original contract's version after it has been queried, verifying that reversal cannot overwrite a later change. Even when split-storage funds have been restored, earlier ordinary stages may remain. The system preserves the pending-recovery result rather than allowing a direct retry to hide it. The [case verification record](../../demos/bank-deposit/docs/latest-refactoring-verification.md) documents the persisted outcomes.
+Tests also change an original contract's version after it has been queried, verifying that reversal cannot overwrite a later change. Even when split-storage funds have been restored, earlier ordinary stages may remain. The system preserves the pending-recovery result rather than allowing a direct retry to hide it. The [case verification record](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md) documents the persisted outcomes.
 
 ## Automatic Inverse Transactions Retain Later Results
 
@@ -2024,7 +2024,7 @@ Meaning still matters: having a `price` field does not authorize arbitrary subst
 
 ## Follow Both Business and Technical Source
 
-Read [requirements](../../demos/petstore/docs/requirements-and-functions.md), then the [payment scenario](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) and its named calculations/checks. Ask what each uses, produces and waits for.
+Read [requirements](../../demos/petstore/docs/implementation-path.md), then the [payment scenario](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) and its named calculations/checks. Ask what each uses, produces and waits for.
 
 Then read [APP](../../demos/petstore/src/main/spp/petshop/petshop.app) and [PHY](../../demos/petstore/src/main/spp/petshop/petshop.phy) for storage, guards, transactions and resources. Functional directories organize source without changing domain identity or requiring a particular deployment machine.
 
@@ -2248,7 +2248,7 @@ If the rejection save fails, do not pretend it persisted. Preserve evidence and 
 
 Check insufficient stock, ordinary-save failure after quantum changes, and unknown results. The first two require stock, application state and reason checks; unknown requires recovery records and no repeated reservation.
 
-See [failure evidence](../../demos/petstore/docs/reservation-failure-handling.md). LOCAL tests alone do not prove every real cross-domain recovery. Check resources and evidence together next.
+See [failure evidence](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md). LOCAL tests alone do not prove every real cross-domain recovery. Check resources and evidence together next.
 
 
 ---
@@ -2339,7 +2339,7 @@ Display caches for wallets and availability do not replace actual payment/reserv
 
 Business reviews payment, status and rejection reasons; technology reviews events. A fail-handled reservation normally returns AFTER even though reservation failed. Logs omit customer/order contents.
 
-Part V, Chapter 27, shows custom Java metrics, alerts and controls through APP/PHY. Query caches and output masking need data adapters. See [technical example](../../demos/petstore/docs/technical-services.md).
+Part V, Chapter 27, shows custom Java metrics, alerts and controls through APP/PHY. Query caches and output masking need data adapters. See [technical example](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md).
 
 ## Apply Security and Governance to Entries
 
@@ -2391,7 +2391,7 @@ Accounts, debts, product policies, business dates, authorization evidence, fundi
 
 Front-office cash acceptance and core calculations may also have different amount conditions. Requiring a positive amount at the front office does not justify deleting a zero-amount repayment path in the core. Service contracts must preserve these differences between calling layers.
 
-The current case separates accounts, eligibility, calculations, fees, accruals, postings, deposits and reversals into capability directories. Each scenario has its own file and directly organizes queries, checks, calculations and updates. A single umbrella scenario does not hide every step. The [source navigation](../../demos/bank-deposit/docs/source-map.md) identifies these capabilities.
+The current case separates accounts, eligibility, calculations, fees, accruals, postings, deposits and reversals into capability directories. Each scenario has its own file and directly organizes queries, checks, calculations and updates. A single umbrella scenario does not hide every step. The [source navigation](../../demos/bank-deposit/docs/language-tour.md) identifies these capabilities.
 
 ## Repayment Allocation and Actual Fund Destinations
 
@@ -2426,7 +2426,7 @@ Within the transaction, quantum settlement comes first. Subsequent calculations 
 
 Pending authorization is a business outcome, not a generic technical exception. The current case supports eligibility and authorization assessment. Persisting pending applications, choosing the authorization domain and resuming across processes still have boundaries to resolve.
 
-A complete resumption flow should requery and recheck potentially changed eligibility after authorization arrives, then execute against current facts. Existing authorization checks do not constitute that complete workflow. The case's [known issues](../../demos/bank-deposit/docs/known-issues-latest.md) records the distinction.
+A complete resumption flow should requery and recheck potentially changed eligibility after authorization arrives, then execute against current facts. Existing authorization checks do not constitute that complete workflow. The case's [known issues](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md) records the distinction.
 
 ## Reversal Driven by the Original Transaction
 
@@ -2469,9 +2469,9 @@ S++ concentrates selected rules in business models, calculations, checks and sce
 
 ## From Web Operations to Verification Evidence
 
-The [Chinese-language deposit workbench](../../demos/bank-deposit/docs/web-workbench.md) supports account opening, cash deposits, reversal previews, formal reversals and accounting queries. The page submits participants and displays results; it does not calculate fees or repayment allocation. Communication loss is shown as an unconfirmed outcome, without automatically resubmitting an update or presenting input balances and candidate postings as settled facts.
+The [Chinese-language deposit workbench](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md) supports account opening, cash deposits, reversal previews, formal reversals and accounting queries. The page submits participants and displays results; it does not calculate fees or repayment allocation. Communication loss is shown as an unconfirmed outcome, without automatically resubmitting an update or presenting input balances and candidate postings as settled facts.
 
-Verification includes real JDBC storage, rule vectors, failures in two environments, concurrent contention, request idempotency, independent-process restarts and browser flows. See the [latest verification record](../../demos/bank-deposit/docs/latest-refactoring-verification.md) and Appendix F for configurations, batches and limits. Outstanding ordinary Saga recovery, complete authorization resumption and automatic resolution of unknown settlement outcomes remain separately documented in the [completion audit](../../demos/bank-deposit/docs/completion-audit.md).
+Verification includes real JDBC storage, rule vectors, failures in two environments, concurrent contention, request idempotency, independent-process restarts and browser flows. See the [latest verification record](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md) and Appendix F for configurations, batches and limits. Outstanding ordinary Saga recovery, complete authorization resumption and automatic resolution of unknown settlement outcomes remain separately documented in the [completion audit](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md).
 
 Complex business becomes manageable by expressing rules, participating facts, processing plans, settlement and recovery separately, then connecting them through scenarios. Existing evidence supports defined paths. Original COBOL execution and bank-confirmed results remain distinct evidence levels; test counts alone cannot establish business equivalence.
 
@@ -3588,36 +3588,36 @@ Petstore counts retain the separate baseline in F7. Bank source and newly added 
 
 ## F3 Petstore Functional Verification
 
-[October 13, 2026 technical-service verification](../references/app-technical-services.md) records 1,123 passing tests: language 362, runtime 617, generator 105, Petstore 39, with zero failures, errors or skips. Coverage includes matching, compilation, phases, access rejection, observer isolation, concurrency and replay. Remote proxies use controlled transport, without real cross-JVM acceptance. The [Petstore example](../../demos/petstore/docs/technical-services.md) shows all-service tracing. Capability comes from main revision `65c766fc`; this book cites existing records.
+[October 13, 2026 technical-service verification](../references/app-technical-services.md) records 1,123 passing tests: language 362, runtime 617, generator 105, Petstore 39, with zero failures, errors or skips. Coverage includes matching, compilation, phases, access rejection, observer isolation, concurrency and replay. Remote proxies use controlled transport, without real cross-JVM acceptance. The [Petstore example](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md) shows all-service tracing. Capability comes from main revision `65c766fc`; this book cites existing records.
 
-[October 13 failure handling](../references/spp-transaction-failure-handling.md) records 1,104 develop tests: language 356, runtime 607, generator 105, Petstore 36, all passing without skips. [Reservation evidence](../../demos/petstore/docs/reservation-failure-handling.md) covers insufficient stock, ordinary-save fault and replay. Framework tests separately establish real JDBC settled inverse before fail. Petstore used LOCAL, not real distributed TCC/external quantum acceptance. These are cited records, not tests rerun for the manuscript.
+[October 13 failure handling](../references/spp-transaction-failure-handling.md) records 1,104 develop tests: language 356, runtime 607, generator 105, Petstore 36, all passing without skips. [Reservation evidence](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md) covers insufficient stock, ordinary-save fault and replay. Framework tests separately establish real JDBC settled inverse before fail. Petstore used LOCAL, not real distributed TCC/external quantum acceptance. These are cited records, not tests rerun for the manuscript.
 
-[October 12 final regression](../../demos/petstore/docs/regression-2026-10-12-conserved-transfers.md) records 1,080 passing tests: lang 340, appframe 581, generator 105, appframe-seata 20, Petstore 34; no failures, errors or skips.
+[October 12 final regression](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/regression-2026-10-12-conserved-transfers.md) records 1,080 passing tests: lang 340, appframe 581, generator 105, appframe-seata 20, Petstore 34; no failures, errors or skips.
 
 That record also covers complete Chrome flows in develop, three-JVM testing with four isolated file databases, and shop restart. After shutdown, checks compare fund totals, per-goods stock/supply and per-transaction delta sums.
 
-Temporary log paths identify original evidence; independent environments must rerun commands to obtain their own results. [Known limitations](../../demos/petstore/docs/known-issues.md) cover opening retries and split zero recovery, detailed in [recovery design](../../demos/petstore/docs/quantum-opening-recovery.md). Functional regression is not Appendix C's serial/parallel benchmark.
+Temporary log paths identify original evidence; independent environments must rerun commands to obtain their own results. [Known limitations](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/known-issues.md) cover opening retries and split zero recovery, detailed in [recovery design](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md). Functional regression is not Appendix C's serial/parallel benchmark.
 
 ## F4 Verification of the Bank Deposit Case
 
 The bank deposit case has completed its migration to current syntax and runtime protocols. Its [production source](../../demos/bank-deposit/src/main/spp/cboddeposit) uses only SPP, APP and PHY, with no handwritten production Java. SPP does not use `try/catch/throw`; generated Java and runtime internals can still use exception handling for technical failures. Historical source remains for rule comparison, not as current executable examples.
 
-This section checks the case against main revision `0fafa21d` and cites existing repository evidence. The manuscript update did not rerun bank tests. The [latest verification record](../../demos/bank-deposit/docs/latest-refactoring-verification.md) preserves commands, results and scope by batch:
+This section checks the case against main revision `0fafa21d` and cites existing repository evidence. The manuscript update did not rerun bank tests. The [latest verification record](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md) preserves commands, results and scope by batch:
 
 |Verification Batch|Result|Scope|
 |---|---|---|
 |October 13, 2026 clean develop joint regression|1,226 tests; zero failures, errors or skips|Language 366, runtime 628, generator 107, bank case 86, Petstore 39; internal recipient accounts, historical snapshots and included fault/concurrency tests|
 |Subsequent testing bank regression|86 tests; zero failures or errors, two skips|Separate quantum and ordinary H2 data sources in one JVM; two LOCAL-only commit-fault tests skipped|
 |Independent reversal-preview tests|Two passing tests in each of develop and testing|No preview writes; formal reversal preserves later deposits; missing originals are rejected without side effects|
-|Chinese workbench verification|Backend tests and browser flows pass in both environments|Exact decimal display, negative-amount rejection, preview, reversal, receipt lookup and mobile layout; see [workbench acceptance](../../demos/bank-deposit/docs/web-workbench.md)|
+|Chinese workbench verification|Backend tests and browser flows pass in both environments|Exact decimal display, negative-amount rejection, preview, reversal, receipt lookup and mobile layout; see [workbench acceptance](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md)|
 
 Split-storage testing does not constitute complete acceptance of real network distribution, XA, Seata AT or TCC. Independent JVM restart and forced exit after confirmed settlement cover their specified persistence paths, not automatic resolution of interrupted or unknown commits. Later targeted tests must not be added together and represented as one unexecuted joint regression.
 
-The [completion audit](../../demos/bank-deposit/docs/completion-audit.md) identifies implemented scenarios, storage, transactions and technical capabilities. The [86-entry historical migration inventory](../../demos/bank-deposit/docs/legacy-entry-migration.md) lists evidence, differences and unmigrated parts entry by entry. Those 86 historical entries and the 86 JUnit tests above are different measures; equal numbers do not establish one-to-one equivalence.
+The [completion audit](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md) identifies implemented scenarios, storage, transactions and technical capabilities. The [86-entry historical migration inventory](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/legacy-entry-migration.md) lists evidence, differences and unmigrated parts entry by entry. Those 86 historical entries and the 86 JUnit tests above are different measures; equal numbers do not establish one-to-one equivalence.
 
-[Known issues](../../demos/bank-deposit/docs/known-issues-latest.md) retain boundaries for committed ordinary Saga recovery, persisted pending authorization and cross-process resumption, automatic confirmation of unknown settlement, and durable auditing of every invocation. A split-storage failure can restore quantum funds while leaving ordinary committed facts. The system explicitly reports `RECOVERY_REQUIRED` and `handled=false`, not complete rollback.
+[Known issues](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md) retain boundaries for committed ordinary Saga recovery, persisted pending authorization and cross-process resumption, automatic confirmation of unknown settlement, and durable auditing of every invocation. A split-storage failure can restore quantum funds while leaving ordinary committed facts. The system explicitly reports `RECOVERY_REQUIRED` and `handled=false`, not complete rollback.
 
-[Source mapping](../../demos/bank-deposit/docs/source-map.md) gives current directories and original rule locations. Source derivation, mathematical expectations, demonstration inputs, generated execution comparisons, original COBOL execution and bank-confirmed results represent different evidence levels. Case success does not establish every bank policy or original-system output equivalence.
+[Source mapping](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/source-map.md) gives current directories and original rule locations. Source derivation, mathematical expectations, demonstration inputs, generated execution comparisons, original COBOL execution and bank-confirmed results represent different evidence levels. Case success does not establish every bank policy or original-system output equivalence.
 
 ## F5 QService References
 

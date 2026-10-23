@@ -18,7 +18,7 @@ Current names and agreed contract names have different duties. Order queries mus
 
 For example, a bank's failure-disposition record must preserve the deposit or reversal contract at the time of failure, including the system-provided cause, service, phase and recovery status. Saving only an association and later querying current facts can change the record's meaning as balances or contracts change.
 
-APP `snapshot` now preserves explicitly declared associated participants and collections as historical snapshots. Queries do not continue filling those snapshot subtrees through role or association chains, and current quantum balances do not overwrite historical balances inside them. Ordinary live associations still follow their normal completion rules. APP configuration distinguishes these uses; see the [bank snapshot verification](../../../demos/bank-deposit/docs/latest-refactoring-verification.md).
+APP `snapshot` now preserves explicitly declared associated participants and collections as historical snapshots. Queries do not continue filling those snapshot subtrees through role or association chains, and current quantum balances do not overwrite historical balances inside them. Ordinary live associations still follow their normal completion rules. APP configuration distinguishes these uses; see the [bank snapshot verification](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md).
 
 ## Identity Is Not the Whole Fact Set
 
@@ -48,7 +48,7 @@ Establishing zero quantum facts differs from crediting nonzero funds. Account op
 
 With role and quantum facts in one database, a common local transaction establishes them. With split storage, the built-in runtime commits role records and a durable technical recovery task locally, then creates remote zero records after confirmation. Local rollback removes both. Remote unavailability or lost responses retain the task for retry. Retry creates only missing zero records, never overwrites settled values, and produces no quantum transaction journal entry.
 
-Scenarios still call role insertion without manually splitting opening or writing business compensation. Opening is not fully successful before remote zero records exist. The current mechanism covers built-in JDBC ordinary and quantum repositories; see [split zero-record recovery](../../../demos/petstore/docs/quantum-opening-recovery.md).
+Scenarios still call role insertion without manually splitting opening or writing business compensation. Opening is not fully successful before remote zero records exist. The current mechanism covers built-in JDBC ordinary and quantum repositories; see [split zero-record recovery](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md).
 
 Every fact should have an owner, locator and maintenance entry. See the [transaction and storage specification](../../references/transaction-storage-v1.md).
 

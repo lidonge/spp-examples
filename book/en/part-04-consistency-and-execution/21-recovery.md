@@ -70,7 +70,7 @@ The bank case in Part VII, Chapter 33 provides a concrete comparison: cash rever
 
 The case's split-storage repository has not yet implemented automatic recovery for committed ordinary stages. This does not change the principle of version-guarded automatic reversal, but shows that the backend protocol must actually be implemented and verified. Recording reconciliation facts is failure disposition; restoring funds and ordinary records is transaction recovery.
 
-Tests also change an original contract's version after it has been queried, verifying that reversal cannot overwrite a later change. Even when split-storage funds have been restored, earlier ordinary stages may remain. The system preserves the pending-recovery result rather than allowing a direct retry to hide it. The [case verification record](../../../demos/bank-deposit/docs/latest-refactoring-verification.md) documents the persisted outcomes.
+Tests also change an original contract's version after it has been queried, verifying that reversal cannot overwrite a later change. Even when split-storage funds have been restored, earlier ordinary stages may remain. The system preserves the pending-recovery result rather than allowing a direct retry to hide it. The [case verification record](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md) documents the persisted outcomes.
 
 ## Automatic Inverse Transactions Retain Later Results
 

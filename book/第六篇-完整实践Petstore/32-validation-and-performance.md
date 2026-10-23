@@ -85,7 +85,7 @@ Petstore 已增加 [技术服务 APP](../../demos/petstore/src/main/spp/petshop/
 
 业务人员仍检查付款金额、订单状态和预约拒绝原因，技术人员通过日志检查实际调用。预约预占失败经过 `fail` 处置后，场景正常返回会记录 `AFTER`；这表示调用正常结束，并不表示预约成功。日志也不打印客户和订单内容。
 
-沿第五篇第27章的接口，可以新增 Java 技术服务并通过 APP／PHY 接入指标、告警或技术访问控制。查询缓存和输出脱敏则使用相应数据适配。样例及验证范围见 [Petstore 技术服务](../../demos/petstore/docs/technical-services.md)。
+沿第五篇第27章的接口，可以新增 Java 技术服务并通过 APP／PHY 接入指标、告警或技术访问控制。查询缓存和输出脱敏则使用相应数据适配。样例及验证范围见 [Petstore 技术服务](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md)。
 
 ## 将安全与运行治理应用到办理入口
 

@@ -84,7 +84,7 @@ Display caches for wallets and availability do not replace actual payment/reserv
 
 Business reviews payment, status and rejection reasons; technology reviews events. A fail-handled reservation normally returns AFTER even though reservation failed. Logs omit customer/order contents.
 
-Part V, Chapter 27, shows custom Java metrics, alerts and controls through APP/PHY. Query caches and output masking need data adapters. See [technical example](../../../demos/petstore/docs/technical-services.md).
+Part V, Chapter 27, shows custom Java metrics, alerts and controls through APP/PHY. Query caches and output masking need data adapters. See [technical example](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md).
 
 ## Apply Security and Governance to Entries
 

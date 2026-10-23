@@ -23,7 +23,7 @@ Receipt是实际办理凭证实体。没有StockBook汇总状态；available/res
 
 每份 Contract 对应明确业务场景，表达当事人与业务约定。ShopOrder 是下单合约，直接包含 Buyer、商品明细、成交金额和预占数量。付款、发货、退货等场景引用原订单合约是使用业务参与者，并非调用下单场景。
 
-完整对应表见 [Petstore 场景设计](../../demos/petstore/docs/scenario-design.md)。申请退货直接进入 requestShopReturn(Buyer, ShopOrder, ReturnRequestAgreement)，申请理由属于退货申请合约；不由 ShopCommand 的动作字符串路由。
+完整对应表见 [Petstore 场景设计](../../demos/petstore/docs/language-tour.md)。申请退货直接进入 requestShopReturn(Buyer, ShopOrder, ReturnRequestAgreement)，申请理由属于退货申请合约；不由 ShopCommand 的动作字符串路由。
 
 不为结果、集合、中间计算另建 Contract。库存预占归属订单，出库数量归属发货约定，释放数量归属取消约定，付款和退款金额归属相应约定。Receipt 是凭证实体。查询直接补全入口及入口集合；没有 OperationOutcome、ProductCatalogue、OrdersProjection、InventoryMovement、MoneyMovement、PurchaseAgreement 或 QuotationAgreement 包装。
 
@@ -72,6 +72,6 @@ Java/ORM 也可分离领域关系与外键、采用角色和乐观锁。SPP 的�
 
 customer拥有Person，product拥有Product，inventory拥有StockLine角色及逐商品库存，petshop拥有销售角色和订单合约。消费方Reference明确来源，可引用提供方实体、角色或合约。APP部署四域同JVM，通过域限定本地服务容器协作；PHY共同资源/数据库/schema/事务连接约定保障共同提交意图。不Mock、不跨域直接读表，场景不调用场景。
 
-实现和生成编译已完成，未运行回归；详见[域边界](../../demos/petstore/docs/domain-boundaries.md)及[编译证据](../../demos/petstore/docs/implementation-path.md)。
+实现和生成编译已完成，未运行回归；详见[域边界](../../demos/petstore/docs/domain-and-layers.md)及[编译证据](../../demos/petstore/docs/implementation-path.md)。
 
 量子属性业务上统一归逻辑量子域，真实一致性机制由APP配置、PHY资源实现；不是强制独立物理服务。事务内读取和混合参与者保护见[事务读取规则](spp-transaction-reads.md)。

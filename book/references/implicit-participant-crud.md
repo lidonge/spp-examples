@@ -67,7 +67,7 @@ Scenario serial readShopOrders(Buyer key, ShopOrder[] orders) { listOrders; }
 
 APP `web.start` 在服务就绪前执行数据库种子准备。框架用专用技术初始化上下文执行这些生成服务：普通插入改为仅缺失时插入，量子初值在其配置的数据源事务中仅缺失时补齐，不覆盖已有余额或库存。不同数据源不承诺共同提交；失败时不发布 readiness，保留已完成种子步骤供重试，不执行业务反交易/补偿。该上下文不用于网页业务请求，正常业务 insert 仍要求原有事务资源协调与重复插入校验。
 
-此机制不提供通用旧库修复，也不把带量子属性的新建业务交易自动视为技术初始化。Petstore 的具体未验证范围见 [known issues](../../demos/petstore/docs/known-issues.md)。
+此机制不提供通用旧库修复，也不把带量子属性的新建业务交易自动视为技术初始化。Petstore 的具体未验证范围见 [known issues](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/known-issues.md)。
 
 建立零量子事实与非零入账分开：同库零事实随本地角色事务共同提交；分库先在角色事务内写入技术待办，提交确认后再 missing-only 建立量子零记录。回滚不发送远端创建，失败待办在启动、查询或技术 API 中重放，不产生交易流水、不覆盖已有成交值，不让 SPP 拆分开户或编写业务补偿。此机制提供持久技术恢复，不声称分库瞬时原子提交；非零资金和库存变化仍由显式双边量子服务完成。
 

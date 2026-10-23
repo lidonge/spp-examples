@@ -50,7 +50,7 @@ The customer uses this value. If its only purpose is database uniqueness, the in
 
 Its purpose is resolving ambiguity. Review still asks who uses the number, in which activity and how it supports processing or verification. “Internally unique” describes technology, not a business credential.
 
-Models are organized by membership, goods, cart, orders and other functions. See the [Petstore source guide](../../../demos/petstore/docs/source-guide.md).
+Models are organized by membership, goods, cart, orders and other functions. See the [Petstore source guide](../../../demos/petstore/docs/language-tour.md).
 
 ---
 

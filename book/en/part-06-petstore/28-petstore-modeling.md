@@ -51,7 +51,7 @@ Meaning still matters: having a `price` field does not authorize arbitrary subst
 
 ## Follow Both Business and Technical Source
 
-Read [requirements](../../../demos/petstore/docs/requirements-and-functions.md), then the [payment scenario](../../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) and its named calculations/checks. Ask what each uses, produces and waits for.
+Read [requirements](../../../demos/petstore/docs/implementation-path.md), then the [payment scenario](../../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) and its named calculations/checks. Ask what each uses, produces and waits for.
 
 Then read [APP](../../../demos/petstore/src/main/spp/petshop/petshop.app) and [PHY](../../../demos/petstore/src/main/spp/petshop/petshop.phy) for storage, guards, transactions and resources. Functional directories organize source without changing domain identity or requiring a particular deployment machine.
 

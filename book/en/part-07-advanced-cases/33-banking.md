@@ -12,7 +12,7 @@ Accounts, debts, product policies, business dates, authorization evidence, fundi
 
 Front-office cash acceptance and core calculations may also have different amount conditions. Requiring a positive amount at the front office does not justify deleting a zero-amount repayment path in the core. Service contracts must preserve these differences between calling layers.
 
-The current case separates accounts, eligibility, calculations, fees, accruals, postings, deposits and reversals into capability directories. Each scenario has its own file and directly organizes queries, checks, calculations and updates. A single umbrella scenario does not hide every step. The [source navigation](../../../demos/bank-deposit/docs/source-map.md) identifies these capabilities.
+The current case separates accounts, eligibility, calculations, fees, accruals, postings, deposits and reversals into capability directories. Each scenario has its own file and directly organizes queries, checks, calculations and updates. A single umbrella scenario does not hide every step. The [source navigation](../../../demos/bank-deposit/docs/language-tour.md) identifies these capabilities.
 
 ## Repayment Allocation and Actual Fund Destinations
 
@@ -47,7 +47,7 @@ Within the transaction, quantum settlement comes first. Subsequent calculations 
 
 Pending authorization is a business outcome, not a generic technical exception. The current case supports eligibility and authorization assessment. Persisting pending applications, choosing the authorization domain and resuming across processes still have boundaries to resolve.
 
-A complete resumption flow should requery and recheck potentially changed eligibility after authorization arrives, then execute against current facts. Existing authorization checks do not constitute that complete workflow. The case's [known issues](../../../demos/bank-deposit/docs/known-issues-latest.md) records the distinction.
+A complete resumption flow should requery and recheck potentially changed eligibility after authorization arrives, then execute against current facts. Existing authorization checks do not constitute that complete workflow. The case's [known issues](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md) records the distinction.
 
 ## Reversal Driven by the Original Transaction
 
@@ -90,9 +90,9 @@ S++ concentrates selected rules in business models, calculations, checks and sce
 
 ## From Web Operations to Verification Evidence
 
-The [Chinese-language deposit workbench](../../../demos/bank-deposit/docs/web-workbench.md) supports account opening, cash deposits, reversal previews, formal reversals and accounting queries. The page submits participants and displays results; it does not calculate fees or repayment allocation. Communication loss is shown as an unconfirmed outcome, without automatically resubmitting an update or presenting input balances and candidate postings as settled facts.
+The [Chinese-language deposit workbench](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md) supports account opening, cash deposits, reversal previews, formal reversals and accounting queries. The page submits participants and displays results; it does not calculate fees or repayment allocation. Communication loss is shown as an unconfirmed outcome, without automatically resubmitting an update or presenting input balances and candidate postings as settled facts.
 
-Verification includes real JDBC storage, rule vectors, failures in two environments, concurrent contention, request idempotency, independent-process restarts and browser flows. See the [latest verification record](../../../demos/bank-deposit/docs/latest-refactoring-verification.md) and Appendix F for configurations, batches and limits. Outstanding ordinary Saga recovery, complete authorization resumption and automatic resolution of unknown settlement outcomes remain separately documented in the [completion audit](../../../demos/bank-deposit/docs/completion-audit.md).
+Verification includes real JDBC storage, rule vectors, failures in two environments, concurrent contention, request idempotency, independent-process restarts and browser flows. See the [latest verification record](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md) and Appendix F for configurations, batches and limits. Outstanding ordinary Saga recovery, complete authorization resumption and automatic resolution of unknown settlement outcomes remain separately documented in the [completion audit](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md).
 
 Complex business becomes manageable by expressing rules, participating facts, processing plans, settlement and recovery separately, then connecting them through scenarios. Existing evidence supports defined paths. Original COBOL execution and bank-confirmed results remain distinct evidence levels; test counts alone cannot establish business equivalence.
 

@@ -68,7 +68,7 @@ transaction {
 
 至少检查库存不足、量子成交后普通保存失败和结果未知三种情况。前两类应分别核对库存、申请状态与拒绝原因；未知情况应核对技术恢复记录，确认没有因为重复请求再次预占。
 
-当前预约验证及其范围见 [失败处置说明](../../demos/petstore/docs/reservation-failure-handling.md)。Petstore 的 LOCAL 用例不能单独证明真实跨域资源的全部恢复能力，技术资源与测试证据还要在下一章一起核对。
+当前预约验证及其范围见 [失败处置说明](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md)。Petstore 的 LOCAL 用例不能单独证明真实跨域资源的全部恢复能力，技术资源与测试证据还要在下一章一起核对。
 
 ---
 

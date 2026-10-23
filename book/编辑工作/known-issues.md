@@ -46,7 +46,7 @@
 
 **当前实现。** 主线 6d4bb08d 已加入 fail 语法、TransactionFailureHandling 与内置 ResultInfo/FailureInfo，先完成事务执行和恢复，再执行相邻 fail 块。恢复不确定或 fail 自身失败时，不把原失败当作已处置成功。第一版只支持串行场景的外层事务 fail；多个合约要求显式关联。详见 [系统结果协议](../references/spp-transaction-failure-handling.md)。
 
-**真实案例与证据。** [预约失败处置](../../demos/petstore/docs/reservation-failure-handling.md)记录库存不足、普通保存失败、结果不明及处置失败的业务结果。主线记录 2026-10-13 develop 1,104 项测试通过，含框架 JDBC 量子阶段反交易先于 fail 的验证；不扩大为真实分布式 TCC 或外部量子服务验收。本书此次同步没有重新运行这些测试。
+**真实案例与证据。** [预约失败处置](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md)记录库存不足、普通保存失败、结果不明及处置失败的业务结果。主线记录 2026-10-13 develop 1,104 项测试通过，含框架 JDBC 量子阶段反交易先于 fail 的验证；不扩大为真实分布式 TCC 或外部量子服务验收。本书此次同步没有重新运行这些测试。
 
 **书稿处理。** 第四篇第19章引用真实预约源片段，第六篇第31章同步拒绝状态和原因，附录 E、F 补充能力与来源。主线 `0fafa21d` 的某银行案例生产源已完成新语法迁移，`try/catch` 只在历史资料中保留，不作为当前可执行示例。附录 F 已改为引用最新验收及明确未完成范围。
 

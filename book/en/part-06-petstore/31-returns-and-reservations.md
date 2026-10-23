@@ -70,7 +70,7 @@ If the rejection save fails, do not pretend it persisted. Preserve evidence and 
 
 Check insufficient stock, ordinary-save failure after quantum changes, and unknown results. The first two require stock, application state and reason checks; unknown requires recovery records and no repeated reservation.
 
-See [failure evidence](../../../demos/petstore/docs/reservation-failure-handling.md). LOCAL tests alone do not prove every real cross-domain recovery. Check resources and evidence together next.
+See [failure evidence](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md). LOCAL tests alone do not prove every real cross-domain recovery. Check resources and evidence together next.
 
 ---
 

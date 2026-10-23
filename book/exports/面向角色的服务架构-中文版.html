@@ -673,7 +673,7 @@ body{max-width:1000px;margin:auto;padding:40px;font-family:Georgia,"Noto Serif C
 </code></pre>
 <p>这里的 <code>receiptId</code> 有客户实际使用的含义。若只是为了给数据库记录分配一个唯一值，系统内部主键已经承接这项责任，无需把它加入 SPP。<code>business</code> 用来说明为什么这个看起来像技术 ID 的字段应当留在业务模型中。</p>
 <p>所以，<code>business</code> 的重点是消除习惯性 ID 带来的歧义。模型评审仍需核对说明是否符合真实需求：谁使用这个编号，在哪项业务中使用，如何凭它办理或核对结果。“内部唯一标识”只说明技术用途，不能据此把技术字段解释成业务凭证。</p>
-<p>模型已按会员、商品、购物车、订单等业务功能拆分，完整阅读入口见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/source-guide.md">Petstore 源码导读</a>。</p>
+<p>模型已按会员、商品、购物车、订单等业务功能拆分，完整阅读入口见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/language-tour.md">Petstore 源码导读</a>。</p>
 <hr />
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/book/第三篇-用S++表达角色与服务/README.md">本篇目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/README.md">全书目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第三篇-用S++表达角色与服务/12-layers.md">上一章</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第三篇-用S++表达角色与服务/14-take.md">下一章</a></p>
 <hr />
@@ -882,7 +882,7 @@ body{max-width:1000px;margin:auto;padding:40px;font-family:Georgia,"Noto Serif C
 <p>合约需要记录成交时约定的内容。例如，顾客下单时商品叫“幼猫粮 1kg”，一个月后商家把商品改名为“幼猫配方粮 1kg”。商品页面应显示新名称，旧订单中的成交名称则仍应显示“幼猫粮 1kg”，便于顾客核对当时买了什么。</p>
 <p>商品的当前名称与合约中的成交名称承担不同职责。查询旧订单时，不能用当前商品名称覆盖合约保存的成交名称。这类要求需要通过 APP 层的存储与映射配置落实，不能仅凭一般角色的扮演关系推导出来。</p>
 <p>例如，某银行的失败处置记录需要保存当时的存入或冲正合约，其中包括系统给出的原因、服务、失败阶段和恢复状态。若只保存关联后查询当前事实，后来的余额或合约变化可能使这份记录失去原含义。</p>
-<p>当前 APP 的 <code>snapshot</code> 可以将显式声明的关联参与者及集合保存为历史快照。查询这类快照时，不沿扮演或关联链继续补全当前事实，也不以当前量子余额覆盖快照中的历史余额；普通实时关联仍按原规则补全。两种用途由 APP 配置区分，详见<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/latest-refactoring-verification.md">某银行案例的快照验证</a>。</p>
+<p>当前 APP 的 <code>snapshot</code> 可以将显式声明的关联参与者及集合保存为历史快照。查询这类快照时，不沿扮演或关联链继续补全当前事实，也不以当前量子余额覆盖快照中的历史余额；普通实时关联仍按原规则补全。两种用途由 APP 配置区分，详见<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md">某银行案例的快照验证</a>。</p>
 <h2 id="_99">身份不等于全部事实</h2>
 <p>买家的钱包和姓名会变化，业务身份仍可能保持。APP 根据主键、业务凭证或组合关系定位参与者；完整事实比较则用于另一类问题，例如确认候选内容是否变化。</p>
 <p>编译器为实体建立业务不可见的内部主键，系统通过内部元数据维护相应存储身份，不需要业务开发者习惯性地添加 id 字段。订单号、会员凭证等真正供业务使用的编号，则按其实际用途进入业务模型。平台版本、防重键和仓储定位规则各自承担技术责任。</p>
@@ -897,7 +897,7 @@ body{max-width:1000px;margin:auto;padding:40px;font-family:Georgia,"Noto Serif C
 <h2 id="_101">零事实的生命周期</h2>
 <p>新角色建立零量子事实，与非零资金入账不同。例如，开户时建立余额为零的账户，只是在准备后续交易所需的存储；充值则需要执行守恒的量子交易。</p>
 <p>角色与量子事实存放在同一个库时，建立过程由本地共同事务完成。分库时，当前内置运行时先把角色记录和技术恢复待办一起提交到本地库，确认提交后，再建立远端零记录。本地事务回滚，两者一起撤销；远端不可用或响应丢失，待办保留，供后续重试。重试只建立缺失的零记录，不覆盖已有成交值，也不产生量子交易流水。</p>
-<p>这些步骤由内置服务承接，业务场景仍只调用角色插入服务，不需要自行拆分开户或编写业务补偿。远端零记录尚未建立时，开户还不能视为完整成功。当前机制支持内置 JDBC 普通仓储与 JDBC 量子库，详见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/quantum-opening-recovery.md">分库零记录技术恢复</a>。</p>
+<p>这些步骤由内置服务承接，业务场景仍只调用角色插入服务，不需要自行拆分开户或编写业务补偿。远端零记录尚未建立时，开户还不能视为完整成功。当前机制支持内置 JDBC 普通仓储与 JDBC 量子库，详见 <a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md">分库零记录技术恢复</a>。</p>
 <p>存储设计的目标是让每项事实都有明确所有者、定位方式和维护入口。完整约定见 <a href="https://github.com/lidonge/spp-examples/blob/main/book/references/transaction-storage-v1.md">事务与存储规范</a>。</p>
 <hr />
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/book/第四篇-一致性与执行保障/README.md">本篇目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/README.md">全书目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第三篇-用S++表达角色与服务/17-scenarios.md">上一章</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第四篇-一致性与执行保障/19-transactions.md">下一章</a></p>
@@ -1145,7 +1145,7 @@ transaction {
 </tbody>
 </table>
 <p>当前案例的分库仓储尚未完成已提交普通阶段的自动恢复。这不改变普通更新可以按版本条件自动冲正的原理，但说明相应后端协议需要真正实现并验证。记录待核对事实是失败处置，恢复资金与普通记录才是事务恢复。</p>
-<p>相应测试还通过修改已查询的原合约版本，验证冲正不能覆盖后来发生的变更。分库资金虽已恢复，先前普通阶段仍可能残留，系统同样保留待恢复结果，不能让调用方直接重试来掩盖它。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/latest-refactoring-verification.md">案例验证记录</a>给出了实际持久化结果。</p>
+<p>相应测试还通过修改已查询的原合约版本，验证冲正不能覆盖后来发生的变更。分库资金虽已恢复，先前普通阶段仍可能残留，系统同样保留待恢复结果，不能让调用方直接重试来掩盖它。<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md">案例验证记录</a>给出了实际持久化结果。</p>
 <h2 id="_120">全自动反交易保留后续结果</h2>
 <p>余额最初为 100，第一笔增加 50，第二笔又增加 20，当前为 170。撤销第一笔时减去原来的 50，结果为 120。若直接恢复旧快照 100，就会抹去第二笔业务。</p>
 <p>量子服务依据原成交记录全自动执行反交易，业务开发者无需另写反交易服务或对应的补偿交易。原成交分量、参与身份、防重和结果确认由系统维护；反交易遇到技术故障时，其确认与恢复策略在 APP 层定义。执行反向请求报错，也不能直接说明反向变化未成交。</p>
@@ -1547,7 +1547,7 @@ intercept scenarios {
 <p>报价规则读取 Buyer 的会员等级、Goods 的价格和 CartLine 的数量。它不需要知道产品最初从哪个数据库、供应商或外部系统取得。另一个参与者如果合法扮演 Goods，并提供报价所需事实，同一套计算和校验就有复用的基础。</p>
 <p>复用仍需要满足角色的业务含义：同样有 <code>price</code> 字段，不代表可以随意替代销售商品。角色多态复用的是一项已经明确的业务职责。当前 Petstore 展示了具体扮演链，新增扮演者的复用还需要相应模型、映射和验证，不能仅凭字段相同就认定已经完成。</p>
 <h2 id="_162">按业务与技术两条线阅读源码</h2>
-<p>先读 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/requirements-and-functions.md">业务需求</a>，再从 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp">付款场景</a> 沿服务名称找到校验和计算。对每一步都问：使用哪些事实，产生什么结果，后一步是否依赖它？</p>
+<p>先读 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/implementation-path.md">业务需求</a>，再从 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp">付款场景</a> 沿服务名称找到校验和计算。对每一步都问：使用哪些事实，产生什么结果，后一步是否依赖它？</p>
 <p>随后读 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/petshop.app">商店 APP</a> 和 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/petshop.phy">商店 PHY</a>，查看存储、请求防重、事务策略与资源接入。业务目录按会员、商品、购物车、订单、付款、交付、退货和预约组织，目录位置不改变业务域身份，也不决定服务必须运行在哪台机器。</p>
 <p>下一章先建立参与者与资源来源，再沿同一组金额和数量观察完整业务线。</p>
 <hr />
@@ -1695,7 +1695,7 @@ transaction {
 <p>如果业务处置本身保存失败，申请也不能假装已经持久化为拒绝。需要保留执行证据，继续确认与恢复。<code>ResultInfo</code> 表达本次执行情况，持久预约状态和拒绝原因表达业务办理结果，两者用途不同。</p>
 <h2 id="_177">用故障验证完成条件</h2>
 <p>至少检查库存不足、量子成交后普通保存失败和结果未知三种情况。前两类应分别核对库存、申请状态与拒绝原因；未知情况应核对技术恢复记录，确认没有因为重复请求再次预占。</p>
-<p>当前预约验证及其范围见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/reservation-failure-handling.md">失败处置说明</a>。Petstore 的 LOCAL 用例不能单独证明真实跨域资源的全部恢复能力，技术资源与测试证据还要在下一章一起核对。</p>
+<p>当前预约验证及其范围见 <a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md">失败处置说明</a>。Petstore 的 LOCAL 用例不能单独证明真实跨域资源的全部恢复能力，技术资源与测试证据还要在下一章一起核对。</p>
 <hr />
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/book/第六篇-完整实践Petstore/README.md">本篇目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/README.md">全书目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第六篇-完整实践Petstore/30-order-lifecycle.md">上一章</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第六篇-完整实践Petstore/32-validation-and-performance.md">下一章</a></p>
 <hr />
@@ -1751,7 +1751,7 @@ transaction {
 <h2 id="_183">从现有日志样例扩展技术服务</h2>
 <p>Petstore 已增加 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/technical-services.app">技术服务 APP</a> 和 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/src/main/spp/petshop/technical-services.phy">技术服务 PHY</a>。APP 用 <code>intercept services</code> 为商店域服务统一安排 <code>invocationTrace</code>，PHY 绑定通用 Java 日志实现，记录调用名称、阶段与耗时，业务 SPP 没有增加日志调用。</p>
 <p>业务人员仍检查付款金额、订单状态和预约拒绝原因，技术人员通过日志检查实际调用。预约预占失败经过 <code>fail</code> 处置后，场景正常返回会记录 <code>AFTER</code>；这表示调用正常结束，并不表示预约成功。日志也不打印客户和订单内容。</p>
-<p>沿第五篇第27章的接口，可以新增 Java 技术服务并通过 APP／PHY 接入指标、告警或技术访问控制。查询缓存和输出脱敏则使用相应数据适配。样例及验证范围见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/technical-services.md">Petstore 技术服务</a>。</p>
+<p>沿第五篇第27章的接口，可以新增 Java 技术服务并通过 APP／PHY 接入指标、告警或技术访问控制。查询缓存和输出脱敏则使用相应数据适配。样例及验证范围见 <a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md">Petstore 技术服务</a>。</p>
 <h2 id="_184">将安全与运行治理应用到办理入口</h2>
 <p>当前 testing PHY 已声明域间调用令牌配置，但单个令牌不等于完整的用户认证、资源授权和数据保护。生产改造还应围绕付款和订单入口安排以下能力：</p>
 <p>|能力|Petstore 中的应用位置|需要验证的结果|
@@ -1791,7 +1791,7 @@ transaction {
 <h2 id="_188">不同参与事实</h2>
 <p>账户、债务、产品政策、业务日期、授权事实、资金来源、处理计划和原交易共同进入业务。账户余额、计息金额、欠息、欠款本金与透支敞口需要分别解释，不能因技术上都表现为金额便混为同一个字段。</p>
 <p>前台现金受理与核心计算还可能有不同金额条件。前台要求正金额，并不意味着核心零金额偿还路径应被删除。服务契约需要保留调用层次的业务差别。</p>
-<p>当前案例按账户、资格、计算、手续费、积数、分录、存入与冲正划分能力目录。每个场景独立保存，场景直接组织查询、校验、计算与更新，避免用一个总场景隐藏全部步骤。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/source-map.md">源文件导航</a>提供各项能力的查阅入口。</p>
+<p>当前案例按账户、资格、计算、手续费、积数、分录、存入与冲正划分能力目录。每个场景独立保存，场景直接组织查询、校验、计算与更新，避免用一个总场景隐藏全部步骤。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/language-tour.md">源文件导航</a>提供各项能力的查阅入口。</p>
 <h2 id="_189">偿还分配与真实资金去向</h2>
 <p>普通债务与不良债务可以具有不同的本金、利息偿还顺序。业务计算先形成明确分量，再由场景组织账户变化和分录。资格检查与授权判断在场景中可见，查询与存储由 APP、PHY 接入。</p>
 <p>例如，现金存入 100 元，其中 10 元偿还利息，90 元增加客户余额。真实资金变化为：</p>
@@ -1811,7 +1811,7 @@ transaction {
 <p>事务内先执行量子成交，其后积数与办理信息的计算形成普通保存所需事实，再保存账户信息、存入合约和分录。这些计算有前后依赖，由串行流程保留；可并行的普通更新仍受其准备条件约束。场景声明完整业务边界，APP、PHY 决定怎样落实到实际资源。</p>
 <h2 id="_191">授权校验与授权续办</h2>
 <p>待授权是一种业务结果，不应统一当成技术异常。当前案例支持资格和授权评估；待授权申请的持久化、授权域归属及跨进程续办仍有需要明确的范围。</p>
-<p>完整续办应在授权事实到达后重新查询和校验可能变化的资格，再根据当前事实执行。已有授权判断不能代替完整续办流程。这项区别记录在案例的<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/known-issues-latest.md">已知问题</a>中。</p>
+<p>完整续办应在授权事实到达后重新查询和校验可能变化的资格，再根据当前事实执行。已有授权判断不能代替完整续办流程。这项区别记录在案例的<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md">已知问题</a>中。</p>
 <h2 id="_192">原交易驱动冲正</h2>
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/src/main/spp/cboddeposit/reversal/cboddeposit-scene-reverseCash.spp">现金冲正场景</a>查询原合约、实际分录与当前账户事实，校验原交易归属、收款账户、冲正资格及分录证据，再按原成交分量形成反向变化。当前政策或贷款状态变化，不应导致重新分配原交易金额。</p>
 <p>例如，先存入 100 元，后来又存入 5 元，撤销第一笔应保留后来的 5 元。冲正不能把整个账户恢复成第一笔之前的快照。同样，原交易的手续费及收款内部户已经记录在成交约定中，不能按当前费率或当前账户路由重新选择。</p>
@@ -1876,8 +1876,8 @@ transaction {
 <p>这些数字说明业务表达与原始实现的维护规模，但两边的覆盖范围不同：原始统计包含来源文件的全部内容，案例迁移的是其中选定的业务路径；当前 S++ 统计不含测试、网页、生成 Java 和公共框架。因此，不能把它表述为三万多行 COBOL 已由一千多行 S++ 完整等价替代，也不能只据行数推导开发效率倍数。</p>
 <p>S++ 将已选规则集中在业务模型、计算、校验和场景中，将重复的数据访问与执行设施交给工具。需要阅读和维护的业务表达因此更集中，工具和框架仍承担实际实现责任。逐项统计、来源清单与复现方法见附录 F 的 F9 节。</p>
 <h2 id="_195">从网页办理到验证证据</h2>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/web-workbench.md">中文存款工作台</a>可以完成开户、现金存入、冲正试算、正式冲正与账务查询。页面负责提交参与者、展示返回结果，不计算费用或偿还分量。通信中断时显示结果未确认，不自动重复发起更新，也不把输入中的余额与候选分录当作已成交事实。</p>
-<p>案例已有真实 JDBC 存储、规则向量、两环境失败路径、并发竞争、请求幂等、独立进程重启及浏览器流程的验证。各批次结果、配置和限制见<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/latest-refactoring-verification.md">最新验证记录</a>与附录 F。普通 Saga 恢复、完整授权续办及未知成交自动查证等未完成范围，仍按<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/completion-audit.md">完整性审计</a>分别说明。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md">中文存款工作台</a>可以完成开户、现金存入、冲正试算、正式冲正与账务查询。页面负责提交参与者、展示返回结果，不计算费用或偿还分量。通信中断时显示结果未确认，不自动重复发起更新，也不把输入中的余额与候选分录当作已成交事实。</p>
+<p>案例已有真实 JDBC 存储、规则向量、两环境失败路径、并发竞争、请求幂等、独立进程重启及浏览器流程的验证。各批次结果、配置和限制见<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md">最新验证记录</a>与附录 F。普通 Saga 恢复、完整授权续办及未知成交自动查证等未完成范围，仍按<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md">完整性审计</a>分别说明。</p>
 <p>复杂业务的关键，是把规则、参与事实、处理计划、成交与恢复分别表达，并用场景连接起来。已有验证支持明确的业务路径；原 COBOL 实测和银行确认结果仍属于不同证据层级，不能只用测试数量替代业务等价判断。</p>
 <hr />
 <p><a href="https://github.com/lidonge/spp-examples/blob/main/book/第七篇-进阶案例与架构方法/README.md">本篇目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/README.md">全书目录</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第六篇-完整实践Petstore/32-validation-and-performance.md">上一章</a> · <a href="https://github.com/lidonge/spp-examples/blob/main/book/第七篇-进阶案例与架构方法/34-migration.md">下一章</a></p>
@@ -2903,15 +2903,15 @@ export SPP_TESTING_LEDGER_JDBC_URL='jdbc:h2:file:/tmp/spp-book-testing-ledger'
 </table>
 <p>Petstore 代码统计保留 F7 所列的独立基线；本次银行案例与新增能力核对以主线 <code>0fafa21d</code> 为基线。规范说明目标与约束，源码说明表达与实现，运行记录提供特定路径的证据。单项资料不能独自代替全部层次。</p>
 <h2 id="f3-petstore">F3 Petstore 功能验证</h2>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/book/references/app-technical-services.md">2026 年 10 月 13 日 APP 技术服务验证</a>记录完整生成与回归 1,123 项通过：语言 362、运行框架 617、生成器 105、Petstore 39，失败、错误、跳过均为零。覆盖匹配和编译检查、调用阶段、技术访问拒绝、观察失败隔离、并发和幂等重放；远程代理使用可控传输验证，未进行真实跨 JVM 验收。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/technical-services.md">Petstore 样例</a>展示商店全服务日志拦截。该能力来自主线 <code>65c766fc</code>；本书此次引用已有测试记录。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/book/references/spp-transaction-failure-handling.md">2026 年 10 月 13 日失败处理验证</a>记录 develop 完整生成链路回归 1,104 项通过：语言 356、运行框架 607、生成器 105、Petstore 36，失败、错误和跳过均为零。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/reservation-failure-handling.md">预约专项说明</a>说明真实 fail 样例的库存不足、普通保存失败与幂等重放结果。框架专项另验证真实 JDBC 量子成交后的自动反交易先于 fail 执行；本轮 Petstore 使用 LOCAL，不代表已经验收真实分布式 TCC 或外部量子服务。本书此次引用已有记录，没有重新运行测试。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/regression-2026-10-12-conserved-transfers.md">2026 年 10 月 12 日最终回归记录</a>报告：develop 联合回归共 1080 项，分别为 lang 340、appframe 581、generator 105、appframe-seata 20、Petstore 34，失败、错误和跳过均为零。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/main/book/references/app-technical-services.md">2026 年 10 月 13 日 APP 技术服务验证</a>记录完整生成与回归 1,123 项通过：语言 362、运行框架 617、生成器 105、Petstore 39，失败、错误、跳过均为零。覆盖匹配和编译检查、调用阶段、技术访问拒绝、观察失败隔离、并发和幂等重放；远程代理使用可控传输验证，未进行真实跨 JVM 验收。<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md">Petstore 样例</a>展示商店全服务日志拦截。该能力来自主线 <code>65c766fc</code>；本书此次引用已有测试记录。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/main/book/references/spp-transaction-failure-handling.md">2026 年 10 月 13 日失败处理验证</a>记录 develop 完整生成链路回归 1,104 项通过：语言 356、运行框架 607、生成器 105、Petstore 36，失败、错误和跳过均为零。<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md">预约专项说明</a>说明真实 fail 样例的库存不足、普通保存失败与幂等重放结果。框架专项另验证真实 JDBC 量子成交后的自动反交易先于 fail 执行；本轮 Petstore 使用 LOCAL，不代表已经验收真实分布式 TCC 或外部量子服务。本书此次引用已有记录，没有重新运行测试。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/regression-2026-10-12-conserved-transfers.md">2026 年 10 月 12 日最终回归记录</a>报告：develop 联合回归共 1080 项，分别为 lang 340、appframe 581、generator 105、appframe-seata 20、Petstore 34，失败、错误和跳过均为零。</p>
 <p>同一记录报告 develop 完整 Chrome 流程，以及 testing 三 JVM、四个隔离文件数据库的完整网页与商店重启验证。停机后核对资金来源与去向合计、按商品核对库存与供应来源、按交易核对流水增减合计。</p>
 <p>这些是仓库已有验证记录，编写书稿时没有重新运行对应业务测试。记录中的临时日志路径用于追踪当次证据，独立环境需按记录重新执行才能取得新的运行结果。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/known-issues.md">已知问题</a>记录初始化重试的实现边界，以及分库零记录技术恢复的已实现范围；具体机制与验证见 <a href="https://github.com/lidonge/spp-examples/blob/main/demos/petstore/docs/quantum-opening-recovery.md">分库零记录技术恢复</a>。功能回归没有提供附录 C 所定义的串并行性能基准。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/known-issues.md">已知问题</a>记录初始化重试的实现边界，以及分库零记录技术恢复的已实现范围；具体机制与验证见 <a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md">分库零记录技术恢复</a>。功能回归没有提供附录 C 所定义的串并行性能基准。</p>
 <h2 id="f4">F4 某银行存款案例验证</h2>
 <p>当前某银行存款案例已完成对齐新语法与运行协议的重构。生产源位于<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/src/main/spp/cboddeposit">案例目录</a>，只使用 SPP、APP、PHY，没有手写生产 Java。SPP 不使用 <code>try/catch/throw</code>；生成的 Java 与运行时内部仍可用异常处理承接技术故障。历史源仅保留作规则对照，不能作为当前可执行示例。</p>
-<p>本节以主线 <code>0fafa21d</code> 为当前案例检查基线，引用仓库中已有记录，本次书稿修改没有重新运行银行业务测试。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/latest-refactoring-verification.md">最新验证记录</a>按批次保存命令、结果及适用范围：</p>
+<p>本节以主线 <code>0fafa21d</code> 为当前案例检查基线，引用仓库中已有记录，本次书稿修改没有重新运行银行业务测试。<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md">最新验证记录</a>按批次保存命令、结果及适用范围：</p>
 <table>
 <thead>
 <tr>
@@ -2939,14 +2939,14 @@ export SPP_TESTING_LEDGER_JDBC_URL='jdbc:h2:file:/tmp/spp-book-testing-ledger'
 <tr>
 <td>中文工作台专项</td>
 <td>两环境后端专项及浏览器流程通过</td>
-<td>精确小数显示、负数拒绝、试算、冲正、回执查询与移动布局；具体范围见<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/web-workbench.md">工作台验收</a></td>
+<td>精确小数显示、负数拒绝、试算、冲正、回执查询与移动布局；具体范围见<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md">工作台验收</a></td>
 </tr>
 </tbody>
 </table>
 <p>testing 的分库证据不能直接扩大为真实网络分布式部署、XA、Seata AT 或 TCC 的完整验收。独立 JVM 重启与成交确认后强制退出，覆盖各自规定的持久化路径，不能代替提交中断或未知成交的自动查证。后续专项也不能直接累计成一次未执行过的全量联合回归。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/completion-audit.md">完整性审计</a>说明已落实的场景、存储、事务与技术能力。<a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/legacy-entry-migration.md">86 个历史入口核对台账</a>逐项列出证据、差异及未迁移部分；86 个历史入口与上述 86 项 JUnit 测试是不同统计，不能因数字相同而认为已经逐项等价。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/known-issues-latest.md">已知问题</a>仍保留普通 Saga 已提交阶段恢复、待授权持久化与跨进程续办、未知成交自动确认、全调用持久化审计等边界。当前分库失败可以自动恢复量子资金，并可能留下普通已提交事实；系统明确报告 <code>RECOVERY_REQUIRED</code>、<code>handled=false</code>，不声称全回滚。</p>
-<p><a href="https://github.com/lidonge/spp-examples/blob/main/demos/bank-deposit/docs/source-map.md">来源映射</a>提供当前能力目录和源程序规则定位。源码推导、业务数学预期、演示输入、生成执行对照、原 COBOL 实测与银行确认结果代表不同证据。案例成功不能扩大为全部银行政策或原系统输出等价。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md">完整性审计</a>说明已落实的场景、存储、事务与技术能力。<a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/legacy-entry-migration.md">86 个历史入口核对台账</a>逐项列出证据、差异及未迁移部分；86 个历史入口与上述 86 项 JUnit 测试是不同统计，不能因数字相同而认为已经逐项等价。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md">已知问题</a>仍保留普通 Saga 已提交阶段恢复、待授权持久化与跨进程续办、未知成交自动确认、全调用持久化审计等边界。当前分库失败可以自动恢复量子资金，并可能留下普通已提交事实；系统明确报告 <code>RECOVERY_REQUIRED</code>、<code>handled=false</code>，不声称全回滚。</p>
+<p><a href="https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/source-map.md">来源映射</a>提供当前能力目录和源程序规则定位。源码推导、业务数学预期、演示输入、生成执行对照、原 COBOL 实测与银行确认结果代表不同证据。案例成功不能扩大为全部银行政策或原系统输出等价。</p>
 <h2 id="f5-qservice">F5 QService 资料</h2>
 <p>相邻 qservice 仓库的 SPP 边界契约 (maintainer reference: <code>../../../qservice/docs/spp-qservice-boundary-contract.md</code>)与量子服务设计 (maintainer reference: <code>../../../qservice/docs/qservice-early-design.md</code>)描述逻辑命令、持久身份、状态查询和恢复。</p>
 <p>该项目的集成产物和测试路径有自己的基线。使用其中一种后端时，需要核对真正接入的协议与执行能力，不能把独立项目的全部验证结论直接扩展到任意部署。</p>

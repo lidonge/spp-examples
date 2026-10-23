@@ -51,7 +51,7 @@ Buyer 由 Person 扮演，Goods 由 Product 扮演。CartLine 由买家和商品
 
 ## 按业务与技术两条线阅读源码
 
-先读 [业务需求](../../demos/petstore/docs/requirements-and-functions.md)，再从 [付款场景](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) 沿服务名称找到校验和计算。对每一步都问：使用哪些事实，产生什么结果，后一步是否依赖它？
+先读 [业务需求](../../demos/petstore/docs/implementation-path.md)，再从 [付款场景](../../demos/petstore/src/main/spp/petshop/payment/petshop-scene-payShopOrder.spp) 沿服务名称找到校验和计算。对每一步都问：使用哪些事实，产生什么结果，后一步是否依赖它？
 
 随后读 [商店 APP](../../demos/petstore/src/main/spp/petshop/petshop.app) 和 [商店 PHY](../../demos/petstore/src/main/spp/petshop/petshop.phy)，查看存储、请求防重、事务策略与资源接入。业务目录按会员、商品、购物车、订单、付款、交付、退货和预约组织，目录位置不改变业务域身份，也不决定服务必须运行在哪台机器。
 

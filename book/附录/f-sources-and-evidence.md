@@ -31,38 +31,38 @@ Petstore 代码统计保留 F7 所列的独立基线；本次银行案例与新�
 
 ## F3 Petstore 功能验证
 
-[2026 年 10 月 13 日 APP 技术服务验证](../references/app-technical-services.md)记录完整生成与回归 1,123 项通过：语言 362、运行框架 617、生成器 105、Petstore 39，失败、错误、跳过均为零。覆盖匹配和编译检查、调用阶段、技术访问拒绝、观察失败隔离、并发和幂等重放；远程代理使用可控传输验证，未进行真实跨 JVM 验收。[Petstore 样例](../../demos/petstore/docs/technical-services.md)展示商店全服务日志拦截。该能力来自主线 `65c766fc`；本书此次引用已有测试记录。
+[2026 年 10 月 13 日 APP 技术服务验证](../references/app-technical-services.md)记录完整生成与回归 1,123 项通过：语言 362、运行框架 617、生成器 105、Petstore 39，失败、错误、跳过均为零。覆盖匹配和编译检查、调用阶段、技术访问拒绝、观察失败隔离、并发和幂等重放；远程代理使用可控传输验证，未进行真实跨 JVM 验收。[Petstore 样例](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/technical-services.md)展示商店全服务日志拦截。该能力来自主线 `65c766fc`；本书此次引用已有测试记录。
 
-[2026 年 10 月 13 日失败处理验证](../references/spp-transaction-failure-handling.md)记录 develop 完整生成链路回归 1,104 项通过：语言 356、运行框架 607、生成器 105、Petstore 36，失败、错误和跳过均为零。[预约专项说明](../../demos/petstore/docs/reservation-failure-handling.md)说明真实 fail 样例的库存不足、普通保存失败与幂等重放结果。框架专项另验证真实 JDBC 量子成交后的自动反交易先于 fail 执行；本轮 Petstore 使用 LOCAL，不代表已经验收真实分布式 TCC 或外部量子服务。本书此次引用已有记录，没有重新运行测试。
+[2026 年 10 月 13 日失败处理验证](../references/spp-transaction-failure-handling.md)记录 develop 完整生成链路回归 1,104 项通过：语言 356、运行框架 607、生成器 105、Petstore 36，失败、错误和跳过均为零。[预约专项说明](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md)说明真实 fail 样例的库存不足、普通保存失败与幂等重放结果。框架专项另验证真实 JDBC 量子成交后的自动反交易先于 fail 执行；本轮 Petstore 使用 LOCAL，不代表已经验收真实分布式 TCC 或外部量子服务。本书此次引用已有记录，没有重新运行测试。
 
-[2026 年 10 月 12 日最终回归记录](../../demos/petstore/docs/regression-2026-10-12-conserved-transfers.md)报告：develop 联合回归共 1080 项，分别为 lang 340、appframe 581、generator 105、appframe-seata 20、Petstore 34，失败、错误和跳过均为零。
+[2026 年 10 月 12 日最终回归记录](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/regression-2026-10-12-conserved-transfers.md)报告：develop 联合回归共 1080 项，分别为 lang 340、appframe 581、generator 105、appframe-seata 20、Petstore 34，失败、错误和跳过均为零。
 
 同一记录报告 develop 完整 Chrome 流程，以及 testing 三 JVM、四个隔离文件数据库的完整网页与商店重启验证。停机后核对资金来源与去向合计、按商品核对库存与供应来源、按交易核对流水增减合计。
 
 这些是仓库已有验证记录，编写书稿时没有重新运行对应业务测试。记录中的临时日志路径用于追踪当次证据，独立环境需按记录重新执行才能取得新的运行结果。
 
-[已知问题](../../demos/petstore/docs/known-issues.md)记录初始化重试的实现边界，以及分库零记录技术恢复的已实现范围；具体机制与验证见 [分库零记录技术恢复](../../demos/petstore/docs/quantum-opening-recovery.md)。功能回归没有提供附录 C 所定义的串并行性能基准。
+[已知问题](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/known-issues.md)记录初始化重试的实现边界，以及分库零记录技术恢复的已实现范围；具体机制与验证见 [分库零记录技术恢复](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/quantum-opening-recovery.md)。功能回归没有提供附录 C 所定义的串并行性能基准。
 
 ## F4 某银行存款案例验证
 
 当前某银行存款案例已完成对齐新语法与运行协议的重构。生产源位于[案例目录](../../demos/bank-deposit/src/main/spp/cboddeposit)，只使用 SPP、APP、PHY，没有手写生产 Java。SPP 不使用 `try/catch/throw`；生成的 Java 与运行时内部仍可用异常处理承接技术故障。历史源仅保留作规则对照，不能作为当前可执行示例。
 
-本节以主线 `0fafa21d` 为当前案例检查基线，引用仓库中已有记录，本次书稿修改没有重新运行银行业务测试。[最新验证记录](../../demos/bank-deposit/docs/latest-refactoring-verification.md)按批次保存命令、结果及适用范围：
+本节以主线 `0fafa21d` 为当前案例检查基线，引用仓库中已有记录，本次书稿修改没有重新运行银行业务测试。[最新验证记录](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/latest-refactoring-verification.md)按批次保存命令、结果及适用范围：
 
 |验证批次|结果|涵盖范围|
 |---|---|---|
 |2026 年 10 月 13 日 clean develop 联合回归|1,226 项，零失败、零错误、零跳过|语言 366、运行框架 628、生成器 107、某银行案例 86、Petstore 39；包含内部收款户、历史快照及已加入的故障与并发测试|
 |随后 testing 银行全量回归|86 项，零失败、零错误、2 项跳过|本 JVM 内独立量子与普通 H2 数据源；跳过两个 LOCAL 专属提交故障测试|
 |独立现金冲正试算专项|develop、testing 各 2 项通过|试算不写入，正式冲正保留后来存入；缺原成交拒绝无副作用|
-|中文工作台专项|两环境后端专项及浏览器流程通过|精确小数显示、负数拒绝、试算、冲正、回执查询与移动布局；具体范围见[工作台验收](../../demos/bank-deposit/docs/web-workbench.md)|
+|中文工作台专项|两环境后端专项及浏览器流程通过|精确小数显示、负数拒绝、试算、冲正、回执查询与移动布局；具体范围见[工作台验收](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/web-workbench.md)|
 
 testing 的分库证据不能直接扩大为真实网络分布式部署、XA、Seata AT 或 TCC 的完整验收。独立 JVM 重启与成交确认后强制退出，覆盖各自规定的持久化路径，不能代替提交中断或未知成交的自动查证。后续专项也不能直接累计成一次未执行过的全量联合回归。
 
-[完整性审计](../../demos/bank-deposit/docs/completion-audit.md)说明已落实的场景、存储、事务与技术能力。[86 个历史入口核对台账](../../demos/bank-deposit/docs/legacy-entry-migration.md)逐项列出证据、差异及未迁移部分；86 个历史入口与上述 86 项 JUnit 测试是不同统计，不能因数字相同而认为已经逐项等价。
+[完整性审计](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/completion-audit.md)说明已落实的场景、存储、事务与技术能力。[86 个历史入口核对台账](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/legacy-entry-migration.md)逐项列出证据、差异及未迁移部分；86 个历史入口与上述 86 项 JUnit 测试是不同统计，不能因数字相同而认为已经逐项等价。
 
-[已知问题](../../demos/bank-deposit/docs/known-issues-latest.md)仍保留普通 Saga 已提交阶段恢复、待授权持久化与跨进程续办、未知成交自动确认、全调用持久化审计等边界。当前分库失败可以自动恢复量子资金，并可能留下普通已提交事实；系统明确报告 `RECOVERY_REQUIRED`、`handled=false`，不声称全回滚。
+[已知问题](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/known-issues-latest.md)仍保留普通 Saga 已提交阶段恢复、待授权持久化与跨进程续办、未知成交自动确认、全调用持久化审计等边界。当前分库失败可以自动恢复量子资金，并可能留下普通已提交事实；系统明确报告 `RECOVERY_REQUIRED`、`handled=false`，不声称全回滚。
 
-[来源映射](../../demos/bank-deposit/docs/source-map.md)提供当前能力目录和源程序规则定位。源码推导、业务数学预期、演示输入、生成执行对照、原 COBOL 实测与银行确认结果代表不同证据。案例成功不能扩大为全部银行政策或原系统输出等价。
+[来源映射](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/bank-deposit/docs/source-map.md)提供当前能力目录和源程序规则定位。源码推导、业务数学预期、演示输入、生成执行对照、原 COBOL 实测与银行确认结果代表不同证据。案例成功不能扩大为全部银行政策或原系统输出等价。
 
 ## F5 QService 资料
 

@@ -50,7 +50,7 @@ Entity Receipt {
 
 所以，`business` 的重点是消除习惯性 ID 带来的歧义。模型评审仍需核对说明是否符合真实需求：谁使用这个编号，在哪项业务中使用，如何凭它办理或核对结果。“内部唯一标识”只说明技术用途，不能据此把技术字段解释成业务凭证。
 
-模型已按会员、商品、购物车、订单等业务功能拆分，完整阅读入口见 [Petstore 源码导读](../../demos/petstore/docs/source-guide.md)。
+模型已按会员、商品、购物车、订单等业务功能拆分，完整阅读入口见 [Petstore 源码导读](../../demos/petstore/docs/language-tour.md)。
 
 ---
 

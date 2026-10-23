@@ -35,7 +35,7 @@
 
 量子越界没有成功成交，不需要再补一笔反交易。LOCAL 内未提交的量子与普通变化共同回滚。非 LOCAL 已提交量子阶段由运行时根据成交记录自动反交易，完成后再执行 fail。业务拒绝、保留已受理申请、待处理记录等由 SPP 明确编写，框架不自动发明业务处置。
 
-预约示例和验收路径见 [Petstore 预约失败处置](../../demos/petstore/docs/reservation-failure-handling.md)。更一般的业务补偿政策、远程恢复协议与嵌套 fail 后续扩展仍需独立讨论，不据此自动推导业务反交易。
+预约示例和验收路径见 [Petstore 预约失败处置](https://github.com/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/petstore/docs/reservation-failure-handling.md)。更一般的业务补偿政策、远程恢复协议与嵌套 fail 后续扩展仍需独立讨论，不据此自动推导业务反交易。
 
 
 ## 实施路径及与传统方案比较

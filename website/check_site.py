@@ -7,6 +7,30 @@ import json
 import re
 
 
+ARCHIVED_DEMO_DOCUMENTS = {
+    'petstore/docs/technical-services.md',
+    'petstore/docs/reservation-failure-handling.md',
+    'petstore/docs/regression-2026-10-12-conserved-transfers.md',
+    'petstore/docs/quantum-opening-recovery.md',
+    'petstore/docs/known-issues.md',
+    'bank-deposit/docs/latest-refactoring-verification.md',
+    'bank-deposit/docs/web-workbench.md',
+    'bank-deposit/docs/completion-audit.md',
+    'bank-deposit/docs/legacy-entry-migration.md',
+    'bank-deposit/docs/known-issues-latest.md',
+    'bank-deposit/docs/source-map.md',
+    'petstore/docs/transaction-boundary-audit.md',
+}
+ALLOWED_GITHUB_PATHS = {
+    '/lidonge/spp-basic',
+    '/lidonge/spp-basic/tree/main/examples',
+    '/lidonge/spp-examples',
+} | {
+    '/lidonge/spp-examples/blob/93d4b68831f1812794e173fd943a77e3be21517a/demos/' + document
+    for document in ARCHIVED_DEMO_DOCUMENTS
+}
+
+
 class Links(HTMLParser):
     def __init__(self, text):
         super().__init__()
@@ -65,8 +89,7 @@ for page, parsed in pages.items():
     for href in parsed.targets:
         link = urlsplit(href)
         if link.hostname and link.hostname.lower() in {'github.com', 'www.github.com', 'raw.githubusercontent.com'}:
-            allowed_repositories = {'/lidonge/spp-basic', '/lidonge/spp-basic/tree/main/examples', '/lidonge/spp-examples'}
-            if link.hostname.lower() != 'github.com' or link.path.rstrip('/') not in allowed_repositories:
+            if link.hostname.lower() != 'github.com' or link.path.rstrip('/') not in ALLOWED_GITHUB_PATHS:
                 errors.append(f'{page.relative_to(root)}: unapproved GitHub repository link: {href}')
         if link.scheme or link.netloc:
             continue
