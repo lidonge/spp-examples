@@ -25,10 +25,18 @@ def build_manuals(base, output, header, links_extension):
     # Fail closed if the imported documentation differs from the reviewed revision.
     for entry, path in zip(provenance['files'], paths):
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry['sha256'], path
+    commercial_root = base / 'manuals/commercial'
+    commercial_provenance = json.loads((commercial_root / 'upstream.json').read_text())
+    commercial_path = commercial_root / 'communication-services.md'
+    assert commercial_provenance['files'] == [{
+        'path': commercial_path.name,
+        'sha256': hashlib.sha256(commercial_path.read_bytes()).hexdigest(),
+    }], 'Unreviewed commercial documentation change'
     pages = {}
     for path in paths:
         relative = path.relative_to(root).as_posix()
         pages[path.resolve()] = DOCUMENTS.get(relative, f'/tutorial/files/{relative}/')
+    pages[commercial_path.resolve()] = '/sdk/communication-services/'
     for sample, slug in [('tutorial', 'first-scenario'), ('custom-services', 'custom-services')]:
         sample_root = root / 'sdk-tools/samples' / sample
         for directory in (sample_root, sample_root / 'src/main/spp'):
@@ -39,13 +47,15 @@ def build_manuals(base, output, header, links_extension):
             ('/tutorial/', 'S++ tutorial'),
             ('/sdk/user-guide/', 'SDK user guide'),
             ('/sdk/technical-services/', 'Technical services'),
+            ('/sdk/communication-services/', 'Paid communication and identity services'),
             ('/sdk/validation/', 'Upstream validation and limits'),
             ('/tutorial/samples/first-scenario/', 'First scenario inputs'),
             ('/tutorial/samples/custom-services/', 'Persistence and custom services'),
         ])
     sidebar += '<a class="book-index" href="/tutorial/downloads/sdk-tutorial-samples.zip">Download sample sources</a>'
-    for path in paths:
-        relative = path.relative_to(root).as_posix()
+    for path in paths + [commercial_path]:
+        is_commercial = path == commercial_path
+        relative = path.name if is_commercial else path.relative_to(root).as_posix()
         title = path.name
         if path.suffix == '.md':
             md = markdown.Markdown(extensions=['tables', 'fenced_code', 'toc', links_extension()])
@@ -66,7 +76,11 @@ def build_manuals(base, output, header, links_extension):
             body += '<p><a href="/tutorial/downloads/sdk-tutorial-samples.zip">Download the tutorial and custom-service sample sources</a>. Use them with the matching basic SDK source tree.</p>'
         url = pages[path.resolve()]
         navigation = sidebar.replace(f'href="{url}"', f'href="{url}" aria-current="page"')
-        document = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)} | S++ SDK</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/book.css"><script src="/site.js" defer></script></head><body class="book-page">{header('guide')}<div class="book-layout"><aside class="book-sidebar"><details class="book-toc" open><summary>Tutorial and SDK manuals</summary><nav aria-label="SDK documentation">{navigation}</nav></details></aside><main id="main-content"><div class="book-meta"><span>SDK DOCUMENTATION · 1.0-SNAPSHOT</span><a href="/tutorial/">Start the tutorial</a></div><article class="book-article">{body}</article><footer class="book-footer"><a href="/guide/">Language guide</a><a href="/tutorial/files/LICENSE/">SDK documentation and samples: Apache-2.0</a><a href="/tutorial/files/NOTICE/">Notices</a></footer></main></div></body></html>'''
+        footer = ('<a href="/guide/">Developer guide</a><a href="/sdk/technical-services/">Technical service contracts</a>'
+                  '<span>Documentation: MIT. appframe-channels implementation: commercial terms.</span>'
+                  if is_commercial else
+                  '<a href="/guide/">Language guide</a><a href="/tutorial/files/LICENSE/">SDK documentation and samples: Apache-2.0</a><a href="/tutorial/files/NOTICE/">Notices</a>')
+        document = f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)} | S++ SDK</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/book.css"><script src="/site.js" defer></script></head><body class="book-page">{header('guide')}<div class="book-layout"><aside class="book-sidebar"><details class="book-toc" open><summary>Tutorial and SDK manuals</summary><nav aria-label="SDK documentation">{navigation}</nav></details></aside><main id="main-content"><div class="book-meta"><span>SDK DOCUMENTATION · 1.0-SNAPSHOT</span><a href="/tutorial/">Start the tutorial</a></div><article class="book-article">{body}</article><footer class="book-footer">{footer}</footer></main></div></body></html>'''
         target = output / url.lstrip('/') / 'index.html'
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(document)
@@ -78,4 +92,4 @@ def build_manuals(base, output, header, links_extension):
         for path in paths:
             if path.is_relative_to(root / 'sdk-tools/samples') or path.name in {'LICENSE', 'NOTICE'}:
                 archive.write(path, path.relative_to(root))
-    print(f'Built {len(paths)} pinned SDK documentation and sample pages')
+    print(f'Built {len(paths)} pinned SDK documentation and sample pages plus the paid communication services manual')

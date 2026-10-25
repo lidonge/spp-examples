@@ -25,6 +25,14 @@ private compiler history and commercial repositories remain unpublished.
 
 ## Inputs and generated output
 
+The developer guide links to `/sdk/communication-services/`, the public integration
+manual for the separately distributed paid `appframe-channels` module. Its reviewed
+Markdown and digest are in `manuals/commercial/`, separate from the Apache-2.0
+Basic SDK import. Only user documentation is published; commercial implementation
+and credentials are excluded. The page identifies the documentation's MIT license
+and the implementation's commercial terms. Update the digest whenever the reviewed
+manual changes. Commercial documents are excluded from the Basic sample download.
+
 - `static/`: maintained HTML, CSS, JavaScript and icons for the public website.
 - `../book/en/`: the maintained English manuscript and translation order.
 - `articles/` and `articles.json`: original introductory articles and their titles, summaries, dates and URL slugs.

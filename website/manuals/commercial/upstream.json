@@ -1,0 +1,12 @@
+{
+  "requirement": "CHANNELS-ONLINE-GUIDE-v1",
+  "scope": "Reviewed public user documentation only. Commercial implementation, credentials and private Git history are excluded.",
+  "documentationLicense": "MIT",
+  "implementationLicense": "Commercial terms; not Apache-2.0",
+  "files": [
+    {
+      "path": "communication-services.md",
+      "sha256": "e7db2d2206268cb348c20640b3cdd3f7e958c3b07c551a818d2b9c4c9c8392a9"
+    }
+  ]
+}
